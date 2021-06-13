@@ -29,3 +29,20 @@ Simplified `load_elf_binary` function:
 				load_bias, interp_elf_phdata,
 				&arch_state);
 	}
+
+## ELF strucutre
+
+This is all for 64 bit.
+
+1. Elf Header 64bytes
+2. Program Headers 56bytes * number of headers
+3. Padding to Pagesize 0x1000 (4096)
+4. .text (program code)
+5. Padding to Pagesize
+6. .rodata (read only data)
+
+In the programs address space there folloing parts are usually mapped
+1+2 -> 0x400000
+4 -> 0x401000
+6 -> 0x402000
+Mappings of a running program can be checked at /proc/<pid>/maps

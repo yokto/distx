@@ -1,16 +1,19 @@
-typedef long ssize_t; // bytecount or error
-typedef long size_t; // bytecount
+#include "types.h"
 
-const char* const hello_world = "hello world";
+#define O_RDONLY        0
+#define O_WRONLY        1
+#define O_RDWR          2
+
+typedef unsigned int mode_t;
 
 ssize_t read(int fd, void* buf, size_t count) {
 	ssize_t ret;
 	/* ssize_t read(int fd, const void *buf, size_t count) */
 	asm(
-			"movq	$0, %%rax;" // systemcall 0 read
 			"movl	%1, %%edi;" // rdi;" // fd
 			"movq	%2, %%rsi;" // buffer
 			"movq	%3, %%rdx;" // count
+			"movq	$0, %%rax;" // systemcall 0 read
 			"syscall;"
 			"movq	%%rax, %0;" // ret 
 			: "=r" (ret)
@@ -23,10 +26,10 @@ ssize_t write(int fd, void* buf, size_t count) {
 	ssize_t ret;
 	/* ssize_t read(int fd, const void *buf, size_t count) */
 	asm(
-			"movq	$1, %%rax;" // systemcall 0 read
-			"movl	%1, %%edi;" // rdi;" // fd
+			"movl	%1, %%edi;" // rdi fd
 			"movq	%2, %%rsi;" // buffer
 			"movq	%3, %%rdx;" // count
+			"movq	$1, %%rax;" // systemcall 1 read
 			"syscall;"
 			"movq	%%rax, %0;" // ret 
 			: "=r" (ret)
@@ -44,13 +47,18 @@ void exit2(int status) {
 	   );
 }
 
-void _start() {
-
-	const int written = write(1, (void*)hello_world, 11);
-
-	char c;
-      	read(0, &c, 1);
-
-	exit2(written);
+int open(const char *pathname, int flags, mode_t mode) {
+	ssize_t ret;
+	/* ssize_t read(int fd, const void *buf, size_t count) */
+	asm(
+			"movq	%1, %%rdi;" // pathname
+			"movl	%2, %%esi;" // flags
+			"movl	%3, %%edx;" // mode
+			"movq	$2, %%rax;" // systemcall 2 read
+			"syscall;"
+			"movq	%%rax, %0;" // ret 
+			: "=r" (ret)
+			: "r" (pathname), "r" (flags), "r" (mode)
+	   );
+	return ret;
 }
-
