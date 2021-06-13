@@ -8,6 +8,14 @@
 #include "../lib/systemcalls.c"
 #include "../lib/elf.h"
 
+typedef struct loaded_lib {
+	int64_t addr;
+	int foo;
+} loaded_lib;
+
+static const int loaded_lib_max = 100;
+static int loaded_lib_next = 0; 
+static const loaded_lib loaded_libs[100];
 
 
 //// Allocates RWX memory of given size and returns a pointer to it. On failure,
@@ -47,11 +55,18 @@ void _start() {
 //		exit2(-1);
 //	}
 	
-	ElfN_Ehdr elf_hdr;
-	const int fd = open("foo", O_RDONLY, 0);
-	read(fd, &elf_hdr, sizeof elf_hdr);
+	ElfN_Ehdr* elf_hdr = (ElfN_Ehdr *)0x400000;
+
+	for (Elf64_Phdr* phdr = (elf_hdr)->e_phoff;
+			e_phoff < e_phoff + e_phnum * sizeof(Elf64_Phdr);
+			phdr += 1) {
+
+	}
 	
-	Elf64_Shdr elf_shdr;
-	exit2(sizeof elf_shdr);
+	asm(
+			"jmpq	%0;" // pathname
+			:
+			: "r" (elf_hdr->e_entry)
+	   );
 	//run_from_rwx();
 }

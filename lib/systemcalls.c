@@ -29,7 +29,7 @@ ssize_t write(int fd, void* buf, size_t count) {
 			"movl	%1, %%edi;" // rdi fd
 			"movq	%2, %%rsi;" // buffer
 			"movq	%3, %%rdx;" // count
-			"movq	$1, %%rax;" // systemcall 1 read
+			"movq	$1, %%rax;" // systemcall 1 write
 			"syscall;"
 			"movq	%%rax, %0;" // ret 
 			: "=r" (ret)
@@ -54,11 +54,30 @@ int open(const char *pathname, int flags, mode_t mode) {
 			"movq	%1, %%rdi;" // pathname
 			"movl	%2, %%esi;" // flags
 			"movl	%3, %%edx;" // mode
-			"movq	$2, %%rax;" // systemcall 2 read
+			"movq	$2, %%rax;" // systemcall 2 open
 			"syscall;"
 			"movq	%%rax, %0;" // ret 
 			: "=r" (ret)
 			: "r" (pathname), "r" (flags), "r" (mode)
+	   );
+	return ret;
+}
+
+// RDI, RSI, RDX, RCX, R8, R9
+void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
+	ssize_t ret;
+	/* ssize_t read(int fd, const void *buf, size_t count) */
+	asm(
+			"movq	%0, %%rdi;" // addr
+			"movq	%1, %%rsi;" // length
+			"movl	%2, %%edx;" // prot
+			"movl	%3, %%ecx;" // flags
+			"movl	%4, %%e8;" // fd
+			"movq	%5, %%r9;" // offset
+			"movq	$9, %%rax;" // systemcall 9 mmap
+			"syscall;"
+			:
+			: "r" (addr), "r" (length), "r" (prot), "r" (flags), "r" (fd), "f" (offset)
 	   );
 	return ret;
 }
