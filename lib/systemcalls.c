@@ -65,19 +65,68 @@ int open(const char *pathname, int flags, mode_t mode) {
 
 // RDI, RSI, RDX, RCX, R8, R9
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
-	ssize_t ret;
+	void *ret;
 	/* ssize_t read(int fd, const void *buf, size_t count) */
 	asm(
-			"movq	%0, %%rdi;" // addr
-			"movq	%1, %%rsi;" // length
-			"movl	%2, %%edx;" // prot
-			"movl	%3, %%ecx;" // flags
-			"movl	%4, %%e8;" // fd
-			"movq	%5, %%r9;" // offset
+			"movq	%1, %%rdi;" // addr
+			"movq	%2, %%rsi;" // length
+			"movl	%3, %%edx;" // prot
+			"movl	%4, %%ecx;" // flags
+			"movl	%5, %%r8d;" // fd
+			"movq	%6, %%r9;" // offset
 			"movq	$9, %%rax;" // systemcall 9 mmap
 			"syscall;"
-			:
-			: "r" (addr), "r" (length), "r" (prot), "r" (flags), "r" (fd), "f" (offset)
+			"movq	%%rax, %0;" // ret 
+			: "=r" (ret)
+			: "r" (addr), "r" (length), "r" (prot), "r" (flags), "r" (fd), "r" (offset)
 	   );
 	return ret;
+}
+
+#define alloca __builtin_alloca
+
+// not really a systemcall
+// only one %p argument
+printf(const int fd, const char* const string, const long num) {
+	int length = 0;
+	int additional = 0;
+	while (string[length] != '\0') {
+		if (string[length] == '%' && string[length+1] == 'p') {
+			additional += 16;
+		}
+		length++;
+	}
+	length ++; // for '\0'
+	length += additional;
+
+	char print_string[length];
+
+	int pos_str = 0;
+	int pos_print = 0;
+	while (pos_print < length) {
+		if (string[pos_str] != '%' || string[pos_str+1] != 'p') {
+			print_string[pos_print] = string[pos_str];
+			pos_str ++;
+			pos_print ++;
+			continue;
+		}
+		print_string[pos_print] = '0';
+		print_string[pos_print+1] = 'x';
+		for (int i = 0; i < 16 ; i++) {
+			int n = (num >> (i * 4)) & 15;
+			if (n <= 9) {
+				print_string[pos_print+17-i] = (char)n + '0';
+			} else {
+				print_string[pos_print+17-i] = (char)(n-10) + 'a';
+			}
+		}
+		pos_str += 2;
+		pos_print += 18;
+			if (pos_print >= length-1) {
+				exit2(3);
+				exit2(print_string[pos_print] + 1);
+			}
+
+	}
+	write(fd, print_string, length);
 }

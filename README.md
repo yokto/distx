@@ -44,18 +44,22 @@ This is all for 64 bit.
 8. .rela.dyn (only if dynamic) relocation non ptl (i.e. variables). sais which part of the code this needs to be copied to
 9. .rela.plt (only if dynamic) relocation for ptl (procedur linkage talbe. i.e. functions). sais which part of the code this needs to be copied to
 10. Padding to Pagesize 0x1000 (4096)
-11. .plt (procedure linkage table) when .text wants to call an external function it calls here. then from here it does jmpq to Global Offset Table. Then first time into _dl_runtime_resolve_xsavec. Second time directly
-11. .text (program code)
-12. Padding to Pagesize
-13. .rodata (read only data)
+11. .plt (procedure linkage table) when .text wants to call an external function it calls here. then from here it does jmpq to Global Offset Table. Then first time into dl_runtime_resolve_xsavec. Second time directly
+12. .text (program code)
+13. Padding to Pagesize
+14. .rodata (read only data)
 ....
-14. Padding to Pagesize 0x1000 - sizeof(.dynamic)
-15. .dynamic (entries in .strtab)
-16. .got.plt (starts at pagesize)
-17. Section Headers 64bytes * number of headers (this actually describes all the .something sections / mostly for the static linker)
+15. Padding to Pagesize 0x1000 - sizeof(.dynamic)
+16. .dynamic (entries in .strtab)
+17. .got.plt (starts at pagesize)
+18. Section Headers 64bytes * number of headers (this actually describes all the .something sections / mostly for the static linker)
 
-In the programs address space there folloing parts are usually mapped
-1 - 9 -> 0x400000 (readonly)
-4 -> 0x401000 (read execute)
-6 -> 0x402000
+In the programs address space there folloing parts are usually mapped. Note executables compiled with -pie -fPIE are more like dynamic libraries and have ASLR (Address Space Layout Randomization).
+1 - 9 -> 0x400000 (readonly) 
+11 - 12 -> 0x401000 (read execute)
+14 - .. -> 0x402000
 Mappings of a running program can be checked at /proc/<pid>/maps
+
+## Stack Layout
+
+http://articles.manugarg.com/aboutelfauxiliaryvectors.html

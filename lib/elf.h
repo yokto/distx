@@ -42,20 +42,6 @@ typedef struct {
 	uint64_t   p_align;
 } Elf64_Phdr;
 
-// probably not needed
-//typedef struct {
-//	uint32_t   sh_name;
-//	uint32_t   sh_type;
-//	uint64_t   sh_flags;
-//	Elf64_Addr sh_addr;
-//	Elf64_Off  sh_offset;
-//	uint64_t   sh_size;
-//	uint32_t   sh_link;
-//	uint32_t   sh_info;
-//	uint64_t   sh_addralign;
-//	uint64_t   sh_entsize;
-//} Elf64_Shdr;
-
 // entry in .dynamic section
 typedef struct {
 	Elf64_Sxword	d_tag;
@@ -104,3 +90,14 @@ typedef struct {
 #define DT_NUM          35              /* Number used */
 #define DT_LOOS         0x6000000d      /* Start of OS-specific */
 #define DT_HIOS         0x6ffff000      /* End of OS-specific */
+
+
+#define PT_NULL         0               /* Program header table entry unused */
+#define PT_LOAD         1               /* Loadable program segment */
+#define PT_DYNAMIC      2               /* Dynamic linking information */
+#define PT_INTERP       3               /* Program interpreter */
+#define PT_NOTE         4               /* Auxiliary information */
+#define PT_SHLIB        5               /* Reserved */
+#define PT_PHDR         6               /* Entry for header table itself */
+#define PT_TLS          7               /* Thread-local storage segment */
+#define PT_NUM          8               /* Number of defined types */

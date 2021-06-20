@@ -1,5 +1,7 @@
 #pragma once
 
-typedef long ssize_t; // bytecount or error
-typedef long size_t; // bytecount
-typedef long off_t;
+#include <stdint.h>
+
+typedef uint64_t ssize_t; // bytecount or error
+typedef uint64_t size_t; // bytecount
+typedef uint64_t off_t;

@@ -1,0 +1,29 @@
+{
+	"architecture": "x64",
+	"exported_symbols": {
+		"<some sym>": {
+		}
+	},
+	"dependencies": [
+		{
+			"name": "libc",
+			"path": "./libc.so",
+			"symbols": ["read", "write"]
+		},
+		{
+			"name": "libfoo",
+			"path": "./libfoo.so",
+			"symbols": ["foo"]
+		}
+	],
+
+	"pages": {
+		".text": {
+			"permission": "r--",
+			"data": "<hex string ignoring spaces so it can be nicely formated>"
+	       	},
+		".got" {
+			"permission": "rw-"
+		}
+	]
+}
