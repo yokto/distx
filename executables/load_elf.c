@@ -9,6 +9,8 @@
 #include "../lib/elf.h"
 #include "../lib/auxv.h"
 
+static const size_t MAX_SIZE_T = 0xffffffffffffffff;
+
 typedef struct loaded_lib {
 	int64_t addr;
 	int foo;
@@ -53,13 +55,55 @@ void load(char* lib) {
 	printf(1, "loading library ",0);
 	printf(1, lib,0);
 	printf(1, "\n", 0);
-	const int fd = open(lib, O_RDONLY);
+	const int fd = open(lib, O_RDONLY, 0);
 	if (fd < 0) {
 		printf(2, "can't open ", 0);
 		printf(2, lib, 0);
-		exit(-1);
+		exit2(-1);
 	}
-	read(
+	ElfN_Ehdr elf_header;
+	if (read(fd, &elf_header, sizeof(ElfN_Ehdr)) != sizeof(ElfN_Ehdr)) {
+		printf(2, "can't read elfheader ", 0);
+		printf(2, lib, 0);
+		exit2(-1);
+	}
+	if (elf_header.e_phnum > 32) {
+		printf(2, "can't read more than 32 program headers in ", 0);
+		printf(2, lib, 0);
+		exit2(-1);
+	}
+	Elf64_Phdr phs[32];
+	int phnum = elf_header.e_phnum;
+	if (read(fd, phs, sizeof(Elf64_Phdr) * phnum) != sizeof(Elf64_Phdr) * phnum) {
+		printf(2, "can't read program headers ", 0);
+		printf(2, lib, 0);
+		exit2(-1);
+	}
+	size_t maxAddr = 0;
+	size_t minAddr = MAX_SIZE_T;
+	for (int i = 0 ; i < phnum ; i++) {
+		const Elf64_Phdr *ph = &phs[i];
+		if (ph->p_type == PT_LOAD) {
+			size_t max = ph->p_vaddr + ph->p_memsz;
+			size_t min = ph->p_vaddr;
+			maxAddr = max > maxAddr ? max : maxAddr;
+			minAddr = min < minAddr ? min : minAddr;
+		}	
+	}
+	if (maxAddr <= minAddr) {
+		printf(2, "library seems to be empty ", 0);
+		printf(2, lib, 0);
+		return;
+	} // nothing to do?
+	// mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
+	void* memory = mmap(
+		0,
+		maxAddr - minAddr,
+		PROT_READ,
+		MAP_PRIVATE | MAP_DENYWRITE,
+		fd,
+		0);
+	printf(2, "f %p", memory);
 }
 
 void _start() {

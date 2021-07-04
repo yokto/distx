@@ -8,16 +8,11 @@ typedef unsigned int mode_t;
 
 ssize_t read(int fd, void* buf, size_t count) {
 	ssize_t ret;
-	/* ssize_t read(int fd, const void *buf, size_t count) */
-	asm(
-			"movl	%1, %%edi;" // rdi;" // fd
-			"movq	%2, %%rsi;" // buffer
-			"movq	%3, %%rdx;" // count
-			"movq	$0, %%rax;" // systemcall 0 read
-			"syscall;"
-			"movq	%%rax, %0;" // ret 
-			: "=r" (ret)
-			: "r" (fd), "r" (buf), "r" (count)
+	asm volatile(
+			"syscall"
+			: "=a" (ret)
+			: "0" (0), "D" (fd), "S" (buf), "d" (count)
+		        : "rcx", "r11", "memory"
 	   );
 	return ret;
 }
@@ -25,25 +20,22 @@ ssize_t read(int fd, void* buf, size_t count) {
 ssize_t write(int fd, void* buf, size_t count) {
 	ssize_t ret;
 	/* ssize_t read(int fd, const void *buf, size_t count) */
-	asm(
-			"movl	%1, %%edi;" // rdi fd
-			"movq	%2, %%rsi;" // buffer
-			"movq	%3, %%rdx;" // count
-			"movq	$1, %%rax;" // systemcall 1 write
-			"syscall;"
-			"movq	%%rax, %0;" // ret 
-			: "=r" (ret)
-			: "r" (fd), "r" (buf), "r" (count)
+	asm volatile(
+			"syscall"
+			: "=a" (ret)
+			: "0" (1), "D" (fd), "S" (buf), "d" (count)
+		        : "rcx", "r11", "memory"
 	   );
 	return ret;
 }
 
 void exit2(int status) {
+	long ret;
 	asm(
-			"movl %0, %%edi;"
-			"movq $60,%%rax;"
-			"syscall;"
-			:: "r" (status)
+			"syscall"
+			: "=a" (ret)
+			: "0" (0x60), "D" (status)
+		        : "rcx", "r11", "memory"
 	   );
 }
 
@@ -51,34 +43,28 @@ int open(const char *pathname, int flags, mode_t mode) {
 	ssize_t ret;
 	/* ssize_t read(int fd, const void *buf, size_t count) */
 	asm(
-			"movq	%1, %%rdi;" // pathname
-			"movl	%2, %%esi;" // flags
-			"movl	%3, %%edx;" // mode
-			"movq	$2, %%rax;" // systemcall 2 open
-			"syscall;"
-			"movq	%%rax, %0;" // ret 
-			: "=r" (ret)
-			: "r" (pathname), "r" (flags), "r" (mode)
+			"syscall"
+			: "=a" (ret)
+			: "0" (2), "D" (pathname), "S" (flags), "d" (mode)
 	   );
 	return ret;
 }
 
+#define PROT_READ 0x1
+#define MAP_PRIVATE 0x2
+#define MAP_DENYWRITE 0x800
+
 // RDI, RSI, RDX, RCX, R8, R9
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
 	void *ret;
-	/* ssize_t read(int fd, const void *buf, size_t count) */
+	register long r10 asm("r10") = flags;
+	register long r8 asm("r8") = fd;
+	register long r9 asm("r9") = offset;
 	asm(
-			"movq	%1, %%rdi;" // addr
-			"movq	%2, %%rsi;" // length
-			"movl	%3, %%edx;" // prot
-			"movl	%4, %%ecx;" // flags
-			"movl	%5, %%r8d;" // fd
-			"movq	%6, %%r9;" // offset
-			"movq	$9, %%rax;" // systemcall 9 mmap
-			"syscall;"
-			"movq	%%rax, %0;" // ret 
-			: "=r" (ret)
-			: "r" (addr), "r" (length), "r" (prot), "r" (flags), "r" (fd), "r" (offset)
+			"syscall"
+			: "=a" (ret)
+			: "0" (9), "D" (addr), "S" (length), "d" (prot), "r" (r10), "r" (r8), "r" (r9)
+		        : "rcx", "r11", "memory"
 	   );
 	return ret;
 }
@@ -87,7 +73,7 @@ void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
 
 // not really a systemcall
 // only one %p argument
-printf(const int fd, const char* const string, const long num) {
+void printf(const int fd, const char* const string, const long num) {
 	int length = 0;
 	int additional = 0;
 	while (string[length] != '\0') {
@@ -122,10 +108,10 @@ printf(const int fd, const char* const string, const long num) {
 		}
 		pos_str += 2;
 		pos_print += 18;
-			if (pos_print >= length-1) {
-				exit2(3);
-				exit2(print_string[pos_print] + 1);
-			}
+//			if (pos_print >= length-1) {
+//				exit2(3);
+//				exit2(print_string[pos_print] + 1);
+//			}
 
 	}
 	write(fd, print_string, length);
