@@ -10,15 +10,24 @@
 #include "../lib/auxv.h"
 
 static const size_t MAX_SIZE_T = 0xffffffffffffffff;
+static const size_t PAGE_SIZE = 0x1000;
+
+static size_t roundup_pagesize(size_t s) {
+	return ((s - 1 + PAGE_SIZE) & (~(PAGE_SIZE-1)));
+}
+static size_t rounddown_pagesize(size_t s) {
+	return (s & (~(PAGE_SIZE-1)));
+}
 
 typedef struct loaded_lib {
-	int64_t addr;
-	int foo;
+	void* base;
+	Elf64_Dyn* dynamic;
+	char name[32]; // TODO: fix
 } loaded_lib;
 
 static const int loaded_lib_max = 100;
 static int loaded_lib_next = 0; 
-static const loaded_lib loaded_libs[100];
+static loaded_lib loaded_libs[100];
 
 
 //// Allocates RWX memory of given size and returns a pointer to it. On failure,
@@ -51,32 +60,32 @@ static const loaded_lib loaded_libs[100];
 //	int result = func(2);
 //	printf("result = %d\n", result);
 //}
-void load(char* lib) {
+loaded_lib* load(char* lib_name) {
 	printf(1, "loading library ",0);
-	printf(1, lib,0);
+	printf(1, lib_name,0);
 	printf(1, "\n", 0);
-	const int fd = open(lib, O_RDONLY, 0);
+	const int fd = open(lib_name, O_RDONLY, 0);
 	if (fd < 0) {
 		printf(2, "can't open ", 0);
-		printf(2, lib, 0);
+		printf(2, lib_name, 0);
 		exit2(-1);
 	}
 	ElfN_Ehdr elf_header;
 	if (read(fd, &elf_header, sizeof(ElfN_Ehdr)) != sizeof(ElfN_Ehdr)) {
 		printf(2, "can't read elfheader ", 0);
-		printf(2, lib, 0);
+		printf(2, lib_name, 0);
 		exit2(-1);
 	}
 	if (elf_header.e_phnum > 32) {
 		printf(2, "can't read more than 32 program headers in ", 0);
-		printf(2, lib, 0);
+		printf(2, lib_name, 0);
 		exit2(-1);
 	}
 	Elf64_Phdr phs[32];
 	int phnum = elf_header.e_phnum;
 	if (read(fd, phs, sizeof(Elf64_Phdr) * phnum) != sizeof(Elf64_Phdr) * phnum) {
 		printf(2, "can't read program headers ", 0);
-		printf(2, lib, 0);
+		printf(2, lib_name, 0);
 		exit2(-1);
 	}
 	size_t maxAddr = 0;
@@ -92,18 +101,51 @@ void load(char* lib) {
 	}
 	if (maxAddr <= minAddr) {
 		printf(2, "library seems to be empty ", 0);
-		printf(2, lib, 0);
+		printf(2, lib_name, 0);
 		return;
 	} // nothing to do?
 	// mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
 	void* memory = mmap(
 		0,
-		maxAddr - minAddr,
+		roundup_pagesize(maxAddr - minAddr),
 		PROT_READ,
 		MAP_PRIVATE | MAP_DENYWRITE,
 		fd,
 		0);
-	printf(2, "f %p", memory);
+	if (memory == -1) {
+		printf(2, "can't map memory", 0);
+		printf(2, lib_name, 0);
+		exit2(-1);
+	}
+
+	loaded_lib* lib = &loaded_libs[loaded_lib_next++];
+	strncpy(&lib->name, lib_name, 32);
+	lib->base = memory;
+
+	for (int i = 0 ; i < phnum ; i++) {
+		const Elf64_Phdr *ph = &phs[i];
+		if (ph->p_type == PT_LOAD) {
+			const size_t maddr = rounddown_pagesize(memory + ph->p_vaddr);
+			const size_t msize = roundup_pagesize(memory + ph->p_vaddr + ph->p_memsz) - maddr;
+			if (ph->p_offset & (PAGE_SIZE-1) != ph->p_vaddr & (PAGE_SIZE-1)) {
+				printf(2, "addresses don't match", 0);
+				printf(2, lib_name, 0);
+				exit2(-1);
+			}
+			mmap(
+				maddr,
+				msize,
+				PROT_READ | PROT_WRITE | PROT_EXEC, // todo remove wrong ones
+				MAP_PRIVATE | MAP_DENYWRITE | MAP_FIXED,
+				fd,
+				rounddown_pagesize(ph->p_offset));
+		}	
+		if (ph->p_type == PT_DYNAMIC) {
+			lib->dynamic = (Elf64_Dyn*)(memory + ph->p_vaddr);
+		}
+	}
+
+	return lib;
 }
 
 void _start() {
@@ -159,19 +201,22 @@ void _start() {
 	Elf64_Dyn* dynamic_orig = (Elf64_Dyn*)(programOffset + dynamicAddr);
 	Elf64_Dyn* dynamic = dynamic_orig;
 	void* strtab;
-	while (dynamic->d_tag != DT_NULL) {
+	for (; dynamic->d_tag != DT_NULL; dynamic++) {
 		if (dynamic->d_tag == DT_STRTAB) {
 			strtab = programOffset + dynamic->d_un.d_ptr;
 		}
-		dynamic += 1;
 	}
 
-	dynamic = dynamic_orig;
-	while (dynamic->d_tag != DT_NULL) {
+	for (dynamic = dynamic_orig; dynamic->d_tag != DT_NULL; dynamic++) {
 		if (dynamic->d_tag == DT_NEEDED) {
-			load(strtab + dynamic->d_un.d_ptr);
+			loaded_lib * lib = load(strtab + dynamic->d_un.d_ptr);
+			for (Elf64_Dyn* dynamic2 = lib->dynamic; dynamic2->d_tag != DT_NULL; dynamic2++) {
+				printf(1, "\ntag:",0);
+				printf(1, "%p", dynamic2->d_tag);
+				printf(1, "\nval:",0);
+				printf(1, "%p", dynamic2->d_un.d_val);
+			}
 		}
-		dynamic += 1;
 	}
 
 	asm(

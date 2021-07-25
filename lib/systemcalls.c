@@ -51,8 +51,11 @@ int open(const char *pathname, int flags, mode_t mode) {
 }
 
 #define PROT_READ 0x1
+#define PROT_WRITE 0x2
+#define PROT_EXEC 0x4
 #define MAP_PRIVATE 0x2
 #define MAP_DENYWRITE 0x800
+#define MAP_FIXED 0x10
 
 // RDI, RSI, RDX, RCX, R8, R9
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
@@ -116,3 +119,19 @@ void printf(const int fd, const char* const string, const long num) {
 	}
 	write(fd, print_string, length);
 }
+
+char * strncpy(char *dest, const char *src, size_t n)
+{
+	size_t i;
+
+	printf(1, src, 0);
+	for (i = 0; i < n - 1 && src[i] != '\0'; i++) {
+		dest[i] = src[i];
+	}
+	for ( ; i < n; i++) {
+		dest[i] = '\0';
+	}
+
+	return dest;
+}
+
