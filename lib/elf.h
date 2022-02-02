@@ -11,6 +11,8 @@ typedef uint64_t Elf64_Addr;
 typedef uint64_t Elf64_Off;
 typedef int64_t Elf64_Sxword;
 typedef uint64_t Elf64_Xword;
+typedef uint32_t Elf64_Word;
+typedef uint16_t Elf64_Half;
 
 // elf header
 typedef struct {
@@ -50,6 +52,19 @@ typedef struct {
    		Elf64_Addr	d_ptr;
 	} d_un;
 } Elf64_Dyn;
+
+// .symtab
+typedef struct {
+        Elf64_Word      st_name;
+        unsigned char   st_info;
+        unsigned char   st_other;
+        Elf64_Half      st_shndx;
+        Elf64_Addr      st_value;
+        Elf64_Xword     st_size;
+} Elf64_Sym;
+
+#define ELF32_ST_TYPE(info)          ((info) & 0xf)
+#define ELF64_ST_TYPE(info)          ((info) & 0xf)
 
 // dynamic tags (.dynamic section)
 #define DT_NULL         0               /* Marks end of dynamic section */
@@ -101,3 +116,18 @@ typedef struct {
 #define PT_PHDR         6               /* Entry for header table itself */
 #define PT_TLS          7               /* Thread-local storage segment */
 #define PT_NUM          8               /* Number of defined types */
+
+inline unsigned long
+elf_Hash(const unsigned char *name)
+{
+    unsigned long h = 0, g;
+
+        while (*name)
+        {
+             h = (h << 4) + *name++;
+             if (g = h & 0xf0000000)
+                  h ^= g >> 24;
+                   h &= ~g;
+        }
+        return h;
+}
