@@ -63,3 +63,34 @@ Mappings of a running program can be checked at /proc/<pid>/maps
 ## Stack Layout
 
 http://articles.manugarg.com/aboutelfauxiliaryvectors.html
+
+## PLT/GOT (Procedure Linkage Table)
+
+Assuming your code looks like this. `foo` and `bar` are external functions
+
+    foo();
+    bar();
+    foo();
+
+The assembly code will look like this
+
+    call 0x11130 <foo.plt>
+    call 0x11140 <bar.plt>
+    call 0x11130 <foo.plt>
+
+The plt will look
+
+    0x11120    push 0x2fe2(%rip) # plt base
+    0x11126    jmp *0x2fe4(%rip) # points to _dl_runtime_resolve_xsavec
+    0x1112c    nopl 0x0(%rax)
+    0x11130    jmp 0x22220 # this is foo@plt and points to foo@got.plt
+    0x11136    push 0x0
+    0x1113b    jmp 0x11120
+    0x11140    jmp 0x22228 # this is bar@plt and points to bar@got.plt
+    0x11146    push 0x1 # plt entry
+    0x1114b    jmp 0x11120
+
+The got will look like
+
+    0x22220    0x11136 # this is foo@got.plt (this will be replaced to point to the actual foo)
+    0x22228    0x11146 # this is bar@got.plt

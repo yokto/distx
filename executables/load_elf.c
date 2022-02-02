@@ -199,22 +199,22 @@ void _start() {
 	}
 
 	Elf64_Dyn* dynamic_orig = (Elf64_Dyn*)(programOffset + dynamicAddr);
-	Elf64_Dyn* dynamic = dynamic_orig;
+	Elf64_Dyn* dynamic;
 	void* strtab;
-	for (; dynamic->d_tag != DT_NULL; dynamic++) {
+	for (dynamic = dynamic_orig; dynamic->d_tag != DT_NULL; dynamic++) {
 		if (dynamic->d_tag == DT_STRTAB) {
 			strtab = programOffset + dynamic->d_un.d_ptr;
 		}
 	}
 
 	for (dynamic = dynamic_orig; dynamic->d_tag != DT_NULL; dynamic++) {
+		//printf(1, "\ntag:",0);
+		//printf(1, "%p", dynamic->d_tag);
+		//printf(1, "\nval:",0);
+		//printf(1, "%p", dynamic->d_un.d_val);
 		if (dynamic->d_tag == DT_NEEDED) {
 			loaded_lib * lib = load(strtab + dynamic->d_un.d_ptr);
 			for (Elf64_Dyn* dynamic2 = lib->dynamic; dynamic2->d_tag != DT_NULL; dynamic2++) {
-				printf(1, "\ntag:",0);
-				printf(1, "%p", dynamic2->d_tag);
-				printf(1, "\nval:",0);
-				printf(1, "%p", dynamic2->d_un.d_val);
 			}
 		}
 	}
