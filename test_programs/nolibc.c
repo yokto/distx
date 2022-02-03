@@ -1,11 +1,13 @@
 #include "../lib/systemcalls.c"
 
+#define DLL_PUBLIC __attribute__ ((visibility ("default")))
+
 extern int foo();
 extern int bar;
 
 const char* const hello_world = "hello world";
 
-void _start() {
+DLL_PUBLIC int main() {
 
 	const int written = write(1, (void*)hello_world, 11);
 
@@ -13,8 +15,8 @@ void _start() {
       	read(0, &c, 1);
 	foo();
 
-	exit2(42);
+	return;
 	bar++;
-	exit2(bar);
+	return;
 }
 
