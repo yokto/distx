@@ -13,9 +13,9 @@ DLL_PUBLIC int main() {
 
 	char c;
       	read(0, &c, 1);
-	foo();
+	//foo();
 
-	return;
+	return 42;
 	bar++;
 	return;
 }

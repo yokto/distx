@@ -29,11 +29,6 @@ typedef struct loaded_lib {
 	char name[32]; // TODO: fix
 } loaded_lib;
 
-static const int loaded_lib_max = 100;
-static int loaded_lib_next = 0; 
-static loaded_lib loaded_libs[100];
-
-
 //// Allocates RWX memory of given size and returns a pointer to it. On failure,
 //// prints out the error and returns NULL.
 //void* alloc_executable_file(size_t size, int fd) {
@@ -64,7 +59,7 @@ static loaded_lib loaded_libs[100];
 //	int result = func(2);
 //	printf("result = %d\n", result);
 //}
-loaded_lib* load(char* lib_name) {
+int load(char* lib_name, loaded_lib* lib) {
 	printf("loading library ",0);
 	printf(lib_name,0);
 	printf("\n", 0);
@@ -106,7 +101,7 @@ loaded_lib* load(char* lib_name) {
 	if (maxAddr <= minAddr) {
 		fprintf(stderr, "library seems to be empty ", 0);
 		fprintf(stderr, lib_name, 0);
-		return 0;
+		return -1;
 	} // nothing to do?
 	// mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
 	void* memory = mmap(
@@ -122,7 +117,6 @@ loaded_lib* load(char* lib_name) {
 		exit(-1);
 	}
 
-	loaded_lib* lib = &loaded_libs[loaded_lib_next++];
 	strncpy(lib->name, lib_name, 32);
 	lib->base = memory;
 
@@ -160,21 +154,29 @@ loaded_lib* load(char* lib_name) {
 					lib->strtab = (char*)(memory + dynamic->d_un.d_ptr);
 				}
 			}
-			const uint32_t nbucket = ((uint32_t*)lib->hash)[0];
-			const uint32_t nchain = ((uint32_t*)lib->hash)[1];
-			printf("nbucket %ld\n", nbucket);
-			printf("nchain %ld\n", nchain);
-			for (int i = 1; i < (1 + nbucket + nchain); i++) {
-				if (lib->hash[i] == 0) { continue; }
-				printf("entry %d\n", lib->hash[i]);
-				printf("type %d\n", ELF64_ST_TYPE(lib->symtab[i].st_info));
-				printf("name idx %d\n", lib->symtab[i].st_name);
-				printf("name %s\n", lib->strtab + lib->symtab[i].st_name);
-			}
 		}
 	}
 
-	return lib;
+	return 0;
+}
+
+Elf64_Half lookup(char* name, loaded_lib* lib) {
+	const uint32_t nbucket = ((uint32_t*)lib->hash)[0];
+	const uint32_t nchain = ((uint32_t*)lib->hash)[1];
+	if (nbucket == 0) { return 0; }
+	const unsigned long hash = elf_Hash(name);
+	printf("nbucket %ld\n", nbucket);
+	printf("nchain %ld\n", nchain);
+
+		printf("loop");
+		fflush(stdout);
+	Elf64_Half idx = lib->hash[2 + (hash % nbucket)];
+	while (idx != 0) {
+		if (strcmp(name, lib->strtab + lib->symtab[idx].st_name) == 0) {
+			return idx;
+		}
+		idx = lib->hash[2 + nbucket + idx];
+	}
 }
 
 void main(int argc, char ** argv) {
@@ -182,7 +184,15 @@ void main(int argc, char ** argv) {
 		fprintf(stderr, "./loadelf file");
 	}
 
-	load(argv[1]);
+	loaded_lib lib;
+	load(argv[1], &lib);
+	Elf64_Half main_idx = lookup("main", &lib);
+	printf("main idx %d\n", main_idx);
+
+	void * main_addr = lib.base + lib.symtab[main_idx].st_value;
+	int ret = ((int (*)())main_addr)();
+	printf("main returned %d\n", ret);
+	
 //	FILE * fp = fopen(argv[1], "r"A)
 //	if (!fp) {
 //		printf("could not open %s", argv[1]);	

@@ -117,7 +117,7 @@ typedef struct {
 #define PT_TLS          7               /* Thread-local storage segment */
 #define PT_NUM          8               /* Number of defined types */
 
-inline unsigned long
+unsigned long
 elf_Hash(const unsigned char *name)
 {
     unsigned long h = 0, g;
