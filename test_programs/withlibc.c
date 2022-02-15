@@ -1,22 +1,20 @@
 #include <stdio.h>
+#include "foobar.h"
 
-extern int foo();
-extern int bar;
+#define DLL_PUBLIC __attribute__ ((visibility ("default")))
 
-const char* const hello_world = "hello world";
+const char* const hello_world = "hello world\n";
 
-int main() {
+DLL_PUBLIC int main() {
 
-	foo();
-	baz();
-	foo();
-	const int written = write(1, (void*)hello_world, 11);
+//	foobar_baz();
+//	foobar_foo();
+	c_printf(hello_world);
 
-	char c;
-      	read(0, &c, 1);
+	c_printf("foo = %d\n", foobar_foo());
+      	c_getchar();
 
+	//foobar_bar++;
 	return 42;
-	bar++;
-	return bar;
 }
 

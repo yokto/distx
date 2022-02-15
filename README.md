@@ -32,6 +32,8 @@ Simplified `load_elf_binary` function:
 
 ## ELF strucutre
 
+https://stevens.netmeister.org/631/elf.html
+
 This is all for 64 bit.
 
 1. Elf Header 64bytes

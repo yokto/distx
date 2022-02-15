@@ -5,9 +5,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-//#include "../lib/systemcalls.c"
+#include <dlfcn.h>
+#include <stdbool.h>
+
 #include "../lib/elf.h"
-//#include "../lib/auxv.h"
 
 static const size_t MAX_SIZE_T = 0xffffffffffffffff;
 static const size_t PAGE_SIZE = 0x1000;
@@ -24,6 +25,12 @@ typedef struct loaded_lib {
 	Elf64_Dyn* dynamic;
 	Elf64_Sym* symtab;
 	char* strtab;
+	Elf64_Rela* rela;
+	size_t rela_count;
+	Elf64_Rela* rela_plt;
+	size_t rela_plt_count;
+	Elf64_Rela* pltgot;
+	size_t gotsz;
 	Elf64_Word* hash;
 	size_t symtab_count;
 	char name[32]; // TODO: fix
@@ -60,6 +67,7 @@ typedef struct loaded_lib {
 //	printf("result = %d\n", result);
 //}
 int load(char* lib_name, loaded_lib* lib) {
+	memset(lib, 0, sizeof(lib));
 	printf("loading library ",0);
 	printf(lib_name,0);
 	printf("\n", 0);
@@ -153,6 +161,29 @@ int load(char* lib_name, loaded_lib* lib) {
 				if (dynamic->d_tag == DT_STRTAB) {
 					lib->strtab = (char*)(memory + dynamic->d_un.d_ptr);
 				}
+				if (dynamic->d_tag == DT_RELA) {
+					lib->rela = (Elf64_Rela*)(memory + dynamic->d_un.d_ptr);
+				}
+				if (dynamic->d_tag == DT_RELASZ) {
+					lib->rela_count = dynamic->d_un.d_val / sizeof(Elf64_Rela);
+				}
+				if (dynamic->d_tag == DT_PLTREL) {
+					if (dynamic->d_un.d_val != DT_RELA) {
+						fprintf(stderr, "can only read DT_RELA at the moment\n");
+						exit(-1);
+					}
+				}
+				if (dynamic->d_tag == DT_PLTRELSZ) {
+					lib->rela_plt_count = dynamic->d_un.d_val / sizeof(Elf64_Rela);
+					//printf("sz %x\n", dynamic->d_un.d_val);
+				}
+				if (dynamic->d_tag == DT_JMPREL) {
+					lib->rela_plt = (Elf64_Rela*)(memory + dynamic->d_un.d_ptr);
+					//printf("rela_plt %x\n", dynamic->d_un.d_ptr);
+				}
+				if (dynamic->d_tag == DT_PLTGOT) {
+					lib->pltgot = (Elf64_Rela*)(memory + dynamic->d_un.d_ptr);
+				}
 			}
 		}
 	}
@@ -165,11 +196,7 @@ Elf64_Half lookup(char* name, loaded_lib* lib) {
 	const uint32_t nchain = ((uint32_t*)lib->hash)[1];
 	if (nbucket == 0) { return 0; }
 	const unsigned long hash = elf_Hash(name);
-	printf("nbucket %ld\n", nbucket);
-	printf("nchain %ld\n", nchain);
 
-		printf("loop");
-		fflush(stdout);
 	Elf64_Half idx = lib->hash[2 + (hash % nbucket)];
 	while (idx != 0) {
 		if (strcmp(name, lib->strtab + lib->symtab[idx].st_name) == 0) {
@@ -179,6 +206,52 @@ Elf64_Half lookup(char* name, loaded_lib* lib) {
 	}
 }
 
+void link(loaded_lib* lib) {
+	loaded_lib libfoobar;
+	bool libfoobar_loaded = false;
+	for (int i = 0 ; i < lib->rela_count ; i++) {
+		printf("offset: %lx, info %lx, addend: %lx\n", lib->rela[i].r_offset, lib->rela[i].r_info, lib->rela[i].r_addend);
+	}
+	for (int i = 0 ; i < lib->rela_plt_count ; i++) {
+		Elf64_Rela * rela = lib->rela_plt + i;
+		//printf("offset: %lx, info %lx, addend: %lx\n", rela->r_offset, rela->r_info, rela->r_addend);
+		int sym = ELF64_R_SYM(rela->r_info);
+		char* sym_name = lib->strtab + lib->symtab[sym].st_name;
+		//printf("symbol name: %s\n", sym_name);
+
+		if (strncmp(sym_name, "c_", 2) == 0) {
+			void* libc = dlopen("libc.so.6", RTLD_NOW);
+			if (!libc) {
+				fprintf(stderr, "could not open libc\n");
+				exit(-1);
+			}
+			void* val = dlsym(libc, sym_name+2);
+			if (!val) {
+				fprintf(stderr, "could not load getchar\n");
+				exit(-1);
+			}
+			//printf("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, val);
+			void** offsetTableLoc = lib->base + rela->r_offset;
+			*offsetTableLoc = val;
+			dlclose(libc);
+		}
+		if (strncmp(sym_name, "foobar_", 7) == 0) {
+			if (!libfoobar_loaded) {
+				load("libfoobar.so", &libfoobar);
+				libfoobar_loaded = true;
+			}
+			Elf64_Half f = lookup(sym_name, &libfoobar);
+			void * f_addr = libfoobar.base + libfoobar.symtab[f].st_value;
+			//printf("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, f_addr);
+			void** offsetTableLoc = lib->base + rela->r_offset;
+			*offsetTableLoc = f_addr;
+		}
+	}
+
+
+
+}
+
 void main(int argc, char ** argv) {
 	if (argc != 2) {
 		fprintf(stderr, "./loadelf file");
@@ -186,12 +259,13 @@ void main(int argc, char ** argv) {
 
 	loaded_lib lib;
 	load(argv[1], &lib);
+	link(&lib);
 	Elf64_Half main_idx = lookup("main", &lib);
-	printf("main idx %d\n", main_idx);
+	//printf("main idx %d\n", main_idx);
 
 	void * main_addr = lib.base + lib.symtab[main_idx].st_value;
 	int ret = ((int (*)())main_addr)();
-	printf("main returned %d\n", ret);
+	//printf("main returned %d\n", ret);
 	
 //	FILE * fp = fopen(argv[1], "r"A)
 //	if (!fp) {

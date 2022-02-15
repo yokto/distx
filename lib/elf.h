@@ -63,8 +63,21 @@ typedef struct {
         Elf64_Xword     st_size;
 } Elf64_Sym;
 
-#define ELF32_ST_TYPE(info)          ((info) & 0xf)
-#define ELF64_ST_TYPE(info)          ((info) & 0xf)
+typedef struct {
+        Elf64_Addr      r_offset;
+        Elf64_Xword     r_info;
+} Elf64_Rel;
+
+typedef struct {
+        Elf64_Addr      r_offset;
+        Elf64_Xword     r_info;
+        Elf64_Sxword    r_addend;
+} Elf64_Rela;
+
+#define ELF64_R_SYM(info)             ((info)>>32)
+#define ELF64_R_TYPE(info)            ((Elf64_Word)(info))
+#define ELF64_R_INFO(sym, type)       (((Elf64_Xword)(sym)<<32)+ \
+                                        (Elf64_Xword)(type))
 
 // dynamic tags (.dynamic section)
 #define DT_NULL         0               /* Marks end of dynamic section */
