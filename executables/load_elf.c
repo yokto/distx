@@ -36,6 +36,38 @@ typedef struct loaded_lib {
 	char name[32]; // TODO: fix
 } loaded_lib;
 
+typedef struct loaded_libs {
+	loaded_lib * libs;
+	int libs_count;
+	int vec_length;
+} loaded_libs;
+
+int alloc_loaded_libs(loaded_libs* libs) {
+	libs->libs = calloc(8, sizeof(loaded_lib));
+	libs->libs_count = 0;
+	libs->vec_length = 8;
+}
+
+int free_loaded_libs(loaded_libs* libs) {
+	free(libs->libs);
+	libs->libs = 0;
+	libs->libs_count = 0;
+	libs->vec_length = 0;
+}
+
+loaded_lib* add_loaded_lib(loaded_libs* libs) {
+	if (libs->libs_count >= libs->vec_length) {
+		int new_vec_length = libs->vec_length * 2;
+		loaded_lib* new_libs = calloc(new_vec_length, sizeof(loaded_lib));
+		memcpy(new_libs, libs->libs, libs->vec_length * sizeof(loaded_lib));
+		free(libs->libs);
+		libs->libs = new_libs;
+		libs->vec_length = new_vec_length;
+	}
+	libs->libs_count++;
+	return &libs->libs[libs->libs_count-1];
+}
+
 //// Allocates RWX memory of given size and returns a pointer to it. On failure,
 //// prints out the error and returns NULL.
 //void* alloc_executable_file(size_t size, int fd) {
@@ -66,10 +98,16 @@ typedef struct loaded_lib {
 //	int result = func(2);
 //	printf("result = %d\n", result);
 //}
-int load(char* lib_name, loaded_lib* lib) {
-	memset(lib, 0, sizeof(lib));
-	printf("loading library ",0);
-	printf(lib_name,0);
+loaded_lib* load(char* lib_name, loaded_libs* libs) {
+	for (int i = 0 ; i < libs->libs_count ; i++) {
+		if (strcmp(libs->libs[i].name, lib_name) == 0) {
+			printf("already loaded library %s", lib_name);
+			return &libs->libs[i];
+		}
+	}
+	loaded_lib* lib = add_loaded_lib(libs);
+	memset(lib, 0, sizeof(loaded_lib));
+	printf("loading library %s", lib_name);
 	printf("\n", 0);
 	FILE* fd = fopen(lib_name, "r");
 	if (fd == 0) {
@@ -109,7 +147,7 @@ int load(char* lib_name, loaded_lib* lib) {
 	if (maxAddr <= minAddr) {
 		fprintf(stderr, "library seems to be empty ", 0);
 		fprintf(stderr, lib_name, 0);
-		return -1;
+		return 0;
 	} // nothing to do?
 	// mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
 	void* memory = mmap(
@@ -188,7 +226,7 @@ int load(char* lib_name, loaded_lib* lib) {
 		}
 	}
 
-	return 0;
+	return lib;
 }
 
 Elf64_Half lookup(char* name, loaded_lib* lib) {
@@ -206,8 +244,8 @@ Elf64_Half lookup(char* name, loaded_lib* lib) {
 	}
 }
 
-void link(loaded_lib* lib) {
-	loaded_lib libfoobar;
+void link(loaded_lib* lib, loaded_libs* libs) {
+	loaded_lib* libfoobar = add_loaded_lib(libs);
 	bool libfoobar_loaded = false;
 	for (int i = 0 ; i < lib->rela_count ; i++) {
 		printf("offset: %lx, info %lx, addend: %lx\n", lib->rela[i].r_offset, lib->rela[i].r_info, lib->rela[i].r_addend);
@@ -237,11 +275,11 @@ void link(loaded_lib* lib) {
 		}
 		if (strncmp(sym_name, "foobar_", 7) == 0) {
 			if (!libfoobar_loaded) {
-				load("libfoobar.so", &libfoobar);
+				libfoobar = load("libfoobar.so", libs);
 				libfoobar_loaded = true;
 			}
-			Elf64_Half f = lookup(sym_name, &libfoobar);
-			void * f_addr = libfoobar.base + libfoobar.symtab[f].st_value;
+			Elf64_Half f = lookup(sym_name, libfoobar);
+			void * f_addr = libfoobar->base + libfoobar->symtab[f].st_value;
 			//printf("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, f_addr);
 			void** offsetTableLoc = lib->base + rela->r_offset;
 			*offsetTableLoc = f_addr;
@@ -257,13 +295,14 @@ void main(int argc, char ** argv) {
 		fprintf(stderr, "./loadelf file");
 	}
 
-	loaded_lib lib;
-	load(argv[1], &lib);
-	link(&lib);
-	Elf64_Half main_idx = lookup("main", &lib);
+	loaded_libs libs;
+	alloc_loaded_libs(&libs);
+	loaded_lib* lib = load(argv[1], &libs);
+	link(lib, &libs);
+	Elf64_Half main_idx = lookup("main", lib);
 	//printf("main idx %d\n", main_idx);
 
-	void * main_addr = lib.base + lib.symtab[main_idx].st_value;
+	void * main_addr = lib->base + lib->symtab[main_idx].st_value;
 	int ret = ((int (*)())main_addr)();
 	//printf("main returned %d\n", ret);
 	

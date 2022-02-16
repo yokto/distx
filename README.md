@@ -38,8 +38,11 @@ This is all for 64 bit.
 
 1. Elf Header 64bytes
 2. Program Headers 56bytes * number of headers (this describes how things get loaded into memory / mostly for the dynamic linker)
+    - irrelevant for dynamic linker
 3. .interp (only if set with -Wl,--dynamic-linker=...) string pointing to dynamic linker
+    - we don't use this
 4. .hash (only if dynamic) hash table lookup for string -> entry in .symtab
+    - we find this from .dynamic -> DT_HASH
 5. .gnu.hash (only if dynamic) faster version of .hash
 6. .dynsym (only if dynamic) list of symbols from other libraries
 7. .dynstr (only if dynamic) strings for .dynsym
