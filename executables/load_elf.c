@@ -247,13 +247,13 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 		char* sym_name = lib->strtab + lib->symtab[sym].st_name;
 		//printf("symbol name: %s\n", sym_name);
 
-		if (strncmp(sym_name, "c_", 2) == 0) {
+		if (strncmp(sym_name, "external_c_", 11) == 0) {
 			void* libc = dlopen("libc.so.6", RTLD_NOW);
 			if (!libc) {
 				fprintf(stderr, "could not open libc\n");
 				exit(-1);
 			}
-			void* val = dlsym(libc, sym_name+2);
+			void* val = dlsym(libc, sym_name+11);
 			if (!val) {
 				fprintf(stderr, "could not load getchar\n");
 				exit(-1);
