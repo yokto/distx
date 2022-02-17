@@ -1,0 +1,4 @@
+distro/*/src
+distro/*/build
+test_programs/build
+.*.swp
