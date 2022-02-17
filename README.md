@@ -1,13 +1,120 @@
+# Elvator
 
-# How is a program loaded
+## Motivation
 
-## Exit from old program
+The idea of this project is to have a loader that can run the same binaries on all operating systems.
+Developers developing in compiled languages have a hard life.
+They need to build their project for multiple cpu architectures (x86, x64, arm32, arm64, riscv...) and multiple operating systems.
+On Linux they might even have to do it for every distribution.
+Even worse, cross compilation is usually very cumbersome, so they actually need a machine for every configuration in their build infrastructure.
+
+There are good reasons (performance/address sizes) to compile binaries for different architectures.
+However what are the reasons for having to compile differently for different operating systems.
+In our opinion there are none.
+
+## Quickstart?
+
+The loader will be given the executable.
+The executable is in the format of a shared library with a main function.
+The loader loads the relevant parts of the executable into memory.
+Since the loader is already running with a setup stack/... and is in fact running the loaders main function it is in the right state to also run the executables main function.
+So there is very little systemspecific setup needed.
+
+
+In the current setup you can compile on linux with the following flag.
+    -shared -nostdlib -fvisibility=hidden -fPIC
+
+## Design considerations
+    
+To understand this section it is good if you have a good understanding of how programs are loaded. There is a short overview in the "Loading on Linux" section
+
+### Where do we make the cut
+
+A program will always need some functionality from the operating system.
+The question is where we want to set this interface.
+
+#### systemcall interface
+We could set it at the systemcall interface.
+This is what docker/WSL (windows subsystem linux) does.
+
+Advantages:
+- What happens in the address space is very well controlled and thus probably very similar wherever it's run.
+- Can run a lot of existing applications
+Disadvantages:
+- Obviously tied to the systemcall interface of one operating system. 
+- If run on a differnt system a lot of out of process virtualization is needed (linux kernel/xserver in case of WSL)
+
+Docker is the less interesting case it only runs natively under linux.
+Ignoring security concerns, it is actually not so different from just running a statically linked binary.
+In Docker it seems uncommon to run GUI applications.
+It seems most suited for applications that don't rely on too much periphery.
+
+WSL is more intersting. It actually has a linux kernel running beside the windows kernel so the executable can actually run normal linux binaries.
+This is only a general solution if all operating system providers implement this same functionality.
+There is probably no way for an independent party to implement such a thing for OSX.
+Because of this same reason, it is also very difficult to add to or change this interface.
+Any new API would first need to be supported by all providers.
+Also it is unclear how userspace drivers should work.
+To avoid unnecessary overhead a program should ideally call directly to the userspace drivers provided by the system.
+The system probably needs to provide linux userspace drivers that talk to virtual kernel drivers that then talk to the real kernel drivers in WSL.
+I assume this is how WSL manages to support OpenGL, but I'm not sure???.
+WSL seems to run it's own version of an XServer. Ideally this overhead could also be removed.
+
+#### Fix unchanged binary in userspace
+
+This is what wine does. The userspace will load the code of the windows binary.
+For all windows system functions wine will link in implementions that use linux systemcalls.
+
+Advantages:
+- This seems to work verry well for a lot of games with very little overhead.
+Disadvantages:
+- Can probably never run anything without proprietary code.
+
+There is a part of code between the libc api and the api that wine virtualizes.
+This part probably consists of proprietary code linked into the executable itself and proprietary code in dlls provided by wine.
+
+#### Create Binary in minimal form
+
+What should the loader do and what should the executable do?
+
+We want to decide for the following things.
+- threading
+  - Implementation on Linux relies on `fork()`. So we could instead have the interface at `fork()`
+- initializing libraries
+- memory allocation
+  - This would work very well as either library or just provided by the system
+- linking symbols
+  - We can not put this into a dynamically linked library because it needs to run before dynamic linking
+  - We don't want to put it in all executables because it would make executables much to big and be very unmodular
+
+### Other solutions
+    
+
+How does this compare to wine?
+
+## Loading on Linux
+
+### Overview
+
+Here we describe the different components involved in starting a new program.
+
+We are mostly interested in dynamically linked programs. So this is always assumed.
+
+1. Exit from old program (old executable). Old program calls the systemcall execve which takes the new executable as argument.
+2. Kernel. The kernel loads the code of the executable and reads path to the interpreter (dynamic loader) from it. It also loads the code of the dynamic loader. It also allocates a stack and puts some arguments on it. Then it passes control to the Dynamic Loader (userspace).
+3. Dynamic Loader (dl in userspace). The dynamic loads the depencencies (libraries) of the executable and links it. Then it gives control to the _start function.
+4. _start (executable). The start function is actually statically linked inside the executable from crt1.o. Not sure what exactly it does. But it calls __libc_start_main in glibc.
+5. __libc_start_main (glibc). Not sure what it does. But it does eventually call main of the executable.
+6. main (executable)
+
+
+### Exit from old program
 
 The old program calles the execve systemcall.
 This call does not return.
 Instead the specified program is executed in this process (programs usually call clone before execve).
 
-## Kernel
+### Kernel
 
 The program specified in the execve systemcall can be either a script with she-bang or an elf executable.
 We will always assume it's an elf executable.
