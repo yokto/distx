@@ -24,6 +24,9 @@ typedef struct loaded_lib {
 	void* base;
 	Elf64_Dyn* dynamic;
 	Elf64_Sym* symtab;
+	Elf64_Half* versym;
+	Elf64_Verdef* verdef;
+	Elf64_Verneed* verneed;
 	char* strtab;
 	Elf64_Rela* rela;
 	size_t rela_count;
@@ -73,6 +76,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	for (int i = 0 ; i < libs->libs_count ; i++) {
 		if (libs->libs[i].path && strcmp(libs->libs[i].path, lib_path) == 0) {
 			printf("already loaded library %s\n", lib_path);
+					fflush(stdout);
 			return &libs->libs[i];
 		}
 	}
@@ -207,7 +211,21 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 				}
 				if (dynamic->d_tag == DT_NEEDED) {
 					char* needed = lib->strtab + dynamic->d_un.d_ptr;
-					loaded_lib * lib = load(strchr(needed, ':') + 1, libs);
+					char* colon = strchr(needed, ':');
+					if (!colon) {
+						fprintf(stderr, "library's soname has no colon %s", needed);
+						exit(-1);
+					}
+					loaded_lib * lib = load(colon + 1, libs);
+				}
+				if (dynamic->d_tag == DT_VERSYM) {
+					lib->versym = (Elf64_Half*)(memory + dynamic->d_un.d_ptr);
+				}
+				if (dynamic->d_tag == DT_VERNEED) {
+					lib->verneed = (Elf64_Verneed*)(memory + dynamic->d_un.d_ptr);
+				}
+				if (dynamic->d_tag == DT_VERDEF) {
+					lib->verdef = (Elf64_Verdef*)(memory + dynamic->d_un.d_ptr);
 				}
 			}
 		}
@@ -220,16 +238,58 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	return lib;
 }
 
-Elf64_Half lookup(char* name, loaded_lib* lib) {
+// find the version string of symbol
+// this are some truely ugly structures
+char * verdefstr(size_t sym_idx, loaded_lib* lib) {
+	Elf64_Verdef * v = lib->verdef;
+	for(int i = 1 ; i < lib->versym[sym_idx] ; i++) {
+		v = (void*)v + v->vd_next;
+	}
+	Elf64_Verdaux * aux = (Elf64_Verdaux*)((void*)v + v->vd_aux);
+
+	char * ver = &lib->strtab[aux->vda_name];
+	//printf("version name %s\n", v);
+	return ver;
+}
+
+// find the version string of symbol
+// this are some truely ugly structures
+char * verneedstr(size_t sym_idx, loaded_lib* lib) {
+	Elf64_Verneed * v = lib->verneed;
+	printf("needed index %d residex %d \n", sym_idx, lib->versym[sym_idx]);
+
+	size_t version = lib->versym[sym_idx];
+	while (true) {
+		Elf64_Vernaux * aux = (Elf64_Vernaux*)((void*)v + v->vn_aux);
+		while (true) {
+			if (aux->vna_other == version) {
+				return &lib->strtab[aux->vna_name];
+			}
+			if (aux->vna_next == 0) { break; }
+			aux = (void*)aux + aux->vna_next;
+		}
+
+		if (v->vn_next == 0) { break; }
+		v = (void*)v + v->vn_next;
+	}
+}
+
+Elf64_Half lookup(char* name, char * version, loaded_lib* lib) {
 	const uint32_t nbucket = ((uint32_t*)lib->hash)[0];
 	const uint32_t nchain = ((uint32_t*)lib->hash)[1];
 	if (nbucket == 0) { return 0; }
 	const unsigned long hash = elf_Hash(name);
 
 	Elf64_Half idx = lib->hash[2 + (hash % nbucket)];
+	printf("looking for %s\n",name);
 	while (idx != 0) {
 		if (strcmp(name, lib->strtab + lib->symtab[idx].st_name) == 0) {
-			return idx;
+			char* version2 = verdefstr(idx, lib);
+			//printf("wanted version %s, existing version %s\n", version, version2);
+			if (!version || strcmp(version2, version) == 0) {
+				//printf("found version %s\n", version, version2);
+				return idx;
+			}
 		}
 		idx = lib->hash[2 + nbucket + idx];
 	}
@@ -262,16 +322,18 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 			void** offsetTableLoc = lib->base + rela->r_offset;
 			*offsetTableLoc = val;
 			dlclose(libc);
-		}
-		size_t lib_len = strchr(sym_name, '_') - sym_name;
-		for (size_t i = 0; i < libs->libs_count; i++) {
-			loaded_lib* l = &libs->libs[i];
-			if (strncmp(sym_name, l->name, lib_len) == 0) {
-				Elf64_Half f = lookup(sym_name, l);
-				void * f_addr = l->base + l->symtab[f].st_value;
-				//printf("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, f_addr);
-				void** offsetTableLoc = lib->base + rela->r_offset;
-				*offsetTableLoc = f_addr;
+		} else {
+			char * version = verneedstr(sym, lib);
+			size_t lib_len = strchr(version, '_') - version;
+			for (size_t i = 0; i < libs->libs_count; i++) {
+				loaded_lib* l = &libs->libs[i];
+				if (strncmp(version, l->name, lib_len) == 0) {
+					Elf64_Half f = lookup(sym_name, version, l);
+					void * f_addr = l->base + l->symtab[f].st_value;
+					//printf("setting name %s, at %x from base %x to %x\n", sym_name, rela->r_offset, lib->base, f_addr);
+					void** offsetTableLoc = lib->base + rela->r_offset;
+					*offsetTableLoc = f_addr;
+				}
 			}
 		}
 	}
@@ -291,7 +353,7 @@ void main(int argc, char ** argv) {
 	for (size_t i = 0 ; i < libs.libs_count ; i++) {
 		link(&libs.libs[i], &libs);
 	}
-	Elf64_Half main_idx = lookup("main", lib);
+	Elf64_Half main_idx = lookup("main", 0, lib);
 	//printf("main idx %d\n", main_idx);
 
 	void * main_addr = lib->base + lib->symtab[main_idx].st_value;

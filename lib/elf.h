@@ -1,3 +1,24 @@
+// A big part of this file was copied from glibc
+/* This file defines standard ELF types, structures, and macros.
+   Copyright (C) 1995-2020 Free Software Foundation, Inc.
+   This file is part of the GNU C Library.
+
+   The GNU C Library is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 2.1 of the License, or (at your option) any later version.
+
+   The GNU C Library is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with the GNU C Library; if not, see
+   <https://www.gnu.org/licenses/>.  */
+
+
+
 #define EI_NIDENT 16
 
 typedef unsigned short uint16_t;
@@ -74,6 +95,37 @@ typedef struct {
         Elf64_Sxword    r_addend;
 } Elf64_Rela;
 
+typedef struct {
+        Elf64_Half      vd_version;
+        Elf64_Half      vd_flags;
+        Elf64_Half      vd_ndx;
+        Elf64_Half      vd_cnt;
+        Elf64_Word      vd_hash;
+        Elf64_Word      vd_aux;
+        Elf64_Word      vd_next;
+} Elf64_Verdef;
+ 
+typedef struct {
+        Elf64_Word      vda_name;
+        Elf64_Word      vda_next;
+} Elf64_Verdaux;
+
+typedef struct {
+        Elf64_Half      vn_version;
+        Elf64_Half      vn_cnt;
+        Elf64_Word      vn_file;
+        Elf64_Word      vn_aux;
+        Elf64_Word      vn_next;
+} Elf64_Verneed;
+
+typedef struct {
+        Elf64_Word      vna_hash;
+        Elf64_Half      vna_flags;
+        Elf64_Half      vna_other;
+        Elf64_Word      vna_name;
+        Elf64_Word      vna_next;
+} Elf64_Vernaux;
+
 #define ELF64_R_SYM(info)             ((info)>>32)
 #define ELF64_R_TYPE(info)            ((Elf64_Word)(info))
 #define ELF64_R_INFO(sym, type)       (((Elf64_Xword)(sym)<<32)+ \
@@ -118,6 +170,24 @@ typedef struct {
 #define DT_NUM          35              /* Number used */
 #define DT_LOOS         0x6000000d      /* Start of OS-specific */
 #define DT_HIOS         0x6ffff000      /* End of OS-specific */
+
+
+/* The versioning entry types.  The next are defined as part of the
+   GNU extension.  */
+#define DT_VERSYM       0x6ffffff0
+
+#define DT_RELACOUNT    0x6ffffff9
+#define DT_RELCOUNT     0x6ffffffa
+
+/* These were chosen by Sun.  */
+#define DT_FLAGS_1      0x6ffffffb      /* State flags, see DF_1_* below.  */
+#define DT_VERDEF       0x6ffffffc      /* Address of version definition
+                                           table */
+#define DT_VERDEFNUM    0x6ffffffd      /* Number of version definitions */
+#define DT_VERNEED      0x6ffffffe      /* Address of table with needed
+                                           versions */
+#define DT_VERNEEDNUM   0x6fffffff      /* Number of needed versions */
+#define DT_VERSIONTAGIDX(tag)   (DT_VERNEEDNUM - (tag)) /* Reverse order! */
 
 
 #define PT_NULL         0               /* Program header table entry unused */

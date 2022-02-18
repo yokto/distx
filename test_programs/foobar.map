@@ -1,0 +1,10 @@
+foobar_2.0.0 {
+    global:
+	foobar_baz;
+};
+foobar_1.0.0 {
+    global:
+        foobar_foo;
+        foobar_baz;
+    local: *;
+};

@@ -12,6 +12,7 @@ DLL_PUBLIC int main() {
 	c_printf(hello_world);
 
 	c_printf("foo = %d\n", foobar_foo());
+	c_printf("foo = %d\n", foobar_baz());
       	c_getchar();
 
 	//foobar_bar++;

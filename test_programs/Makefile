@@ -10,25 +10,25 @@ all: $(HELLOC) $(HELLORUST) $(HELLOCPP)
 #nolibc: foobar.so nolibc.c ../lib/* Makefile
 #	gcc -shared -nostdlib '-Wl,--dynamic-linker=/home/silvio/stuff/sources/elf/executables/load_elf.so' -fvisibility=hidden -fPIC -o nolibc -lfoobar -L. nolibc.c
 
-$(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile
+$(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile helloc.map
 	mkdir -p $(dir $(HELLOC))
-	gcc -Wl,--no-undefined -Wl,-soname,helloc:helloc/lib/helloc -shared -nostdlib -fvisibility=hidden -fPIC -o $(HELLOC) \
+	gcc -Wl,--no-undefined -Wl,-soname,helloc:helloc/lib/helloc -Wl,--version-script=helloc.map -shared -nostdlib -fvisibility=hidden -fPIC -o $(HELLOC) \
 		-lfoobar -L$(dir $(LIBFOOBAR)) \
 		-lc -L$(dir $(LIBC)) \
 		helloc.c 
 
-$(LIBFOOBAR): foobar.c Makefile
+$(LIBFOOBAR): foobar.c Makefile foobar.map
 	mkdir -p $(dir $(LIBFOOBAR))
-	gcc -Wl,-soname,foobar:foobar/lib/libfoobar.so -nostdlib -shared -o $(LIBFOOBAR) foobar.c
+	gcc -Wl,-soname,foobar:foobar/lib/libfoobar.so -Wl,--version-script=foobar.map -nostdlib -shared -o $(LIBFOOBAR) foobar.c
 
 $(LIBC): libc.c Makefile
 	mkdir -p $(dir $(LIBC))
-	gcc -Wl,-soname,c:libc/lib/libc.so -nostdlib -shared -o $(LIBC) libc.c
+	gcc -Wl,-soname,c:libc/lib/libc.so -Wl,--version-script=libc.map -nostdlib -shared -o $(LIBC) libc.c
 
 $(HELLORUST): hellorust.rs Makefile
 	mkdir -p $(dir $(HELLORUST))
 	rustc hellorust.rs --crate-type cdylib -o $(HELLORUST)
 
-$(HELLOCPP): hellocpp.cpp Makefile
+$(HELLOCPP): hellocpp.cpp Makefile hellocpp.map
 	mkdir -p $(dir $(HELLOCPP))
-	g++ -shared -fvisibility=hidden -fPIC -o $(HELLOCPP) hellocpp.cpp 
+	g++ -shared -Wl,--version-script=hellocpp.map -fPIC -o $(HELLOCPP) hellocpp.cpp 
