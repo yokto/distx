@@ -1,4 +1,5 @@
-#include <stdio.h>
+//#include <stdio.h>
+#include <stdarg.h>
 
 #define DLL_PUBLIC __attribute__ ((visibility ("default")))
 

@@ -1,4 +1,4 @@
-BUILDDIR := build
+BUILDDIR := ../build
 LIBFOOBAR := $(BUILDDIR)/foobar/lib/libfoobar.so
 HELLOC := $(BUILDDIR)/helloc/bin/helloc
 LIBC := $(BUILDDIR)/libc/lib/libc.so
@@ -13,6 +13,7 @@ all: $(HELLOC) $(HELLORUST) $(HELLOCPP)
 $(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile helloc.map
 	mkdir -p $(dir $(HELLOC))
 	gcc -Wl,--no-undefined -Wl,-soname,helloc:helloc/lib/helloc -Wl,--version-script=helloc.map -shared -nostdlib -fvisibility=hidden -fPIC -o $(HELLOC) \
+		-fno-builtin-printf \
 		-lfoobar -L$(dir $(LIBFOOBAR)) \
 		-lc -L$(dir $(LIBC)) \
 		helloc.c 

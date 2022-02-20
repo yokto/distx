@@ -1,6 +1,6 @@
-distro/*/src
-distro/*/build
-distro/*/*/src
-distro/*/*/build
-test_programs/build
+/distro/*/src
+/distro/*/build
+/distro/*/*/src
+/distro/*/*/build
+/build
 .*.swp
