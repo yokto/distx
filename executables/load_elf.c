@@ -389,6 +389,14 @@ void dlclose2(void* lib) {
 #endif
 }
 
+#if defined(WIN32)
+#define EXTERNAL_PREFIX "external_windows_c_"
+#define EXTERNAL_PREFIX_LEN 19
+#else
+#define EXTERNAL_PREFIX "external_linux_c_"
+#define EXTERNAL_PREFIX_LEN 17
+#endif
+
 void link(loaded_lib* lib, loaded_libs* libs) {
 	printf("linking library %s\n", lib->path);
 	for (int i = 0 ; i < lib->rela_count ; i++) {
@@ -402,22 +410,26 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 		//printf("symbol name: %s\n", sym_name);
 
 		void** offsetTableLoc = lib->base + rela->r_offset;
-		if (strncmp(sym_name, "external_c_", 11) == 0) {
+		void* ret = 0;
+		if (strncmp(sym_name, EXTERNAL_PREFIX, EXTERNAL_PREFIX_LEN) == 0) {
 			void* libc = dlopen2("libc.so.6");
 			if (!libc) {
 				fprintf(stderr, "could not open libc\n");
 				exit(-1);
 			}
-			void* val = dlsym2(libc, sym_name+11);
+			void* val = dlsym2(libc, sym_name+ EXTERNAL_PREFIX_LEN);
 			if (!val) {
-				fprintf(stderr, "could not load %s\n", sym_name+11);
+				fprintf(stderr, "could not load external %s\n", sym_name+ EXTERNAL_PREFIX_LEN);
 				exit(-1);
 			}
 			//printf("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, val);
-			*offsetTableLoc = val;
+			ret = val;
 			dlclose2(libc);
 		} else if (strcmp(sym_name, "external_elfator_os") == 0) {
-			*offsetTableLoc = &get_os;
+			ret = &get_os;
+
+		} else if (strncmp(sym_name, "external_", 9) == 0) {
+			// ignore
 		} else {
 			char * version = verneedstr(sym, lib);
 			size_t lib_len = strchr(version, '_') - version;
@@ -427,10 +439,12 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 					Elf64_Half f = lookup(sym_name, version, l);
 					void * f_addr = l->base + l->symtab[f].st_value;
 					//printf("setting name %s, at %x from base %x to %x\n", sym_name, rela->r_offset, lib->base, f_addr);
-					*offsetTableLoc = f_addr;
+					ret = f_addr;
 				}
 			}
 		}
+		*offsetTableLoc = ret;
+		printf("setting symbol %s to %p\n", sym_name, *offsetTableLoc);
 	}
 
 

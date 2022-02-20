@@ -5,17 +5,23 @@
 #define OS_LINUX 1
 #define OS_WINDOWS 0
 
+char external_windows_c_getchar() __attribute((ms_abi));
+char external_windows_c_printf() __attribute((ms_abi));
 
 DLL_PUBLIC
 char c_getchar(void) {
-//	if (external_elvator_os() == OS_LINUX) {
-		return external_c_getchar();
-	//} else if (external_elvator_os() == OS_WINDOWS) {
-		return external_c_getchar();
-	//}
+	if (external_elfator_os() == OS_LINUX) {
+		return external_linux_c_getchar();
+	} else if (external_elfator_os() == OS_WINDOWS) {
+		return external_windows_c_getchar();
+	}
 }
 
 DLL_PUBLIC
 int c_printf(const char *restrict format, va_list argp) {
-	return external_c_printf(format, argp);
+	if (external_elfator_os() == OS_LINUX) {
+		return external_linux_c_printf(format, argp);
+	} else if (external_elfator_os() == OS_WINDOWS) {
+		return external_windows_c_printf(format, argp);
+	}
 }
