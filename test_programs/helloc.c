@@ -10,11 +10,11 @@ DLL_PUBLIC int main() {
 	//return foobar_foo();
 //	foobar_baz();
 //	foobar_foo();
-	c_printf(hello_world);
+	printf(hello_world);
 
-	c_printf("foo = %d\n", foobar_foo());
-	c_printf("foo = %d\n", foobar_baz());
-      	c_getchar();
+	printf("foo = %d\n", foobar_foo());
+	printf("foo = %d\n", foobar_baz());
+      	getchar();
 
 	//foobar_bar++;
 	return 42;
