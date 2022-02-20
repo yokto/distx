@@ -2,10 +2,17 @@
 
 #define DLL_PUBLIC __attribute__ ((visibility ("default")))
 
+#define OS_LINUX 1
+#define OS_WINDOWS 0
+
 
 DLL_PUBLIC
 char c_getchar(void) {
-	return external_c_getchar();
+//	if (external_elvator_os() == OS_LINUX) {
+		return external_c_getchar();
+	//} else if (external_elvator_os() == OS_WINDOWS) {
+		return external_c_getchar();
+	//}
 }
 
 DLL_PUBLIC

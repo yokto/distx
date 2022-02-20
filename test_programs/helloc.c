@@ -7,6 +7,7 @@ const char* const hello_world = "hello world\n";
 
 DLL_PUBLIC int main() {
 
+	return foobar_foo();
 //	foobar_baz();
 //	foobar_foo();
 	c_printf(hello_world);

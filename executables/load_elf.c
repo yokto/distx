@@ -1,12 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
-#include <dlfcn.h>
 #include <stdbool.h>
+
+#if defined(WIN32)
+	#include <memoryapi.h>
+	#include <windows.h>
+	#include <sysinfoapi.h>
+#else
+	#include <sys/mman.h>
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	#include <dlfcn.h>
+#endif
 
 #include "../lib/elf.h"
 
@@ -46,6 +53,14 @@ typedef struct loaded_libs {
 	int vec_length;
 } loaded_libs;
 
+__attribute__((sysv_abi)) char* get_os() {
+#if defined(WIN32)
+	return 0;
+#else
+	return 1;
+#endif
+}
+
 int alloc_loaded_libs(loaded_libs* libs) {
 	libs->libs = calloc(8, sizeof(loaded_lib));
 	libs->libs_count = 0;
@@ -72,6 +87,36 @@ loaded_lib* add_loaded_lib(loaded_libs* libs) {
 	return &libs->libs[libs->libs_count-1];
 }
 
+void * reserve_memory(size_t size) {
+	size = roundup_pagesize(size);
+#if defined(WIN32)
+// unfortunately we cant use this because of dwAllocationGranularity
+//	void* memory = VirtualAlloc(0, size, MEM_RESERVE, PAGE_NOACCESS);
+//	printf("foo %p\n\n\n", memory);
+//	fflush(stdout);
+//	VirtualFree(memory, size, MEM_RELEASE);
+	void* memory = VirtualAlloc(0, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	if (memory == 0) {
+		fprintf(stderr, "can't map memory");
+		return 0;
+	}
+#else
+	void* memory = mmap(
+			0,
+			size,
+			PROT_READ,
+			MAP_PRIVATE | MAP_DENYWRITE | MAP_ANONYMOUS,
+			-1,
+			0);
+	if (memory == MAP_FAILED) {
+		fprintf(stderr, "can't map memory\n");
+		return 0;
+	}
+#endif
+	return memory;
+}
+
+
 loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	for (int i = 0 ; i < libs->libs_count ; i++) {
 		if (libs->libs[i].path && strcmp(libs->libs[i].path, lib_path) == 0) {
@@ -88,28 +133,24 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	lib->path = malloc(strlen(lib_path) + 1);
 	strcpy(lib->path, lib_path);
 
-	FILE* fd = fopen(lib_path, "r");
+	FILE* fd = fopen(lib_path, "rb");
 	if (fd == 0) {
-		fprintf(stderr, "can't open ", 0);
-		fprintf(stderr, lib_path, 0);
+		fprintf(stderr, "can't open %s", lib_path);
 		exit(-1);
 	}
 	ElfN_Ehdr elf_header;
 	if (fread(&elf_header, sizeof(ElfN_Ehdr), 1, fd) != 1) {
-		fprintf(stderr, "can't read elfheader ", 0);
-		fprintf(stderr, lib_path, 0);
+		fprintf(stderr, "can't read elfheader %s", lib_path);
 		exit(-1);
 	}
 	if (elf_header.e_phnum > 32) {
-		fprintf(stderr, "can't read more than 32 program headers in ", 0);
-		fprintf(stderr, lib_path, 0);
+		fprintf(stderr, "can't read more than 32 program headers in %s", lib_path);
 		exit(-1);
 	}
 	Elf64_Phdr phs[32];
 	int phnum = elf_header.e_phnum;
 	if (fread(phs, sizeof(Elf64_Phdr), phnum, fd) != phnum) {
-		fprintf(stderr, "can't read program headers ", 0);
-		fprintf(stderr, lib_path, 0);
+		fprintf(stderr, "can't read program headers %s", lib_path);
 		exit(-1);
 	}
 	size_t maxAddr = 0;
@@ -124,24 +165,24 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 		}	
 	}
 	if (maxAddr <= minAddr) {
-		fprintf(stderr, "library seems to be empty ", 0);
-		fprintf(stderr, lib_path, 0);
+		fprintf(stderr, "library seems to be empty %s", lib_path);
 		return 0;
 	} // nothing to do?
-	// mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
-	void* memory = mmap(
-		0,
-		roundup_pagesize(maxAddr - minAddr),
-		PROT_READ,
-		MAP_PRIVATE | MAP_DENYWRITE,
-		fileno(fd),
-		0);
-	if (memory == MAP_FAILED) {
-		fprintf(stderr, "can't map memory", 0);
-		fprintf(stderr, lib_path, 0);
-		exit(-1);
-	}
 
+#if defined(WIN32)
+	// unfortunately we cant use this because of dwAllocationGranularity
+	//HANDLE h = CreateFile(lib_path, GENERIC_READ | GENERIC_WRITE | GENERIC_EXECUTE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+	//HANDLE mapping = CreateFileMapping(
+	//		h,
+	//		0,
+	//		PAGE_EXECUTE_WRITECOPY,
+	//		0,
+	//		0,
+	//		0
+	//		);
+#endif
+
+	void * memory = reserve_memory(maxAddr - minAddr);
 	lib->base = memory;
 
 	for (int i = 0 ; i < phnum ; i++) {
@@ -149,18 +190,43 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 		if (ph->p_type == PT_LOAD) {
 			const size_t maddr = rounddown_pagesize((size_t)memory + ph->p_vaddr);
 			const size_t msize = roundup_pagesize((size_t)memory + ph->p_vaddr + ph->p_memsz) - maddr;
+			const size_t file_offset = rounddown_pagesize(ph->p_offset);
 			if (ph->p_offset & (PAGE_SIZE-1) != ph->p_vaddr & (PAGE_SIZE-1)) {
-				fprintf(stderr, "addresses don't match", 0);
-				fprintf(stderr, lib_path, 0);
+				fprintf(stderr, "addresses don't match %s", lib_path);
 				exit(-1);
 			}
+#if defined(WIN32)
+// unfortunately we cant use this because of dwAllocationGranularity
+//			void* m = MapViewOfFileEx(
+//					mapping,
+//					FILE_MAP_READ,
+//					file_offset >> 32,
+//					file_offset & 0xffffffff,
+//					msize,
+//					maddr 
+//					);
+//
+			printf("read addr %p size\n", maddr);
+			fflush(stdout);
+			if (fseek(fd, ph->p_offset, SEEK_SET) != 0) {
+				fprintf(stderr, "can't seek in %s\n", lib_path);
+				exit(-1);
+			}
+			printf("bar\n", maddr);
+			fflush(stdout);
+			if (fread((void*) memory + ph->p_vaddr, ph->p_filesz, 1, fd) != 1) {
+				fprintf(stderr, "can't read section %s\n", lib_path);
+				exit(-1);
+			}
+#else
 			mmap(
 				(void*)maddr,
 				msize,
 				PROT_READ | PROT_WRITE | PROT_EXEC, // todo remove wrong ones
 				MAP_PRIVATE | MAP_DENYWRITE | MAP_FIXED,
 				fileno(fd),
-				rounddown_pagesize(ph->p_offset));
+				file_offset);
+#endif
 		}	
 		if (ph->p_type == PT_DYNAMIC) {
 			lib->dynamic = (Elf64_Dyn*)(memory + ph->p_vaddr);
@@ -256,7 +322,7 @@ char * verdefstr(size_t sym_idx, loaded_lib* lib) {
 // this are some truely ugly structures
 char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 	Elf64_Verneed * v = lib->verneed;
-	printf("needed index %d residex %d \n", sym_idx, lib->versym[sym_idx]);
+	printf("needed index %zd residex %d \n", sym_idx, lib->versym[sym_idx]);
 
 	size_t version = lib->versym[sym_idx];
 	while (true) {
@@ -295,6 +361,34 @@ Elf64_Half lookup(char* name, char * version, loaded_lib* lib) {
 	}
 }
 
+
+void* dlopen2(char* name) {
+#if defined(WIN32)
+	printf("getting lib %s\n", name);
+	return LoadLibrary("msvcrt.dll");
+#else
+	return dlopen(name, RTLD_NOW);
+#endif
+}
+
+void* dlsym2(char* lib, char* name) {
+#if defined(WIN32)
+	printf("getting sym %s from lib %p\n", name, lib);
+	return GetProcAddress(lib, name);
+#else
+	return dlsym(lib, name);
+#endif
+}
+
+void dlclose2(void* lib) {
+#if defined(WIN32)
+	return;
+#else
+	dlclose(lib);
+	return;
+#endif
+}
+
 void link(loaded_lib* lib, loaded_libs* libs) {
 	printf("linking library %s\n", lib->path);
 	for (int i = 0 ; i < lib->rela_count ; i++) {
@@ -307,21 +401,23 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 		char* sym_name = lib->strtab + lib->symtab[sym].st_name;
 		//printf("symbol name: %s\n", sym_name);
 
+		void** offsetTableLoc = lib->base + rela->r_offset;
 		if (strncmp(sym_name, "external_c_", 11) == 0) {
-			void* libc = dlopen("libc.so.6", RTLD_NOW);
+			void* libc = dlopen2("libc.so.6");
 			if (!libc) {
 				fprintf(stderr, "could not open libc\n");
 				exit(-1);
 			}
-			void* val = dlsym(libc, sym_name+11);
+			void* val = dlsym2(libc, sym_name+11);
 			if (!val) {
-				fprintf(stderr, "could not load getchar\n");
+				fprintf(stderr, "could not load %s\n", sym_name+11);
 				exit(-1);
 			}
 			//printf("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, val);
-			void** offsetTableLoc = lib->base + rela->r_offset;
 			*offsetTableLoc = val;
-			dlclose(libc);
+			dlclose2(libc);
+		} else if (strcmp(sym_name, "external_elfator_os") == 0) {
+			*offsetTableLoc = &get_os;
 		} else {
 			char * version = verneedstr(sym, lib);
 			size_t lib_len = strchr(version, '_') - version;
@@ -331,7 +427,6 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 					Elf64_Half f = lookup(sym_name, version, l);
 					void * f_addr = l->base + l->symtab[f].st_value;
 					//printf("setting name %s, at %x from base %x to %x\n", sym_name, rela->r_offset, lib->base, f_addr);
-					void** offsetTableLoc = lib->base + rela->r_offset;
 					*offsetTableLoc = f_addr;
 				}
 			}
@@ -356,9 +451,11 @@ void main(int argc, char ** argv) {
 	Elf64_Half main_idx = lookup("main", 0, lib);
 	//printf("main idx %d\n", main_idx);
 
+	int (*main_f)(void) __attribute__((sysv_abi));
 	void * main_addr = lib->base + lib->symtab[main_idx].st_value;
-	int ret = ((int (*)())main_addr)();
-	//printf("main returned %d\n", ret);
+	main_f = main_addr;
+	int ret = main_f();
+	printf("main returned %d\n", ret);
 	
 //	FILE * fp = fopen(argv[1], "r"A)
 //	if (!fp) {

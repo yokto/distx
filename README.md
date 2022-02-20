@@ -206,3 +206,15 @@ The got will look like
 
     0x22220    0x11136 # this is foo@got.plt (this will be replaced to point to the actual foo)
     0x22228    0x11146 # this is bar@got.plt
+
+## Windows
+
+Trying to run ELF executables on Windows we run into the following problem.
+Our executables want most of their segments to be loaded contiguously.
+Their alignment is the pagesize.
+However under windows mapping files into memory is only possible with allignment dwAllocationGranularity.
+For now we solve this by just copying the data.
+This has two backdraws.
+
+1. Multiple copies of the same library in memory.
+2. The whole memory segment has to be rwx. This could be a security problem.

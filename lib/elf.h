@@ -21,10 +21,7 @@
 
 #define EI_NIDENT 16
 
-typedef unsigned short uint16_t;
-typedef unsigned int uint32_t;
-typedef unsigned long uint64_t;
-typedef signed long int64_t;
+#include <stdint.h>
 
 typedef uint64_t ElfN_Addr;
 typedef uint64_t ElfN_Off;
@@ -200,10 +197,10 @@ typedef struct {
 #define PT_TLS          7               /* Thread-local storage segment */
 #define PT_NUM          8               /* Number of defined types */
 
-unsigned long
+uint32_t
 elf_Hash(const unsigned char *name)
 {
-    unsigned long h = 0, g;
+    uint32_t h = 0, g;
 
         while (*name)
         {
