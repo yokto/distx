@@ -6,5 +6,6 @@ foobar_1.0.0 {
     global:
         foobar_foo;
         foobar_baz;
+        foobar_bar;
     local: *;
 };

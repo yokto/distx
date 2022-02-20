@@ -1,3 +1,3 @@
 int foobar_foo();
 int foobar_baz();
-int foobar_bar;
+extern int foobar_bar;

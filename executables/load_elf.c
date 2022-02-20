@@ -53,7 +53,7 @@ typedef struct loaded_libs {
 	int vec_length;
 } loaded_libs;
 
-__attribute__((sysv_abi)) char* get_os() {
+__attribute__((sysv_abi)) uint32_t get_os() {
 #if defined(WIN32)
 	return 0;
 #else
@@ -206,14 +206,10 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 //					maddr 
 //					);
 //
-			printf("read addr %p size\n", maddr);
-			fflush(stdout);
 			if (fseek(fd, ph->p_offset, SEEK_SET) != 0) {
 				fprintf(stderr, "can't seek in %s\n", lib_path);
 				exit(-1);
 			}
-			printf("bar\n", maddr);
-			fflush(stdout);
 			if (fread((void*) memory + ph->p_vaddr, ph->p_filesz, 1, fd) != 1) {
 				fprintf(stderr, "can't read section %s\n", lib_path);
 				exit(-1);
@@ -279,10 +275,11 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 					char* needed = lib->strtab + dynamic->d_un.d_ptr;
 					char* colon = strchr(needed, ':');
 					if (!colon) {
-						fprintf(stderr, "library's soname has no colon %s", needed);
-						exit(-1);
+						fprintf(stderr, "library's soname has no colon %s\n", needed);
+						//exit(-1);
+					} else {
+						loaded_lib * lib = load(colon + 1, libs);
 					}
-					loaded_lib * lib = load(colon + 1, libs);
 				}
 				if (dynamic->d_tag == DT_VERSYM) {
 					lib->versym = (Elf64_Half*)(memory + dynamic->d_un.d_ptr);
@@ -371,7 +368,7 @@ void* dlopen2(char* name) {
 #endif
 }
 
-void* dlsym2(char* lib, char* name) {
+void* dlsym2(void* lib, char* name) {
 #if defined(WIN32)
 	printf("getting sym %s from lib %p\n", name, lib);
 	return GetProcAddress(lib, name);
@@ -397,54 +394,63 @@ void dlclose2(void* lib) {
 #define EXTERNAL_PREFIX_LEN 17
 #endif
 
+void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
+	int sym = ELF64_R_SYM(rela->r_info);
+	char* sym_name = lib->strtab + lib->symtab[sym].st_name;
+	printf("linking symbol name: %s\n", sym_name);
+
+	void* ret = 0;
+	if (strncmp(sym_name, EXTERNAL_PREFIX, EXTERNAL_PREFIX_LEN) == 0) {
+		void* libc = dlopen2("libc.so.6");
+		if (!libc) {
+			fprintf(stderr, "could not open libc\n");
+			exit(-1);
+		}
+		void* val = dlsym2(libc, sym_name+ EXTERNAL_PREFIX_LEN);
+		if (!val) {
+			fprintf(stderr, "could not load external %s\n", sym_name+ EXTERNAL_PREFIX_LEN);
+			exit(-1);
+		}
+		//printf("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, val);
+		ret = val;
+		dlclose2(libc);
+	} else if (strcmp(sym_name, "external_elfator_os") == 0) {
+		ret = &get_os;
+
+	} else if (strncmp(sym_name, "external_", 9) == 0) {
+		// ignore
+	} else {
+		printf("version \n");
+		char * version = verneedstr(sym, lib);
+		size_t lib_len = strchr(version, '_') - version;
+		for (size_t i = 0; i < libs->libs_count; i++) {
+			loaded_lib* l = &libs->libs[i];
+			if (strncmp(version, l->name, lib_len) == 0) {
+				Elf64_Half f = lookup(sym_name, version, l);
+				void * f_addr = l->base + l->symtab[f].st_value;
+				//printf("setting name %s, at %x from base %x to %x\n", sym_name, rela->r_offset, lib->base, f_addr);
+				ret = f_addr;
+			}
+		}
+	}
+	printf("setting symbol %s to %p\n", sym_name, ret);
+	return ret;
+}
+
 void link(loaded_lib* lib, loaded_libs* libs) {
 	printf("linking library %s\n", lib->path);
 	for (int i = 0 ; i < lib->rela_count ; i++) {
-		printf("offset: %lx, info %lx, addend: %lx\n", lib->rela[i].r_offset, lib->rela[i].r_info, lib->rela[i].r_addend);
+		Elf64_Rela * rela = lib->rela + i;
+		void** offsetTableLoc = lib->base + rela->r_offset;
+
+		*offsetTableLoc = findSymbol(rela, lib, libs);
+		//printf("offset: %lx, info %lx, addend: %lx\n", lib->rela[i].r_offset, lib->rela[i].r_info, lib->rela[i].r_addend);
 	}
 	for (int i = 0 ; i < lib->rela_plt_count ; i++) {
 		Elf64_Rela * rela = lib->rela_plt + i;
-		//printf("offset: %lx, info %lx, addend: %lx\n", rela->r_offset, rela->r_info, rela->r_addend);
-		int sym = ELF64_R_SYM(rela->r_info);
-		char* sym_name = lib->strtab + lib->symtab[sym].st_name;
-		//printf("symbol name: %s\n", sym_name);
-
 		void** offsetTableLoc = lib->base + rela->r_offset;
-		void* ret = 0;
-		if (strncmp(sym_name, EXTERNAL_PREFIX, EXTERNAL_PREFIX_LEN) == 0) {
-			void* libc = dlopen2("libc.so.6");
-			if (!libc) {
-				fprintf(stderr, "could not open libc\n");
-				exit(-1);
-			}
-			void* val = dlsym2(libc, sym_name+ EXTERNAL_PREFIX_LEN);
-			if (!val) {
-				fprintf(stderr, "could not load external %s\n", sym_name+ EXTERNAL_PREFIX_LEN);
-				exit(-1);
-			}
-			//printf("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, val);
-			ret = val;
-			dlclose2(libc);
-		} else if (strcmp(sym_name, "external_elfator_os") == 0) {
-			ret = &get_os;
 
-		} else if (strncmp(sym_name, "external_", 9) == 0) {
-			// ignore
-		} else {
-			char * version = verneedstr(sym, lib);
-			size_t lib_len = strchr(version, '_') - version;
-			for (size_t i = 0; i < libs->libs_count; i++) {
-				loaded_lib* l = &libs->libs[i];
-				if (strncmp(version, l->name, lib_len) == 0) {
-					Elf64_Half f = lookup(sym_name, version, l);
-					void * f_addr = l->base + l->symtab[f].st_value;
-					//printf("setting name %s, at %x from base %x to %x\n", sym_name, rela->r_offset, lib->base, f_addr);
-					ret = f_addr;
-				}
-			}
-		}
-		*offsetTableLoc = ret;
-		printf("setting symbol %s to %p\n", sym_name, *offsetTableLoc);
+		*offsetTableLoc = findSymbol(rela, lib, libs);
 	}
 
 
@@ -470,54 +476,4 @@ void main(int argc, char ** argv) {
 	main_f = main_addr;
 	int ret = main_f();
 	printf("main returned %d\n", ret);
-	
-//	FILE * fp = fopen(argv[1], "r"A)
-//	if (!fp) {
-//		printf("could not open %s", argv[1]);	
-//	}
-//
-//	long ph_num;
-//	Elf64_Phdr * ph;
-//	void * entry;
-//
-//	Elf64_Addr programOffset;
-//	Elf64_Addr dynamicAddr;
-//	for (int i = 0; i < ph_num; i++) {
-//		const Elf64_Phdr * h = ph + i;
-//		if (h->p_type == PT_DYNAMIC) {
-//			dynamicAddr = h->p_vaddr;
-//		}
-//		if (h->p_type == PT_PHDR) {
-//			programOffset = (Elf64_Addr)ph - h->p_vaddr;
-//		}
-//	}
-//
-//	Elf64_Dyn* dynamic_orig = (Elf64_Dyn*)(programOffset + dynamicAddr);
-//	Elf64_Dyn* dynamic;
-//	void* strtab;
-//	for (dynamic = dynamic_orig; dynamic->d_tag != DT_NULL; dynamic++) {
-//		if (dynamic->d_tag == DT_STRTAB) {
-//			strtab = programOffset + dynamic->d_un.d_ptr;
-//		}
-//	}
-//
-//	for (dynamic = dynamic_orig; dynamic->d_tag != DT_NULL; dynamic++) {
-//		//printf(1, "\ntag:",0);
-//		//printf(1, "%p", dynamic->d_tag);
-//		//printf(1, "\nval:",0);
-//		//printf(1, "%p", dynamic->d_un.d_val);
-//		if (dynamic->d_tag == DT_NEEDED) {
-//			loaded_lib * lib = load(strtab + dynamic->d_un.d_ptr);
-//			for (Elf64_Dyn* dynamic2 = lib->dynamic; dynamic2->d_tag != DT_NULL; dynamic2++) {
-//			}
-//		}
-//	}
-//
-//	asm(
-//			"movq	%0, %%rsp;"
-//			"jmp	%1;"
-//			:
-//			: "r" (stack), "r" (entry)
-//	   );
-//	exit(ph_num);
 }
