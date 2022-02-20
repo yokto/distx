@@ -1,8 +1,0 @@
-#include <stdio.h>
-
-int main() {
-	printf("%#010x\n", -0x19);
-	printf("%#010x\n", -0x2e);
-	printf("%#010x\n", -0x38);
-	printf("%#010x\n", -0x42);
-}
