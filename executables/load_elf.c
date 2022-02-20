@@ -45,6 +45,10 @@ typedef struct loaded_lib {
 	size_t symtab_count;
 	char* name;
 	char* path;
+	size_t init_arraysz;
+	size_t* init_array;
+	size_t fini_arraysz;
+	size_t* fini_array;
 } loaded_lib;
 
 typedef struct loaded_libs {
@@ -232,6 +236,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 					lib->strtab = (char*)(memory + dynamic->d_un.d_ptr);
 				}
 			}
+
 			for (dynamic = lib->dynamic; dynamic->d_tag != DT_NULL; dynamic++) {
 				if (dynamic->d_tag == DT_SYMTAB) {
 					lib->symtab = (Elf64_Sym*)(memory + dynamic->d_un.d_ptr);
@@ -290,6 +295,18 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 				if (dynamic->d_tag == DT_VERDEF) {
 					lib->verdef = (Elf64_Verdef*)(memory + dynamic->d_un.d_ptr);
 				}
+				if (dynamic->d_tag == DT_INIT_ARRAY) {
+					lib->init_array = memory + dynamic->d_un.d_ptr;
+				}
+				if (dynamic->d_tag == DT_INIT_ARRAYSZ) {
+					lib->init_arraysz = dynamic->d_un.d_val;
+				}
+				if (dynamic->d_tag == DT_FINI_ARRAY) {
+					lib->fini_array = memory + dynamic->d_un.d_ptr;
+				}
+				if (dynamic->d_tag == DT_FINI_ARRAYSZ) {
+					lib->fini_arraysz = dynamic->d_un.d_val;
+				}
 			}
 		}
 	}
@@ -344,8 +361,9 @@ Elf64_Half lookup(char* name, char * version, loaded_lib* lib) {
 	const unsigned long hash = elf_Hash(name);
 
 	Elf64_Half idx = lib->hash[2 + (hash % nbucket)];
-	printf("looking for %s\n",name);
+	printf("looking for %s in library %s\n",name, lib->name);
 	while (idx != 0) {
+		printf("name %s, foundname %s\n", name, lib->strtab + lib->symtab[idx].st_name);
 		if (strcmp(name, lib->strtab + lib->symtab[idx].st_name) == 0) {
 			char* version2 = verdefstr(idx, lib);
 			//printf("wanted version %s, existing version %s\n", version, version2);
@@ -396,8 +414,14 @@ void dlclose2(void* lib) {
 
 void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 	int sym = ELF64_R_SYM(rela->r_info);
+	int type = ELF64_R_TYPE(rela->r_info);
+
+	//printf("rela info %lx, offset %lx, addend %lx, sym %lx, type %lx\n", rela->r_info, rela->r_offset, rela->r_addend, sym, type);
+	if (sym == 0 && rela->r_addend != 0) {
+		return lib->base + rela->r_addend;
+	}
 	char* sym_name = lib->strtab + lib->symtab[sym].st_name;
-	printf("linking symbol name: %s\n", sym_name);
+	//printf("linking symbol name: %s\n", sym_name);
 
 	void* ret = 0;
 	if (strncmp(sym_name, EXTERNAL_PREFIX, EXTERNAL_PREFIX_LEN) == 0) {
@@ -443,10 +467,12 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 		Elf64_Rela * rela = lib->rela + i;
 		void** offsetTableLoc = lib->base + rela->r_offset;
 
+		printf("linking symbol\n");
 		*offsetTableLoc = findSymbol(rela, lib, libs);
-		//printf("offset: %lx, info %lx, addend: %lx\n", lib->rela[i].r_offset, lib->rela[i].r_info, lib->rela[i].r_addend);
+		printf("offset: %lx, info %lx, addend: %lx\n", lib->rela[i].r_offset, lib->rela[i].r_info, lib->rela[i].r_addend);
 	}
 	for (int i = 0 ; i < lib->rela_plt_count ; i++) {
+		printf("linking function\n");
 		Elf64_Rela * rela = lib->rela_plt + i;
 		void** offsetTableLoc = lib->base + rela->r_offset;
 
@@ -457,11 +483,39 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 
 }
 
+void init_libs(loaded_libs* libs) {
+	for (int i = 0; i < libs->libs_count; i++) {
+		loaded_lib* lib = &libs->libs[i];
+		if (lib->init_array) {
+			for (int j = 0; j * sizeof(void*) < lib->init_arraysz ; j++) {
+				// this is already absolute because of relocation
+				size_t rel_f = lib->init_array[j];
+				((void (*)())(rel_f))();
+			}
+		}
+	}
+}
+
+void fini_libs(loaded_libs* libs) {
+	for (int i = 0; i < libs->libs_count; i++) {
+		loaded_lib* lib = &libs->libs[i];
+		if (lib->fini_array) {
+			for (int j = 0; j * sizeof(void*) < lib->fini_arraysz ; j++) {
+				// this is already absolute because of relocation
+				size_t rel_f = lib->fini_array[j];
+				((void (*)())(rel_f))();
+			}
+		}
+	}
+}
+
+
 void main(int argc, char ** argv) {
 	if (argc != 2) {
 		fprintf(stderr, "./loadelf file");
 	}
 
+	realloc(0, 234);
 	loaded_libs libs;
 	alloc_loaded_libs(&libs);
 	loaded_lib* lib = load(argv[1], &libs);
@@ -469,11 +523,13 @@ void main(int argc, char ** argv) {
 		link(&libs.libs[i], &libs);
 	}
 	Elf64_Half main_idx = lookup("main", 0, lib);
+	init_libs(&libs);
 	//printf("main idx %d\n", main_idx);
 
 	int (*main_f)(void) __attribute__((sysv_abi));
 	void * main_addr = lib->base + lib->symtab[main_idx].st_value;
 	main_f = main_addr;
 	int ret = main_f();
+	fini_libs(&libs);
 	printf("main returned %d\n", ret);
 }

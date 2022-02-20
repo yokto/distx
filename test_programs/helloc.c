@@ -1,16 +1,31 @@
 #include <stdio.h>
 #include "foobar.h"
 
-#define DLL_PUBLIC __attribute__ ((visibility ("default")))
+char* foo = 0;
 
-DLL_PUBLIC int foo = 1;
+__attribute__((constructor)) void init_foo() {
+	printf("init foo\n");
+	foo = malloc(4);
+	foo[0] = 'f';
+	foo[1] = 'o';
+	foo[2] = 'o';
+	foo[3] = '\0';
+}
 
-DLL_PUBLIC int main() {
+__attribute__((destructor)) void fini_foo() {
+	printf("fini foo\n");
+	free(foo);
+}
+
+int main() {
+	realloc(0, 232);
 
 	printf("hello wörld\n");
 	printf("foo = %d\n", foobar_foo());
 	printf("baz = %d\n", foobar_baz());
       	getchar();
+
+	printf("foo = %s\n", foo);
 
 	printf("before %d\n", foobar_bar);
 	foobar_bar++;

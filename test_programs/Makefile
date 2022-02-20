@@ -16,7 +16,9 @@ $(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile helloc.map foobar.h
 		-Wl,--no-undefined \
 		-Wl,-soname,helloc:helloc/bin/helloc \
 		-Wl,--version-script=helloc.map \
-		-shared -nostdlib -fvisibility=hidden \
+		-Wl,-Bsymbolic \
+		-Wl,-Bsymbolic-functions \
+		-shared -nostdlib \
 		-fPIC \
 		-o $(HELLOC) \
 		-fno-builtin-printf \
@@ -33,10 +35,11 @@ $(LIBC): libc.c Makefile
 	gcc \
 		-Wl,-soname,c:libc/lib/libc.so \
 		-Wl,--version-script=libc.map \
-		-nostdlib -shared \
 		-Wl,-Bsymbolic-functions \
+		-nostdlib -shared \
 		-o $(LIBC) \
 		-lc -L$(dir $(LIBC)) \
+		-fPIC \
 		libc.c
 
 $(HELLORUST): hellorust.rs Makefile

@@ -18,7 +18,7 @@ typedef uint64_t size_t;
 DECLARE(char, getchar)
 DECLARE(int, printf, const char * fmt, ...)
 DECLARE(void, free, void* ptr) 
-DECLARE(void*, realloc, void* ptr, size_t new_size) 
+DECLARE(void*, malloc, size_t new_size) 
 
 uint32_t external_elfator_os();
 
@@ -49,20 +49,12 @@ void free(void* ptr) {
 	}
 }
 
-DLL_PUBLIC
-void* realloc(void* ptr, size_t new_size) {
-	if (new_size == 0) {
-		free(ptr);
-		return 0;
-	}
-	if (external_elfator_os() == OS_LINUX) {
-//		return external_linux_c_realloc(ptr, new_size);
-	} else if (external_elfator_os() == OS_WINDOWS) {
-		return external_windows_c_realloc(ptr, new_size);
-	}
-}
 
 DLL_PUBLIC
 void* malloc(size_t new_size) {
-	return realloc(0, new_size);
+	if (external_elfator_os() == OS_LINUX) {
+		return external_linux_c_malloc(new_size);
+	} else if (external_elfator_os() == OS_WINDOWS) {
+		return external_windows_c_malloc(new_size);
+	}
 }

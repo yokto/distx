@@ -1,6 +1,5 @@
 helloc_1.0.0 {
       global:
 main;
-foo;
       local: *;
     };
