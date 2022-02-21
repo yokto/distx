@@ -13,22 +13,24 @@ all: $(HELLOC) $(HELLORUST) $(HELLOCPP)
 $(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile helloc.map foobar.h
 	mkdir -p $(dir $(HELLOC))
 	gcc \
+		helloc.c \
 		-Wl,--no-undefined \
 		-Wl,-soname,helloc:helloc/bin/helloc \
 		-Wl,--version-script=helloc.map \
 		-Wl,-Bsymbolic \
 		-Wl,-Bsymbolic-functions \
+		-Wl,--hash-style=sysv \
 		-shared -nostdlib \
 		-fPIC \
 		-o $(HELLOC) \
 		-fno-builtin-printf \
 		-lfoobar -L$(dir $(LIBFOOBAR)) \
-		-lc -L$(dir $(LIBC)) \
-		helloc.c 
+		-lc -L$(dir $(LIBC))
 
 $(LIBFOOBAR): foobar.c Makefile foobar.map
 	mkdir -p $(dir $(LIBFOOBAR))
-	gcc -Wl,-soname,foobar:foobar/lib/libfoobar.so -Wl,--version-script=foobar.map -nostdlib -shared -o $(LIBFOOBAR) foobar.c
+	gcc -Wl,-soname,foobar:foobar/lib/libfoobar.so -Wl,--version-script=foobar.map -nostdlib -shared -o $(LIBFOOBAR) foobar.c \
+		-Wl,--hash-style=sysv
 
 $(LIBC): libc.c Makefile
 	mkdir -p $(dir $(LIBC))
@@ -37,10 +39,11 @@ $(LIBC): libc.c Makefile
 		-Wl,--version-script=libc.map \
 		-Wl,-Bsymbolic-functions \
 		-nostdlib -shared \
+		-Wl,--hash-style=sysv \
 		-o $(LIBC) \
+		libc.c
 		-lc -L$(dir $(LIBC)) \
 		-fPIC \
-		libc.c
 
 $(HELLORUST): hellorust.rs Makefile
 	mkdir -p $(dir $(HELLORUST))
@@ -48,4 +51,4 @@ $(HELLORUST): hellorust.rs Makefile
 
 $(HELLOCPP): hellocpp.cpp Makefile hellocpp.map
 	mkdir -p $(dir $(HELLOCPP))
-	g++ -Wl,-soname,hellocpp:hellocpp/bin/hellocpp -shared -Wl,--version-script=hellocpp.map -nolibc -fPIC -lc -L -o $(HELLOCPP) hellocpp.cpp 
+	g++ -Wl,-soname,hellocpp:hellocpp/bin/hellocpp -shared -Wl,--version-script=hellocpp.map -nolibc -fPIC -lc -L$(dir $(LIBC)) -o $(HELLOCPP) hellocpp.cpp 

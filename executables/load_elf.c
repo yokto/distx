@@ -125,7 +125,6 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	for (int i = 0 ; i < libs->libs_count ; i++) {
 		if (libs->libs[i].path && strcmp(libs->libs[i].path, lib_path) == 0) {
 			printf("already loaded library %s\n", lib_path);
-					fflush(stdout);
 			return &libs->libs[i];
 		}
 	}
@@ -355,6 +354,10 @@ char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 }
 
 Elf64_Half lookup(char* name, char * version, loaded_lib* lib) {
+	if (!lib->hash) {
+		printf("no hash table in %s\n", lib->name);
+		exit(-1);
+	}
 	const uint32_t nbucket = ((uint32_t*)lib->hash)[0];
 	const uint32_t nchain = ((uint32_t*)lib->hash)[1];
 	if (nbucket == 0) { return 0; }
