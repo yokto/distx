@@ -51,4 +51,12 @@ $(HELLORUST): hellorust.rs Makefile
 
 $(HELLOCPP): hellocpp.cpp Makefile hellocpp.map
 	mkdir -p $(dir $(HELLOCPP))
-	g++ -Wl,-soname,hellocpp:hellocpp/bin/hellocpp -shared -Wl,--version-script=hellocpp.map -nolibc -fPIC -lc -L$(dir $(LIBC)) -o $(HELLOCPP) hellocpp.cpp 
+	g++ \
+		hellocpp.cpp \
+		-Wl,-soname,hellocpp:hellocpp/bin/hellocpp \
+		-Wl,--version-script=hellocpp.map \
+		-shared \
+		-nolibc \
+		-fPIC \
+		-lc -L$(dir $(LIBC)) \
+		-o $(HELLOCPP)
