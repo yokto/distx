@@ -13,6 +13,16 @@
 	exit(-1); \
 }
 
+//#define STRICT 1
+#ifdef STRICT
+#define STRICT_ERR(...) { \
+	fprintf(stderr, __VA_ARGS__); \
+	exit(-1); \
+}
+#else
+#define STRICT_ERR(...) {}
+#endif
+
 #if defined(WIN32)
 	#include <memoryapi.h>
 	#include <windows.h>
@@ -280,7 +290,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 					char* needed = lib->strtab + dynamic->d_un.d_ptr;
 					char* colon = strchr(needed, ':');
 					if (!colon) {
-						ERR("library's soname has no colon %s\n", needed);
+						STRICT_ERR("library's soname has no colon %s\n", needed);
 					} else {
 						loaded_lib * lib = load(colon + 1, libs);
 					}
@@ -335,6 +345,10 @@ char * verdefstr(size_t sym_idx, loaded_lib* lib) {
 // this are some truely ugly structures
 char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 	Elf64_Verneed * v = lib->verneed;
+	if (!lib->verneed) {
+		STRICT_ERR("could not find version for symbol %d in library %s\n", lib->strtab + lib->symtab[sym_idx].st_name, lib->name);
+		return 0;
+	}
 	printf("needed index %zd residex %d \n", sym_idx, lib->versym[sym_idx]);
 
 	size_t version = lib->versym[sym_idx];
@@ -351,7 +365,7 @@ char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 		if (v->vn_next == 0) { break; }
 		v = (void*)v + v->vn_next;
 	}
-	WARN("could not find version for symbol %s in library %s\n", lib->strtab + lib->symtab[sym_idx].st_name, lib->name);
+	STRICT_ERR("could not find version for symbol %d in library %s\n", lib->strtab + lib->symtab[sym_idx].st_name, lib->name);
 	return 0;
 }
 
@@ -426,7 +440,7 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 		return lib->base + rela->r_addend;
 	}
 	char* sym_name = lib->strtab + lib->symtab[sym].st_name;
-	//printf("linking symbol name: %s\n", sym_name);
+	printf("linking symbol: %s\n", sym_name);
 
 	void* ret = 0;
 	if (strncmp(sym_name, EXTERNAL_PREFIX, EXTERNAL_PREFIX_LEN) == 0) {
@@ -447,17 +461,20 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 	} else if (strncmp(sym_name, "external_", 9) == 0) {
 		// ignore
 	} else {
-		printf("version \n");
 		char * version = verneedstr(sym, lib);
-		if (!version) {  return 0; }
-		size_t lib_len = strchr(version, '_') - version;
-		for (size_t i = 0; i < libs->libs_count; i++) {
-			loaded_lib* l = &libs->libs[i];
-			if (strncmp(version, l->name, lib_len) == 0) {
-				Elf64_Half f = lookup(sym_name, version, l);
-				void * f_addr = l->base + l->symtab[f].st_value;
-				//printf("setting name %s, at %x from base %x to %x\n", sym_name, rela->r_offset, lib->base, f_addr);
-				ret = f_addr;
+		if (!version) {
+			STRICT_ERR("could not link symbol\n", sym_name);
+			return 0;
+		} else {
+			size_t lib_len = strchr(version, '_') - version;
+			for (size_t i = 0; i < libs->libs_count; i++) {
+				loaded_lib* l = &libs->libs[i];
+				if (strncmp(version, l->name, lib_len) == 0) {
+					Elf64_Half f = lookup(sym_name, version, l);
+					void * f_addr = l->base + l->symtab[f].st_value;
+					//printf("setting name %s, at %x from base %x to %x\n", sym_name, rela->r_offset, lib->base, f_addr);
+					ret = f_addr;
+				}
 			}
 		}
 	}
@@ -471,7 +488,6 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 		Elf64_Rela * rela = lib->rela + i;
 		void** offsetTableLoc = lib->base + rela->r_offset;
 
-		printf("linking symbol\n");
 		void * sym = findSymbol(rela, lib, libs);
 		if (sym) {
 			*offsetTableLoc = sym;
@@ -479,7 +495,6 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 		printf("offset: %lx, info %lx, addend: %lx\n", lib->rela[i].r_offset, lib->rela[i].r_info, lib->rela[i].r_addend);
 	}
 	for (int i = 0 ; i < lib->rela_plt_count ; i++) {
-		printf("linking function\n");
 		Elf64_Rela * rela = lib->rela_plt + i;
 		void** offsetTableLoc = lib->base + rela->r_offset;
 
@@ -500,6 +515,7 @@ void init_libs(loaded_libs* libs) {
 			for (int j = 0; j * sizeof(void*) < lib->init_arraysz ; j++) {
 				// this is already absolute because of relocation
 				size_t rel_f = lib->init_array[j];
+				//printf("exec init at %llx for lib %s\n", rel_f, lib->name);
 				((void (*)())(rel_f))();
 			}
 		}

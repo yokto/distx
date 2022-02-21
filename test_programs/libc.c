@@ -19,6 +19,7 @@ DECLARE(char, getchar)
 DECLARE(int, printf, const char * fmt, ...)
 DECLARE(void, free, void* ptr) 
 DECLARE(void*, malloc, size_t new_size) 
+DECLARE(int, puts, const char* str) 
 
 uint32_t external_elfator_os();
 
@@ -56,5 +57,14 @@ void* malloc(size_t new_size) {
 		return external_linux_c_malloc(new_size);
 	} else if (external_elfator_os() == OS_WINDOWS) {
 		return external_windows_c_malloc(new_size);
+	}
+}
+
+DLL_PUBLIC
+int puts(const char* str) {
+	if (external_elfator_os() == OS_LINUX) {
+		return external_linux_c_puts(str);
+	} else if (external_elfator_os() == OS_WINDOWS) {
+		return external_windows_c_puts(str);
 	}
 }

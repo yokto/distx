@@ -56,6 +56,8 @@ $(HELLOCPP): hellocpp.cpp Makefile hellocpp.map
 		hellocpp.cpp \
 		-Wl,-soname,hellocpp:hellocpp/bin/hellocpp \
 		-Wl,--version-script=hellocpp.map \
+		-Wl,-Bsymbolic \
+		-Wl,-Bsymbolic-functions \
 		-shared \
 		-nolibc \
 		-fPIC \
