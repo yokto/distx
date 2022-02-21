@@ -4,6 +4,15 @@
 #include <fcntl.h>
 #include <stdbool.h>
 
+#define WARN(...) { \
+	fprintf(stderr, __VA_ARGS__); \
+}
+
+#define ERR(...) { \
+	fprintf(stderr, __VA_ARGS__); \
+	exit(-1); \
+}
+
 #if defined(WIN32)
 	#include <memoryapi.h>
 	#include <windows.h>
@@ -138,23 +147,19 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 
 	FILE* fd = fopen(lib_path, "rb");
 	if (fd == 0) {
-		fprintf(stderr, "can't open %s", lib_path);
-		exit(-1);
+		ERR("can't open %s", lib_path);
 	}
 	ElfN_Ehdr elf_header;
 	if (fread(&elf_header, sizeof(ElfN_Ehdr), 1, fd) != 1) {
-		fprintf(stderr, "can't read elfheader %s", lib_path);
-		exit(-1);
+		ERR("can't read elfheader %s", lib_path);
 	}
 	if (elf_header.e_phnum > 32) {
-		fprintf(stderr, "can't read more than 32 program headers in %s", lib_path);
-		exit(-1);
+		ERR("can't read more than 32 program headers in %s", lib_path);
 	}
 	Elf64_Phdr phs[32];
 	int phnum = elf_header.e_phnum;
 	if (fread(phs, sizeof(Elf64_Phdr), phnum, fd) != phnum) {
-		fprintf(stderr, "can't read program headers %s", lib_path);
-		exit(-1);
+		ERR("can't read program headers %s", lib_path);
 	}
 	size_t maxAddr = 0;
 	size_t minAddr = MAX_SIZE_T;
@@ -195,8 +200,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 			const size_t msize = roundup_pagesize((size_t)memory + ph->p_vaddr + ph->p_memsz) - maddr;
 			const size_t file_offset = rounddown_pagesize(ph->p_offset);
 			if (ph->p_offset & (PAGE_SIZE-1) != ph->p_vaddr & (PAGE_SIZE-1)) {
-				fprintf(stderr, "addresses don't match %s", lib_path);
-				exit(-1);
+				ERR("addresses don't match %s", lib_path);
 			}
 #if defined(WIN32)
 // unfortunately we cant use this because of dwAllocationGranularity
@@ -210,12 +214,10 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 //					);
 //
 			if (fseek(fd, ph->p_offset, SEEK_SET) != 0) {
-				fprintf(stderr, "can't seek in %s\n", lib_path);
-				exit(-1);
+				ERR("can't seek in %s\n", lib_path);
 			}
 			if (fread((void*) memory + ph->p_vaddr, ph->p_filesz, 1, fd) != 1) {
-				fprintf(stderr, "can't read section %s\n", lib_path);
-				exit(-1);
+				ERR("can't read section %s\n", lib_path);
 			}
 #else
 			mmap(
@@ -260,8 +262,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 				}
 				if (dynamic->d_tag == DT_PLTREL) {
 					if (dynamic->d_un.d_val != DT_RELA) {
-						fprintf(stderr, "can only read DT_RELA at the moment\n");
-						exit(-1);
+						ERR("can only read DT_RELA at the moment\n");
 					}
 				}
 				if (dynamic->d_tag == DT_PLTRELSZ) {
@@ -279,8 +280,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 					char* needed = lib->strtab + dynamic->d_un.d_ptr;
 					char* colon = strchr(needed, ':');
 					if (!colon) {
-						fprintf(stderr, "library's soname has no colon %s\n", needed);
-						//exit(-1);
+						ERR("library's soname has no colon %s\n", needed);
 					} else {
 						loaded_lib * lib = load(colon + 1, libs);
 					}
@@ -351,6 +351,8 @@ char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 		if (v->vn_next == 0) { break; }
 		v = (void*)v + v->vn_next;
 	}
+	WARN("could not find version for symbol %s in library %s\n", lib->strtab + lib->symtab[sym_idx].st_name, lib->name);
+	return 0;
 }
 
 Elf64_Half lookup(char* name, char * version, loaded_lib* lib) {
@@ -430,13 +432,11 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 	if (strncmp(sym_name, EXTERNAL_PREFIX, EXTERNAL_PREFIX_LEN) == 0) {
 		void* libc = dlopen2("libc.so.6");
 		if (!libc) {
-			fprintf(stderr, "could not open libc\n");
-			exit(-1);
+			ERR("could not open libc\n");
 		}
 		void* val = dlsym2(libc, sym_name+ EXTERNAL_PREFIX_LEN);
 		if (!val) {
-			fprintf(stderr, "could not load external %s\n", sym_name+ EXTERNAL_PREFIX_LEN);
-			exit(-1);
+			ERR("could not load external %s\n", sym_name+ EXTERNAL_PREFIX_LEN);
 		}
 		//printf("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, val);
 		ret = val;
@@ -449,6 +449,7 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 	} else {
 		printf("version \n");
 		char * version = verneedstr(sym, lib);
+		if (!version) {  return 0; }
 		size_t lib_len = strchr(version, '_') - version;
 		for (size_t i = 0; i < libs->libs_count; i++) {
 			loaded_lib* l = &libs->libs[i];
@@ -471,7 +472,10 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 		void** offsetTableLoc = lib->base + rela->r_offset;
 
 		printf("linking symbol\n");
-		*offsetTableLoc = findSymbol(rela, lib, libs);
+		void * sym = findSymbol(rela, lib, libs);
+		if (sym) {
+			*offsetTableLoc = sym;
+		}
 		printf("offset: %lx, info %lx, addend: %lx\n", lib->rela[i].r_offset, lib->rela[i].r_info, lib->rela[i].r_addend);
 	}
 	for (int i = 0 ; i < lib->rela_plt_count ; i++) {
@@ -479,7 +483,10 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 		Elf64_Rela * rela = lib->rela_plt + i;
 		void** offsetTableLoc = lib->base + rela->r_offset;
 
-		*offsetTableLoc = findSymbol(rela, lib, libs);
+		void * sym = findSymbol(rela, lib, libs);
+		if (sym) {
+			*offsetTableLoc = sym;
+		}
 	}
 
 
@@ -515,7 +522,7 @@ void fini_libs(loaded_libs* libs) {
 
 void main(int argc, char ** argv) {
 	if (argc != 2) {
-		fprintf(stderr, "./loadelf file");
+		ERR("./loadelf file");
 	}
 
 	realloc(0, 234);

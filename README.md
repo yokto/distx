@@ -137,6 +137,31 @@ Simplified `load_elf_binary` function:
 				&arch_state);
 	}
 
+## CSU (C Start Up)
+
+Defined in glibc/csu.
+This contains some important files.
+	crt1.o
+	crti.o
+	crtn.o
+
+### crt1.o (c run time)
+
+This gets added to to every executable at the beginning.
+It contains the `_start` symbol.
+It does not get added to `-shared` objects.
+It fiddles around with the stack a bit, sets up env, auxv, runs `__libc_start_main`.
+This in turn fiddles some more, calls the initializers of all the shared libraries and executes main.
+
+In our loader these tasks are done by the loader so we (hopefully) don't need this.
+
+### crti.o and crtn.o
+
+They seem to do some magic with the .init .fini section.
+They are only a couple of lines of assembly.
+E.g in `sysdeps/x86_64/crti.S`
+I think `crti` can setup `__gmon_start__` which is some kind of monitoring/progiling tool if it's present.
+
 ## ELF strucutre
 
 https://stevens.netmeister.org/631/elf.html

@@ -20,7 +20,8 @@ $(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile helloc.map foobar.h
 		-Wl,-Bsymbolic \
 		-Wl,-Bsymbolic-functions \
 		-Wl,--hash-style=sysv \
-		-shared -nostdlib \
+		-nostdlib \
+		-shared \
 		-fPIC \
 		-o $(HELLOC) \
 		-fno-builtin-printf \
