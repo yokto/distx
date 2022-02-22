@@ -1,5 +1,5 @@
 [
 	[".", "mkdir", "-p", "build"],
-	["build", "../src/configure", "--enable-languages=c", "--disable-multilib", "CFLAGS=-Werror=format-security", "CXXFLAGS=-Werror=format-security"],
+	["build", "../src/configure", "--enable-languages=c", "--disable-multilib", "CFLAGS=-Werror=format-security", "CPPFLAGS=-Werror=format-security"],
 	["build", "make"]
 ]

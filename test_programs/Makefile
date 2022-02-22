@@ -1,3 +1,4 @@
+CC ?= gcc
 BUILDDIR := ../build
 LIBFOOBAR := $(BUILDDIR)/foobar/lib/libfoobar.so
 HELLOC := $(BUILDDIR)/helloc/bin/helloc
@@ -12,7 +13,7 @@ all: $(HELLOC) $(HELLORUST) $(HELLOCPP)
 
 $(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile helloc.map foobar.h
 	mkdir -p $(dir $(HELLOC))
-	gcc \
+	${CC} \
 		helloc.c \
 		-Wl,--no-undefined \
 		-Wl,-soname,helloc:helloc/bin/helloc \
@@ -30,21 +31,23 @@ $(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile helloc.map foobar.h
 
 $(LIBFOOBAR): foobar.c Makefile foobar.map
 	mkdir -p $(dir $(LIBFOOBAR))
-	gcc -Wl,-soname,foobar:foobar/lib/libfoobar.so -Wl,--version-script=foobar.map -nostdlib -shared -o $(LIBFOOBAR) foobar.c \
+	${CC} -Wl,-soname,foobar:foobar/lib/libfoobar.so -Wl,--version-script=foobar.map -nostdlib -shared -o $(LIBFOOBAR) foobar.c \
 		-Wl,--hash-style=sysv
 
 $(LIBC): libc.c Makefile
 	mkdir -p $(dir $(LIBC))
-	gcc \
+	${CC} \
 		-Wl,-soname,c:libc/lib/libc.so \
 		-Wl,--version-script=libc.map \
+		-Wl,-Bsymbolic \
 		-Wl,-Bsymbolic-functions \
-		-nostdlib -shared \
 		-Wl,--hash-style=sysv \
-		-o $(LIBC) \
-		libc.c
-		-lc -L$(dir $(LIBC)) \
+		-nostdlib -shared \
 		-fPIC \
+		-fno-builtin \
+		-o $(LIBC) \
+		libc.c \
+		-lc -L$(dir $(LIBC)) 
 
 $(HELLORUST): hellorust.rs Makefile
 	mkdir -p $(dir $(HELLORUST))

@@ -20,7 +20,9 @@
 	exit(-1); \
 }
 #else
-#define STRICT_ERR(...) {}
+#define STRICT_ERR(...) { \
+	fprintf(stderr, __VA_ARGS__); \
+}
 #endif
 
 #if defined(WIN32)
@@ -463,6 +465,9 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 	} else {
 		char * version = verneedstr(sym, lib);
 		if (!version) {
+			version = verdefstr(sym, lib);
+		}
+		if (!version) {
 			STRICT_ERR("could not link symbol\n", sym_name);
 			return 0;
 		} else {
@@ -538,7 +543,7 @@ void fini_libs(loaded_libs* libs) {
 
 void main(int argc, char ** argv) {
 	if (argc != 2) {
-		ERR("./loadelf file");
+		ERR("./loadelf file\n");
 	}
 
 	realloc(0, 234);
