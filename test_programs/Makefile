@@ -7,7 +7,9 @@ LIBBASE := $(BUILDDIR)/libbase/lib/libbase.so
 HELLORUST := $(BUILDDIR)/hellorust/bin/hellorust
 HELLOCPP := $(BUILDDIR)/hellocpp/bin/hellocpp
 
-all: $(HELLOC) $(HELLORUST) $(HELLOCPP)
+.PHONY: libbase
+
+all: $(HELLOC) $(HELLORUST) $(HELLOCPP) $(LIBBASE) libbase
 
 #nolibc: foobar.so nolibc.c ../lib/* Makefile
 #	gcc -shared -nostdlib '-Wl,--dynamic-linker=/home/silvio/stuff/sources/elf/executables/load_elf.so' -fvisibility=hidden -fPIC -o nolibc -lfoobar -L. nolibc.c
@@ -71,17 +73,5 @@ $(HELLOCPP): hellocpp.cpp Makefile hellocpp.map
 		-lc -L$(dir $(LIBC)) \
 		-o $(HELLOCPP)
 
-$(LIBBASE): libbase/* Makefile
-	mkdir -p $(dir $(LIBC))
-	${CC} \
-		-Wl,-soname,base:libbase/lib/libbase.so \
-		-Wl,--version-script=libbase/libbase.map \
-		-Wl,-Bsymbolic \
-		-Wl,-Bsymbolic-functions \
-		-Wl,--hash-style=sysv \
-		-nostdlib -shared \
-		-fPIC \
-		-fno-builtin \
-		-Ilibbase \
-		-o $(LIBC) \
-		libbase/base.c \
+libbase:
+	$(MAKE) -C libbase/src

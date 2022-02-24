@@ -1,3 +1,5 @@
+#include "base.h"
+
 int32_t open(const char *pathname, int32_t flags) {
 	return -1;
 }
