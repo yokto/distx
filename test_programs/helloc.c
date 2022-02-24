@@ -4,7 +4,7 @@
 char* foo = 0;
 
 __attribute__((constructor)) void init_foo() {
-	printf("init foo\n");
+//	printf("init foo\n");
 	foo = malloc(4);
 	foo[0] = 'f';
 	foo[1] = 'o';
@@ -13,7 +13,7 @@ __attribute__((constructor)) void init_foo() {
 }
 
 __attribute__((destructor)) void fini_foo() {
-	printf("fini foo\n");
+	//printf("fini foo\n");
 	free(foo);
 }
 

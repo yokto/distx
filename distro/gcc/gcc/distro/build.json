@@ -1,5 +1,12 @@
 [
 	[".", "mkdir", "-p", "build"],
-	["build", "../src/configure", "--enable-languages=c", "--disable-multilib", "CFLAGS=-Werror=format-security", "CPPFLAGS=-Werror=format-security"],
+	["build",
+		"../src/configure",
+		"CFLAGS=-Wno-format-security",
+		"CPPFLAGS=-Wno-format-security",
+		"--enable-languages=c",
+		"--disable-multilib",
+		"--with-native-system-header-dir=/home/silvio/stuff/sources/elf/distro/gcc/libc/include",
+		"--enable-languages=c,c++"],
 	["build", "make"]
 ]

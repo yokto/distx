@@ -1,0 +1,6 @@
+[
+	[".", "mkdir", "-p", "build"],
+	["build", "../src/configure", "--target=x86_64-unknown-zwolf", "--prefix=/home/silvio/stuff/sources/elf/distro/binutils/binutils"],
+	["build", "make"],
+	["build", "make", "install"]
+]

@@ -1,0 +1,6 @@
+[
+	[".", "mkdir", "-p", "build"],
+	["build", "../src/configure", "--prefix", "/home/silvio/stuff/sources/elf/distro/glibc/glibc"],
+	["build", "make"],
+	["build", "make", "install"]
+]

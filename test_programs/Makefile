@@ -3,6 +3,7 @@ BUILDDIR := ../build
 LIBFOOBAR := $(BUILDDIR)/foobar/lib/libfoobar.so
 HELLOC := $(BUILDDIR)/helloc/bin/helloc
 LIBC := $(BUILDDIR)/libc/lib/libc.so
+LIBBASE := $(BUILDDIR)/libbase/lib/libbase.so
 HELLORUST := $(BUILDDIR)/hellorust/bin/hellorust
 HELLOCPP := $(BUILDDIR)/hellocpp/bin/hellocpp
 
@@ -11,6 +12,7 @@ all: $(HELLOC) $(HELLORUST) $(HELLOCPP)
 #nolibc: foobar.so nolibc.c ../lib/* Makefile
 #	gcc -shared -nostdlib '-Wl,--dynamic-linker=/home/silvio/stuff/sources/elf/executables/load_elf.so' -fvisibility=hidden -fPIC -o nolibc -lfoobar -L. nolibc.c
 
+# -fno-stack-protection is for aarch64
 $(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile helloc.map foobar.h
 	mkdir -p $(dir $(HELLOC))
 	${CC} \
@@ -21,11 +23,11 @@ $(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile helloc.map foobar.h
 		-Wl,-Bsymbolic \
 		-Wl,-Bsymbolic-functions \
 		-Wl,--hash-style=sysv \
+		-fno-stack-protector \
 		-nostdlib \
 		-shared \
 		-fPIC \
 		-o $(HELLOC) \
-		-fno-builtin-printf \
 		-lfoobar -L$(dir $(LIBFOOBAR)) \
 		-lc -L$(dir $(LIBC))
 
@@ -34,7 +36,7 @@ $(LIBFOOBAR): foobar.c Makefile foobar.map
 	${CC} -Wl,-soname,foobar:foobar/lib/libfoobar.so -Wl,--version-script=foobar.map -nostdlib -shared -o $(LIBFOOBAR) foobar.c \
 		-Wl,--hash-style=sysv
 
-$(LIBC): libc.c Makefile
+$(LIBC): libc/libc.c Makefile
 	mkdir -p $(dir $(LIBC))
 	${CC} \
 		-Wl,-soname,c:libc/lib/libc.so \
@@ -43,10 +45,12 @@ $(LIBC): libc.c Makefile
 		-Wl,-Bsymbolic-functions \
 		-Wl,--hash-style=sysv \
 		-nostdlib -shared \
+		-fno-stack-protector \
 		-fPIC \
 		-fno-builtin \
+		-Ilibc \
 		-o $(LIBC) \
-		libc.c \
+		libc/libc.c \
 		-lc -L$(dir $(LIBC)) 
 
 $(HELLORUST): hellorust.rs Makefile
@@ -66,3 +70,18 @@ $(HELLOCPP): hellocpp.cpp Makefile hellocpp.map
 		-fPIC \
 		-lc -L$(dir $(LIBC)) \
 		-o $(HELLOCPP)
+
+$(LIBBASE): libbase/* Makefile
+	mkdir -p $(dir $(LIBC))
+	${CC} \
+		-Wl,-soname,base:libbase/lib/libbase.so \
+		-Wl,--version-script=libbase/libbase.map \
+		-Wl,-Bsymbolic \
+		-Wl,-Bsymbolic-functions \
+		-Wl,--hash-style=sysv \
+		-nostdlib -shared \
+		-fPIC \
+		-fno-builtin \
+		-Ilibbase \
+		-o $(LIBC) \
+		libbase/base.c \

@@ -243,3 +243,7 @@ This has two backdraws.
 
 1. Multiple copies of the same library in memory.
 2. The whole memory segment has to be rwx. This could be a security problem.
+
+## Libc
+
+After fighting with c++ on gcc a bit, it seems like it might easier to port glibc to windows and just emulate the systemcalls than to port stdlibc++ to a libc that just uses the corresponding libc calls of the os. This is because glibc has many calls that are not really standard.
