@@ -5,7 +5,7 @@ all: $(LIBBASE)
 $(LIBBASE): *
 	mkdir -p $(dir $(LIBBASE))
 	${CC} \
-		-Wl,-soname,base:libbase/lib/libbase.so \
+		-Wl,-soname,libbase/lib/libbase.so \
 		-Wl,--version-script=libbase.map \
 		-Wl,-Bsymbolic \
 		-Wl,-Bsymbolic-functions \

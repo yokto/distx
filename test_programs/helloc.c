@@ -1,10 +1,11 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "foobar.h"
 
 char* foo = 0;
 
 __attribute__((constructor)) void init_foo() {
-//	printf("init foo\n");
+	printf("init foo\n");
 	foo = malloc(4);
 	foo[0] = 'f';
 	foo[1] = 'o';
@@ -18,12 +19,14 @@ __attribute__((destructor)) void fini_foo() {
 }
 
 int main() {
-	realloc(0, 232);
+//	realloc(0, 232);
 
 	printf("hello wörld\n");
+	printf("3 = %d\n", 3);
+	return 3;
 	printf("foo = %d\n", foobar_foo());
 	printf("baz = %d\n", foobar_baz());
-      	getchar();
+	getchar();
 
 	printf("foo = %s\n", foo);
 

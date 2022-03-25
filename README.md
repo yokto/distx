@@ -247,3 +247,24 @@ This has two backdraws.
 ## Libc
 
 After fighting with c++ on gcc a bit, it seems like it might easier to port glibc to windows and just emulate the systemcalls than to port stdlibc++ to a libc that just uses the corresponding libc calls of the os. This is because glibc has many calls that are not really standard.
+
+## GDB
+
+It seems gdb gets info about newly loaded librarys when the loader calls `_dl_debug_state`
+
+### breakpoints
+
+In gdb `target_insert_breakpoint`.
+There are different breakpoints.
+The only one I observed was a memory breakpoint in `default_memory_insert_break`.
+GDB then writes an interupt instruction `0xCC` (x86) into the program where it wants the breakpoint.
+You can't observe this in gdb itself since it changes it back at any interrupt and inserts it again when you continue running the program.
+
+The following program will print different results depending on weather there is a breakpoint on main or not.
+
+	#include <stdio.h>
+	
+	int main() {
+	        printf("instruction %02hhX\n", *(char*)(&main + 4));
+	        return 0;
+	}

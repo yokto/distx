@@ -1,8 +1,10 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <stdbool.h>
+#include <stdarg.h>
 
 #define WARN(...) { \
 	fprintf(stderr, __VA_ARGS__); \
@@ -34,6 +36,35 @@
 	#include <sys/types.h>
 	#include <sys/stat.h>
 	#include <dlfcn.h>
+#endif
+
+#ifndef WIN32
+// we need this for telling gdb about our symbols
+struct link_map {
+    void* l_addr;          /* Difference between the address in the ELF
+                                   file and the addresses in memory.  */
+    char *l_name;               /* Absolute file name object was found in.  */
+    void *l_ld;            /* Dynamic section of the shared object.  */
+    struct link_map *l_next, *l_prev; /* Chain of loaded objects.  */
+  };
+struct r_debug
+  {
+    int r_version;              /* Version number for this protocol.  */
+    struct link_map *r_map;     /* Head of the chain of loaded objects.  */
+    void* r_brk;
+    enum
+      {
+        /* This state value describes the mapping change taking place when
+           the `r_brk' address is called.  */
+        RT_CONSISTENT,          /* Mapping change is complete.  */
+        RT_ADD,                 /* Beginning to add a new object.  */
+        RT_DELETE               /* Beginning to remove an object mapping.  */
+      } r_state;
+
+    void* r_ldbase;        /* Base address the linker is loaded at.  */
+  };
+extern void _dl_debug_state (void) __attribute__ ((weak));
+static struct r_debug* _dl_debug_r = 0;
 #endif
 
 #include "../lib/elf.h"
@@ -70,13 +101,34 @@ typedef struct loaded_lib {
 	size_t* init_array;
 	size_t fini_arraysz;
 	size_t* fini_array;
+	bool init_started;
 } loaded_lib;
 
 typedef struct loaded_libs {
 	loaded_lib * libs;
 	int libs_count;
 	int vec_length;
+#ifndef WIN32
+	struct link_map* m_head;
+	struct link_map* m_tail;
+#endif
 } loaded_libs;
+
+#ifndef WIN32
+void m_add(loaded_libs* libs, struct link_map* new) {
+	if (!libs->m_head) {
+		libs->m_head = new;
+		libs->m_tail = new;
+		new->l_next = 0;
+		new->l_prev = 0;
+	} else {
+		new->l_next = libs->m_head;
+		new->l_prev = 0;
+		libs->m_head->l_prev = new;
+		libs->m_head = new;
+	}
+}
+#endif
 
 __attribute__((sysv_abi)) uint32_t get_os() {
 #if defined(WIN32)
@@ -152,6 +204,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	loaded_lib* lib = add_loaded_lib(libs);
 	memset(lib, 0, sizeof(loaded_lib));
 	printf("\tloading library %s\n", lib_path);
+	getchar();
 
 	// needs to happen before recursive call to load
 	lib->path = malloc(strlen(lib_path) + 1);
@@ -256,10 +309,18 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 				}
 				if (dynamic->d_tag == DT_SONAME) {
 					char * soname = lib->strtab + dynamic->d_un.d_ptr;
-					size_t lib_name_len = strchr(soname, ':') - soname;
+					char * soname_len = strlen(soname);
+					char * last_slash = strrchr(soname, '/');
+					char * lib_name = last_slash && strncmp(last_slash, "/lib", 4) == 0 ? last_slash + 4 : 0; // drop the "lib" in "libxyz.so"
+					char * dot = lib_name ? strchr(lib_name, '.') : 0;
+					size_t lib_name_len = dot ? dot - lib_name : 0;
 					lib->name = malloc(lib_name_len + 1);
-					strncpy(lib->name, soname, lib_name_len);
+					strncpy(lib->name, lib_name, lib_name_len);
 					lib->name[lib_name_len] = '\0';
+					printf("libname %s\n", lib->name);
+					if (lib_name_len <= 0){ 
+						WARN("Could not figure out libname of %s", soname);
+					}
 				}
 				if (dynamic->d_tag == DT_HASH) {
 					lib->hash = (Elf64_Word*)(memory + dynamic->d_un.d_ptr);
@@ -290,12 +351,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 				}
 				if (dynamic->d_tag == DT_NEEDED) {
 					char* needed = lib->strtab + dynamic->d_un.d_ptr;
-					char* colon = strchr(needed, ':');
-					if (!colon) {
-						STRICT_ERR("library's soname has no colon %s\n", needed);
-					} else {
-						loaded_lib * lib = load(colon + 1, libs);
-					}
+					loaded_lib * lib = load(needed, libs);
 				}
 				if (dynamic->d_tag == DT_VERSYM) {
 					lib->versym = (Elf64_Half*)(memory + dynamic->d_un.d_ptr);
@@ -326,21 +382,46 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 		fprintf(stderr, "library %s has no soname", lib_path);
 	}
 
+#ifndef WIN32
+	struct link_map* new_map = malloc(sizeof(struct link_map));
+	memset(new_map, 0, sizeof(struct link_map));
+	new_map->l_name = lib->name;
+	new_map->l_addr = lib->base;
+	//new_map->l_ld = lib->dynamic;
+	new_map->l_ld = (void*)lib->dynamic - lib->base;
+	m_add(libs, new_map);
+
+	_dl_debug_r->r_state = RT_ADD;
+	printf("_dl_debug_state() instruction %lx\n", ((long*)(&_dl_debug_state))[0]);
+	_dl_debug_state();
+
+	struct link_map* oldmap = _dl_debug_r->r_map;
+
+	oldmap->l_prev = libs->m_tail;
+	_dl_debug_r->r_map = libs->m_head;
+	_dl_debug_r->r_state = RT_CONSISTENT;
+	_dl_debug_state();
+	oldmap->l_prev = 0;
+
+	_dl_debug_r->r_map = oldmap;
+#endif
+
 	return lib;
 }
 
 // find the version string of symbol
 // this are some truely ugly structures
 char * verdefstr(size_t sym_idx, loaded_lib* lib) {
-	Elf64_Verdef * v = lib->verdef;
-	for(int i = 1 ; i < lib->versym[sym_idx] ; i++) {
-		v = (void*)v + v->vd_next;
-	}
-	Elf64_Verdaux * aux = (Elf64_Verdaux*)((void*)v + v->vd_aux);
-
-	char * ver = &lib->strtab[aux->vda_name];
-	//printf("version name %s\n", v);
-	return ver;
+	return lib->path;
+//	Elf64_Verdef * v = lib->verdef;
+//	for(int i = 1 ; i < lib->versym[sym_idx] ; i++) {
+//		v = (void*)v + v->vd_next;
+//	}
+//	Elf64_Verdaux * aux = (Elf64_Verdaux*)((void*)v + v->vd_aux);
+//
+//	char * ver = &lib->strtab[aux->vda_name];
+//	//printf("version name %s\n", v);
+//	return ver;
 }
 
 // find the version string of symbol
@@ -348,7 +429,8 @@ char * verdefstr(size_t sym_idx, loaded_lib* lib) {
 char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 	Elf64_Verneed * v = lib->verneed;
 	if (!lib->verneed) {
-		STRICT_ERR("could not find version for symbol %d in library %s\n", lib->strtab + lib->symtab[sym_idx].st_name, lib->name);
+		STRICT_ERR("could not find version for symbol %s in library %s\n",
+			lib->strtab + lib->symtab[sym_idx].st_name, lib->name);
 		return 0;
 	}
 	printf("\t\t\tneeded index %zd residex %d \n", sym_idx, lib->versym[sym_idx]);
@@ -358,7 +440,7 @@ char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 		Elf64_Vernaux * aux = (Elf64_Vernaux*)((void*)v + v->vn_aux);
 		while (true) {
 			if (aux->vna_other == version) {
-				return &lib->strtab[aux->vna_name];
+				return &lib->strtab[v->vn_file];
 			}
 			if (aux->vna_next == 0) { break; }
 			aux = (void*)aux + aux->vna_next;
@@ -371,7 +453,7 @@ char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 	return 0;
 }
 
-Elf64_Half lookup(char* name, char * version, loaded_lib* lib) {
+Elf64_Half lookup(char* name, loaded_lib* lib) {
 	if (!lib->hash) {
 		ERR("no hash table in %s\n", lib->name);
 	}
@@ -385,19 +467,33 @@ Elf64_Half lookup(char* name, char * version, loaded_lib* lib) {
 	while (idx != 0) {
 		printf("\t\t\tname %s, foundname %s\n", name, lib->strtab + lib->symtab[idx].st_name);
 		if (strcmp(name, lib->strtab + lib->symtab[idx].st_name) == 0) {
-			char* version2 = verdefstr(idx, lib);
+			//char* version2 = verdefstr(idx, lib);
 			//printf("wanted version %s, existing version %s\n", version, version2);
-			if (!version || strcmp(version2, version) == 0) {
+			//if (!version || strcmp(version2, version) == 0) {
 				//printf("found version %s\n", version, version2);
 				return idx;
-			}
+			//}
 		}
 		idx = lib->hash[2 + nbucket + idx];
 	}
 }
 
+__attribute__((sysv_abi))
+void exit2(int ret) {
+	exit(ret);
+}
 
+__attribute__((sysv_abi))
+int printf2(const char *restrict format, ...) {
+	va_list arglist;
+	va_start(arglist, format);
+	vprintf(format, arglist);
+	va_end(arglist);
+}
+
+__attribute__((sysv_abi))
 void* dlopen2(char* name) {
+	printf("dlopening %s\n", name);
 #if defined(WIN32)
 	printf("\t\tgetting lib %s\n", name);
 	return LoadLibrary("msvcrt.dll");
@@ -406,7 +502,9 @@ void* dlopen2(char* name) {
 #endif
 }
 
+__attribute__((sysv_abi))
 void* dlsym2(void* lib, char* name) {
+	printf("dlsyming %s\n", name);
 #if defined(WIN32)
 	printf("\t\tgetting sym %s from lib %p\n", name, lib);
 	return GetProcAddress(lib, name);
@@ -460,24 +558,29 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 		//printf("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, val);
 		ret = val;
 		dlclose2(libc);
-	} else if (strcmp(sym_name, "external_elfator_os") == 0) {
-		ret = &get_os;
+	} else if (strcmp(sym_name, "__printf") == 0) {
+		ret = &printf2;
+	} else if (strcmp(sym_name, "__dlsym") == 0) {
+		ret = &dlsym2;
+	} else if (strcmp(sym_name, "__dlopen") == 0) {
+		ret = &dlopen2;
+	} else if (strcmp(sym_name, "__exit") == 0) {
+		ret = &exit2;
 	} else if (strncmp(sym_name, "external_", 9) == 0) {
 		// ignore
 	} else {
-		char * version = verneedstr(sym, lib);
-		if (!version) {
-			version = verdefstr(sym, lib);
+		char * file = verneedstr(sym, lib);
+		if (!file) {
+			file = verdefstr(sym, lib);
 		}
-		if (!version) {
+		if (!file) {
 			STRICT_ERR("could not link symbol\n", sym_name);
 			return 0;
 		} else {
-			size_t lib_len = strchr(version, '_') - version;
 			for (size_t i = 0; i < libs->libs_count; i++) {
 				loaded_lib* l = &libs->libs[i];
-				if (strncmp(version, l->name, lib_len) == 0) {
-					Elf64_Half f = lookup(sym_name, version, l);
+				if (strcmp(file, l->path) == 0) {
+					Elf64_Half f = lookup(sym_name, l);
 					void * f_addr = l->base + l->symtab[f].st_value;
 					//printf("setting name %s, at %x from base %x to %x\n", sym_name, rela->r_offset, lib->base, f_addr);
 					printf("\t\t\tfound symbol in %s\n", l->name);
@@ -492,6 +595,8 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 
 void link(loaded_lib* lib, loaded_libs* libs) {
 	printf("\tlinking library %s\n", lib->path);
+	printf("\trela count %d\n", lib->rela_count);
+	printf("\trela plt count %d\n", lib->rela_plt_count);
 	for (int i = 0 ; i < lib->rela_count ; i++) {
 		Elf64_Rela * rela = lib->rela + i;
 		void** offsetTableLoc = lib->base + rela->r_offset;
@@ -516,17 +621,42 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 
 }
 
+void init_lib(loaded_lib* lib, loaded_libs* libs) {
+	printf("\tstart init %s\n", lib->name);
+	if (lib->init_started) { return; }
+	lib->init_started = true;
+
+	// init dependencies
+	Elf64_Dyn* dynamic;
+	for (dynamic = lib->dynamic; dynamic->d_tag != DT_NULL; dynamic++) {
+		if (dynamic->d_tag == DT_NEEDED) {
+			char* needed = lib->strtab + dynamic->d_un.d_ptr;
+			for (int j = 0; j < libs->libs_count; j++) {
+				loaded_lib* lib2 = &libs->libs[j];
+				if (strcmp(lib2->path,  needed)) {
+					init_lib(lib2, libs);
+				}
+			}
+		}
+	}
+
+	// init self
+	printf("\tinit %s\n", lib->name);
+	if (lib->init_array) {
+		for (int j = 0; j * sizeof(void*) < lib->init_arraysz ; j++) {
+			// this is already absolute because of relocation
+			printf("\tinit %d from %s\n", j, lib->name);
+			size_t rel_f = lib->init_array[j];
+			//printf("exec init at %llx for lib %s\n", rel_f, lib->name);
+			((void (*)())(rel_f))();
+		}
+	}
+}
+
 void init_libs(loaded_libs* libs) {
 	for (int i = 0; i < libs->libs_count; i++) {
 		loaded_lib* lib = &libs->libs[i];
-		if (lib->init_array) {
-			for (int j = 0; j * sizeof(void*) < lib->init_arraysz ; j++) {
-				// this is already absolute because of relocation
-				size_t rel_f = lib->init_array[j];
-				//printf("exec init at %llx for lib %s\n", rel_f, lib->name);
-				((void (*)())(rel_f))();
-			}
-		}
+		init_lib(lib, libs);
 	}
 }
 
@@ -543,9 +673,16 @@ void fini_libs(loaded_libs* libs) {
 	}
 }
 
-
-void main(int argc, char ** argv) {
-	printf("printf %s\n", &printf);
+int main(int argc, char ** argv) {
+#ifndef WIN32
+	_dl_debug_r = dlsym(RTLD_DEFAULT, "_r_debug");
+	printf("_dl_debug_state %p\n", &_dl_debug_state);
+	printf("_dl_debug_state code %lx\n", ((long*)&_dl_debug_state)[0]);
+#endif
+//#if defined(WIN32)
+//	SetConsoleOutputCP(65001);
+//#endif
+	//printf("printf %s\n", &printf);
 	printf("stdin %p, stdout %p, stderr %p\n", stdin, stdout, stderr);
 	if (argc != 2) {
 		ERR("./loadelf file\n");
@@ -560,7 +697,7 @@ void main(int argc, char ** argv) {
 	for (size_t i = 0 ; i < libs.libs_count ; i++) {
 		link(&libs.libs[i], &libs);
 	}
-	Elf64_Half main_idx = lookup("main", 0, lib);
+	Elf64_Half main_idx = lookup("main", lib);
 	printf("init\n");
 	init_libs(&libs);
 
