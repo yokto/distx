@@ -268,3 +268,11 @@ The following program will print different results depending on weather there is
 	        printf("instruction %02hhX\n", *(char*)(&main + 4));
 	        return 0;
 	}
+
+http://sourceware.org/gdb/onlinedocs/gdb/JIT-Interface.html
+
+separate debug from exec data as follows
+
+    objcopy --strip-debug a.out a.exe
+    objcopy --only-keep-debug a.out a.dbg
+    objcopy --add-gnu-debuglink="a.dbg" "a.exe"

@@ -39,32 +39,7 @@
 #endif
 
 #ifndef WIN32
-// we need this for telling gdb about our symbols
-struct link_map {
-    void* l_addr;          /* Difference between the address in the ELF
-                                   file and the addresses in memory.  */
-    char *l_name;               /* Absolute file name object was found in.  */
-    void *l_ld;            /* Dynamic section of the shared object.  */
-    struct link_map *l_next, *l_prev; /* Chain of loaded objects.  */
-  };
-struct r_debug
-  {
-    int r_version;              /* Version number for this protocol.  */
-    struct link_map *r_map;     /* Head of the chain of loaded objects.  */
-    void* r_brk;
-    enum
-      {
-        /* This state value describes the mapping change taking place when
-           the `r_brk' address is called.  */
-        RT_CONSISTENT,          /* Mapping change is complete.  */
-        RT_ADD,                 /* Beginning to add a new object.  */
-        RT_DELETE               /* Beginning to remove an object mapping.  */
-      } r_state;
-
-    void* r_ldbase;        /* Base address the linker is loaded at.  */
-  };
-extern void _dl_debug_state (void) __attribute__ ((weak));
-static struct r_debug* _dl_debug_r = 0;
+#include "../lib/jit.h"
 #endif
 
 #include "../lib/elf.h"
@@ -108,26 +83,24 @@ typedef struct loaded_libs {
 	loaded_lib * libs;
 	int libs_count;
 	int vec_length;
-#ifndef WIN32
-	struct link_map* m_head;
-	struct link_map* m_tail;
-#endif
+//#ifndef WIN32
+//	struct link_map* m_head;
+//#endif
 } loaded_libs;
 
 #ifndef WIN32
-void m_add(loaded_libs* libs, struct link_map* new) {
-	if (!libs->m_head) {
-		libs->m_head = new;
-		libs->m_tail = new;
-		new->l_next = 0;
-		new->l_prev = 0;
-	} else {
-		new->l_next = libs->m_head;
-		new->l_prev = 0;
-		libs->m_head->l_prev = new;
-		libs->m_head = new;
-	}
-}
+//void m_add(loaded_libs* libs, struct DGBLIST* new) {
+//	if (!libs->m_head) {
+//		libs->m_head = new;
+//		new->l_next = 0;
+//		new->l_prev = 0;
+//	} else {
+//		new->l_next = libs->m_head;
+//		new->l_prev = 0;
+//		libs->m_head->l_prev = new;
+//		libs->m_head = new;
+//	}
+//}
 #endif
 
 __attribute__((sysv_abi)) uint32_t get_os() {
@@ -204,7 +177,6 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	loaded_lib* lib = add_loaded_lib(libs);
 	memset(lib, 0, sizeof(loaded_lib));
 	printf("\tloading library %s\n", lib_path);
-	getchar();
 
 	// needs to happen before recursive call to load
 	lib->path = malloc(strlen(lib_path) + 1);
@@ -309,7 +281,6 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 				}
 				if (dynamic->d_tag == DT_SONAME) {
 					char * soname = lib->strtab + dynamic->d_un.d_ptr;
-					char * soname_len = strlen(soname);
 					char * last_slash = strrchr(soname, '/');
 					char * lib_name = last_slash && strncmp(last_slash, "/lib", 4) == 0 ? last_slash + 4 : 0; // drop the "lib" in "libxyz.so"
 					char * dot = lib_name ? strchr(lib_name, '.') : 0;
@@ -385,25 +356,31 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 #ifndef WIN32
 	struct link_map* new_map = malloc(sizeof(struct link_map));
 	memset(new_map, 0, sizeof(struct link_map));
-	new_map->l_name = lib->name;
+	const char * pwd = "/home/silvio/stuff/sources/elf/build/";
+	const int pwd_len = strlen(pwd);
+	const int lib_len = strlen(lib_path);
+	char * full_path = malloc(pwd_len + lib_len + 1);
+	memcpy(full_path, pwd, pwd_len);
+	memcpy(full_path + pwd_len, lib_path, lib_len);
+	full_path[lib_len + pwd_len] = '\0';
+	new_map->l_name = full_path;
 	new_map->l_addr = lib->base;
 	//new_map->l_ld = lib->dynamic;
-	new_map->l_ld = (void*)lib->dynamic - lib->base;
-	m_add(libs, new_map);
+	new_map->l_ld = (void*)lib->dynamic;
+	//m_add(libs, new_map);
 
-	_dl_debug_r->r_state = RT_ADD;
-	printf("_dl_debug_state() instruction %lx\n", ((long*)(&_dl_debug_state))[0]);
-	_dl_debug_state();
-
-	struct link_map* oldmap = _dl_debug_r->r_map;
-
-	oldmap->l_prev = libs->m_tail;
-	_dl_debug_r->r_map = libs->m_head;
-	_dl_debug_r->r_state = RT_CONSISTENT;
-	_dl_debug_state();
-	oldmap->l_prev = 0;
-
-	_dl_debug_r->r_map = oldmap;
+	// for some reason it seems we need to append to the list rather than prepend
+	struct link_map* current_map = _r_debug.r_map;
+	if (current_map == 0) {
+		_r_debug.r_map = new_map;
+	} else {
+		while (current_map->l_next != 0) {
+			current_map = current_map->l_next;
+		}
+		current_map->l_next = new_map;
+		new_map->l_next = 0; // not strictly needed
+		new_map->l_prev = current_map;
+	}
 #endif
 
 	return lib;
@@ -674,11 +651,6 @@ void fini_libs(loaded_libs* libs) {
 }
 
 int main(int argc, char ** argv) {
-#ifndef WIN32
-	_dl_debug_r = dlsym(RTLD_DEFAULT, "_r_debug");
-	printf("_dl_debug_state %p\n", &_dl_debug_state);
-	printf("_dl_debug_state code %lx\n", ((long*)&_dl_debug_state)[0]);
-#endif
 //#if defined(WIN32)
 //	SetConsoleOutputCP(65001);
 //#endif
@@ -692,11 +664,32 @@ int main(int argc, char ** argv) {
 	alloc_loaded_libs(&libs);
 
 	printf("loading\n");
+#ifndef WIN32
+	_r_debug.r_state = RT_ADD;
+	((void(*)())(_r_debug.r_brk))();
+	//_dl_debug_state();
+#endif
 	loaded_lib* lib = load(argv[1], &libs);
+
 	printf("linking\n");
 	for (size_t i = 0 ; i < libs.libs_count ; i++) {
 		link(&libs.libs[i], &libs);
 	}
+#ifndef WIN32
+	_r_debug.r_state = RT_CONSISTENT;
+	((void(*)())(_r_debug.r_brk))();
+	printf("f %p\n", _r_debug.r_brk);
+	printf("f %p\n", &_dl_debug_state);
+	//_dl_debug_state();
+	struct link_map* m = _r_debug.r_map;
+	while (m) {
+		printf("map %s\n", m->l_name);
+		printf("addr %p\n", m->l_addr);
+		printf("dynamic %p\n", m->l_ld);
+		m = m->l_next;
+	}
+	getchar();
+#endif
 	Elf64_Half main_idx = lookup("main", lib);
 	printf("init\n");
 	init_libs(&libs);

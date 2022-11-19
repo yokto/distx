@@ -1,6 +1,2 @@
-/distro/*/src
-/distro/*/build
-/distro/*/*/src
-/distro/*/*/build
 /build
 .*.swp
