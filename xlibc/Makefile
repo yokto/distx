@@ -9,6 +9,7 @@ all: $(LIBC) $(HEADERS)
 $(LIBC): libc.c Makefile libc.map
 	mkdir -p $(dir $(LIBC))
 	${CC} \
+		-g \
 		-Wall -Wextra -Werror \
 		-Wl,-soname,xlibc/lib/libc.so \
 		-Wl,--version-script=libc.map \

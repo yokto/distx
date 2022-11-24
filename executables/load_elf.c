@@ -83,12 +83,10 @@ typedef struct loaded_libs {
 	loaded_lib * libs;
 	int libs_count;
 	int vec_length;
-//#ifndef WIN32
-//	struct link_map* m_head;
-//#endif
 } loaded_libs;
 
 #ifndef WIN32
+struct link_map* global_libs = 0;
 //void m_add(loaded_libs* libs, struct DGBLIST* new) {
 //	if (!libs->m_head) {
 //		libs->m_head = new;
@@ -165,6 +163,63 @@ void * reserve_memory(size_t size) {
 #endif
 	return memory;
 }
+
+#ifndef WIN32
+void add_local_libs() {
+	_r_debug.r_state = RT_ADD;
+	((void(*)())(_r_debug.r_brk))();
+	struct link_map* current_map = _r_debug.r_map;
+	if (current_map == 0) {
+		_r_debug.r_map = global_libs;
+	} else {
+		while (current_map->l_next != 0) {
+			current_map = current_map->l_next;
+		}
+		current_map->l_next = global_libs;
+		global_libs->l_prev = current_map;
+	}
+	_r_debug.r_state = RT_CONSISTENT;
+	((void(*)())(_r_debug.r_brk))();
+
+
+	
+	printf("\n\n\n readding\n", _r_debug.r_brk);
+	struct link_map* m = _r_debug.r_map;
+	while (m) {
+		printf("map %s\n", m->l_name);
+		printf("addr %p\n", m->l_addr);
+		printf("dynamic %p\n", m->l_ld);
+		m = m->l_next;
+	}
+}
+void remove_local_libs() {
+	_r_debug.r_state = RT_DELETE;
+	((void(*)())(_r_debug.r_brk))();
+	struct link_map* current_map = _r_debug.r_map;
+	if (current_map == global_libs) {
+		_r_debug.r_map = 0;
+	} else {
+		while (current_map->l_next != global_libs) {
+			current_map = current_map->l_next;
+		}
+		current_map->l_next = 0;
+	}
+	global_libs->l_prev = 0;
+	_r_debug.r_state = RT_CONSISTENT;
+	((void(*)())(_r_debug.r_brk))();
+	
+
+
+	printf("\n\n\n removing\n", _r_debug.r_brk);
+	struct link_map* m = _r_debug.r_map;
+	while (m) {
+		printf("map %s\n", m->l_name);
+		printf("addr %p\n", m->l_addr);
+		printf("dynamic %p\n", m->l_ld);
+		m = m->l_next;
+	}
+}
+#endif
 
 
 loaded_lib* load(char* lib_path, loaded_libs* libs) {
@@ -356,7 +411,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 #ifndef WIN32
 	struct link_map* new_map = malloc(sizeof(struct link_map));
 	memset(new_map, 0, sizeof(struct link_map));
-	const char * pwd = "/home/silvio/stuff/sources/elf/build/";
+	const char * pwd = "/home/silvio/stuff/sources/elfx86/test_programs/";
 	const int pwd_len = strlen(pwd);
 	const int lib_len = strlen(lib_path);
 	char * full_path = malloc(pwd_len + lib_len + 1);
@@ -369,16 +424,15 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	new_map->l_ld = (void*)lib->dynamic;
 	//m_add(libs, new_map);
 
-	// for some reason it seems we need to append to the list rather than prepend
-	struct link_map* current_map = _r_debug.r_map;
+	new_map->l_next = 0; // not strictly needed
+	struct link_map* current_map = global_libs;
 	if (current_map == 0) {
-		_r_debug.r_map = new_map;
+		global_libs = new_map;
 	} else {
 		while (current_map->l_next != 0) {
 			current_map = current_map->l_next;
 		}
 		current_map->l_next = new_map;
-		new_map->l_next = 0; // not strictly needed
 		new_map->l_prev = current_map;
 	}
 #endif
@@ -475,7 +529,10 @@ void* dlopen2(char* name) {
 	printf("\t\tgetting lib %s\n", name);
 	return LoadLibrary("msvcrt.dll");
 #else
-	return dlopen(name, RTLD_NOW);
+	remove_local_libs();
+	void* res = dlopen(name, RTLD_NOW);
+	add_local_libs();
+	return res;
 #endif
 }
 
@@ -664,11 +721,6 @@ int main(int argc, char ** argv) {
 	alloc_loaded_libs(&libs);
 
 	printf("loading\n");
-#ifndef WIN32
-	_r_debug.r_state = RT_ADD;
-	((void(*)())(_r_debug.r_brk))();
-	//_dl_debug_state();
-#endif
 	loaded_lib* lib = load(argv[1], &libs);
 
 	printf("linking\n");
@@ -676,19 +728,9 @@ int main(int argc, char ** argv) {
 		link(&libs.libs[i], &libs);
 	}
 #ifndef WIN32
-	_r_debug.r_state = RT_CONSISTENT;
-	((void(*)())(_r_debug.r_brk))();
+	add_local_libs();
 	printf("f %p\n", _r_debug.r_brk);
 	printf("f %p\n", &_dl_debug_state);
-	//_dl_debug_state();
-	struct link_map* m = _r_debug.r_map;
-	while (m) {
-		printf("map %s\n", m->l_name);
-		printf("addr %p\n", m->l_addr);
-		printf("dynamic %p\n", m->l_ld);
-		m = m->l_next;
-	}
-	getchar();
 #endif
 	Elf64_Half main_idx = lookup("main", lib);
 	printf("init\n");

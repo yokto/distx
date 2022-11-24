@@ -22,6 +22,7 @@ all: $(HELLOC) $(HELLORUST) $(HELLOCPP) $(LIBBASE) $(CONSTANTS) # $(HELLOGLIBC) 
 $(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile helloc.map foobar.h
 	mkdir -p $(dir $(HELLOC))
 	${CC} \
+		-g \
 		-I $(DEPDIR)/xlibc/include \
 		helloc.c \
 		-Wl,--no-undefined \
@@ -52,6 +53,7 @@ $(HELLOCPP): hellocpp.cpp Makefile hellocpp.map
 	mkdir -p $(dir $(HELLOCPP))
 	g++ \
 		hellocpp.cpp \
+		-g \
 		-Wl,-soname,hellocpp/bin/libhellocpp.so \
 		-Wl,--version-script=hellocpp.map \
 		-Wl,-Bsymbolic \
