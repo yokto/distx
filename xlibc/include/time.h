@@ -1,9 +1,19 @@
 #ifndef TIME_H
 #define TIME_H
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stddef.h>
 
 #define CLOCKS_PER_SEC 1
+
+typedef uint64_t time_t;
+
+typedef struct timespec {
+    time_t  tv_sec;  /* Seconds */
+    long    tv_nsec; /* Nanoseconds */
+} timespec;
 
 struct tm {
 	int tm_sec;         /* seconds,  range 0 to 59          */
@@ -16,9 +26,7 @@ struct tm {
 	int tm_yday;        /* day in the year, range 0 to 365  */
 	int tm_isdst;       /* daylight saving time             */
 };
-
-typedef time_t uint64_t;
-typedef clock_t uint64_t;
+typedef uint64_t clock_t;
 
 char *asctime(const struct tm *timeptr);
 clock_t clock(void);
@@ -30,4 +38,7 @@ time_t mktime(struct tm *timeptr);
 size_t strftime(char *str, size_t maxsize, const char *format, const struct tm *timeptr);
 time_t time(time_t *timer);
 
+#ifdef __cplusplus
+}
+#endif
 #endif // TIME_H

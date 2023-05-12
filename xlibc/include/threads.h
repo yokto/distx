@@ -1,7 +1,12 @@
 #ifndef THREAD_H
 #define THREAD_H
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+#include <time.h>
 #include <stddef.h>
+
 
 // Thread
 typedef size_t thrd_t;
@@ -28,8 +33,8 @@ enum {
 typedef size_t mtx_t;
 int mtx_init( mtx_t* mutex, int type );
 int mtx_lock( mtx_t* mutex );
-int mtx_timedlock( mtx_t *restrict mutex,
-                   const struct timespec *restrict time_point );
+int mtx_timedlock( mtx_t * mutex,
+                   const struct timespec * time_point );
 int mtx_trylock( mtx_t *mutex );
 int mtx_unlock( mtx_t *mutex );
 void mtx_destroy( mtx_t *mutex );
@@ -50,8 +55,8 @@ int cnd_init( cnd_t* cond );
 int cnd_signal( cnd_t *cond );
 int cnd_broadcast( cnd_t *cond );
 int cnd_wait( cnd_t* cond, mtx_t* mutex );
-int cnd_timedwait( cnd_t* restrict cond, mtx_t* restrict mutex,
-                   const struct timespec* restrict time_point );
+int cnd_timedwait( cnd_t*  cond, mtx_t*  mutex,
+                   const struct timespec*  time_point );
 void cnd_destroy( cnd_t* cond );
 
 // thread local
@@ -64,4 +69,7 @@ void *tss_get( tss_t tss_key );
 int tss_set( tss_t tss_id, void *val );
 void tss_delete( tss_t tss_id );
 
+#ifdef __cplusplus
+}
+#endif
 #endif // THREAD_H

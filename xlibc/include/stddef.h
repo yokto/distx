@@ -1,14 +1,24 @@
 #ifndef STDDEF_H
 #define STDDEF_H
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define NULL 0
 #define offsetof(st, m) \
     ((size_t)&(((st *)0)->m))
 
-typedef unsigned long size_t;
-typedef long ssize_t;
+typedef __SIZE_TYPE__ size_t;
+#ifdef __SSIZE_TYPE__
+typedef __SSIZE_TYPE__ ssize_t;
+#else
+typedef signed long ssize_t;
+#endif
 
 typedef long ptrdiff_t;
-typedef int wchar_t;
+typedef __WCHAR_TYPE__ wchar_t;
 
+#ifdef __cplusplus
+}
+#endif
 #endif // STDDEF_H
