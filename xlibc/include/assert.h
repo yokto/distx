@@ -1,11 +1,12 @@
 #ifndef ASSERT_H
 #define ASSERT_H
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #include <stdio.h>
 #include <stddef.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define assert(x) { \
 	if (!(x)) { \

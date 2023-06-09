@@ -12,4 +12,4 @@ typedef char bool;
 #ifdef __cplusplus
 }
 #endif
-#endif // SIGNAL_H
+#endif // STDBOOL_H

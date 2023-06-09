@@ -1,5 +1,5 @@
-#ifndef STDINT_H
-#define STDINT_H
+#ifndef SYSTYPES_H
+#define SYSTYPES_H
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -37,26 +37,19 @@ typedef int16_t int_fast16_t;
 typedef int32_t int_fast32_t;
 typedef int64_t int_fast64_t;
 
-#define UINT8_MAX   0xff
-#define UINT16_MAX  0xffff
-#define UINT32_MAX  0xffffffff
-#define INT32_MAX  0x7fffffff
-#define UINT64_MAX  0xffffffffffffffff
-#define SIZE_MAX ((size_t)UINT64_MAX)
+typedef __SIZE_TYPE__ size_t;
+#ifdef __SSIZE_TYPE__
+typedef __SSIZE_TYPE__ ssize_t;
+#else
+typedef signed long ssize_t;
+#endif
 
-#define UINT8_C(x)   (x)
-#define UINT16_C(x)  (x)
-#define UINT32_C(x)  ((x) + (UINT32_MAX - UINT32_MAX))
-#define UINT64_C(x)  ((x) + (UINT64_MAX - UINT64_MAX))
-
-#define PRIu64 "llu"
-#define PRIx64 "llx"
-#define PRId64 "lld"
-#define PRIxPTR "p"
-#define PRIu8 "u"
-#define PRIdPTR "p"
+typedef ssize_t ptrdiff_t;
+#ifndef __cplusplus
+typedef __WCHAR_TYPE__ wchar_t;
+#endif
 
 #ifdef __cplusplus
 }
 #endif
-#endif // STDINT_H
+#endif // SYSTYPES_H

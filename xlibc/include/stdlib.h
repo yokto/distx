@@ -1,9 +1,13 @@
 #ifndef STDLIB_H
 #define STDLIB_H
+
+#include <systypes.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+//typedef __WCHAR_TYPE__ wchar_t;
 typedef __SIZE_TYPE__ size_t;
 typedef struct {
 	int quot;
@@ -61,7 +65,20 @@ void *realloc(void *ptr, size_t size);
 void *memset(void *ptr, int value, size_t num);
 void *memcpy(void * dest, const void * src, size_t n);
 char *getenv(const char *name);
-
+long int strtol(const char* str, char** endptr, int base);
+int mbtowc(wchar_t *pwc, const char *s, size_t n);
+unsigned long int strtoul(const char* str, char** endptr, int base);
+long long int strtoll(const char* str, char** endptr, int base);
+#define strtoll_l(str, endptr, base, locale) (strtoll(str, endptr, base))
+#define strtold_l(str, endptr, base, locale) (strtold(str, endptr, base))
+#define strtoull_l(str, endptr, base, locale) (strtoull(str, endptr, base))
+#define strtof_l(str, endptr, locale) (strtof(str, endptr))
+#define strtod_l(str, endptr, locale) (strtod(str, endptr))
+#define strtold_l(str, endptr, locale) (strtold(str, endptr))
+unsigned long long int strtoull(const char* str, char** endptr, int base);
+float strtof(const char *nptr, char **endptr);
+double strtod(const char *nptr, char **endptr);
+long double strtold (const char* nptr, char** endptr);
 
 
 #define dladdr(x, y) 0
@@ -69,6 +86,8 @@ typedef void* FILE; // not really supposed to be here
 extern FILE* stderr; // not really supposed to be here
 int fprintf(FILE* stream, const char * format, ...); // not really supposed to be here
 void abort() __attribute__ ((__noreturn__));
+
+#define MB_CUR_MAX 1
 
 #ifdef __cplusplus
 }
