@@ -60,6 +60,8 @@ DECLARE(int, ungetc, int c, FILE *stream)
 DECLARE(int, fflush, FILE* file)
 DECLARE(char *, getenv, const char *name)
 DECLARE(void, thrd_yield, void)
+DECLARE(thrd_t, thrd_current, void);
+DECLARE(int, thrd_sleep, const struct timespec* duration, struct timespec* remaining );
 DECLARE(int, cnd_broadcast, cnd_t *cond )
 DECLARE(int, cnd_wait, cnd_t* cond, mtx_t* mutex )
 DECLARE(void, call_once, once_flag* flag, void (*func)(void) );
@@ -78,6 +80,32 @@ DECLARE(int, fseek, FILE *stream, long int offset, int whence)
 DECLARE(size_t, fread, void * ptr, size_t size, size_t nmemb, FILE * stream)
 DECLARE(int, fputc, int c, FILE *stream)
 DECLARE(int, remove, const char *pathname)
+DECLARE(int, cnd_signal, cnd_t *cond );
+DECLARE(int, cnd_wait, cnd_t* cond, mtx_t* mutex );
+DECLARE(void, cnd_destroy, cnd_t* cond );
+DECLARE(int, mtx_trylock, mtx_t *mutex );
+DECLARE(void, mtx_destroy, mtx_t *mutex );
+DECLARE(int, thrd_equal, thrd_t lhs, thrd_t rhs );
+DECLARE(int, clock_gettime, clockid_t clockid, struct timespec *tp);
+DECLARE(int, getentropy, void *buffer, size_t length);
+DECLARE(char*, realpath, const char * path, char * resolved_path);
+DECLARE(int, mkdir, const char *pathname, mode_t mode);
+DECLARE(int, stat, const char * pathname, struct stat * statbuf);
+DECLARE(char*, getcwd, char *buf, size_t size);
+DECLARE(struct dirent*, readdir, DIR * dir);
+DECLARE(int, closedir, DIR* dir);
+DECLARE(int, chdir, const char *path);
+DECLARE(DIR*, opendir, const char * path);
+DECLARE(int, mtime, const char *pathname, struct timespec * time);
+DECLARE(ssize_t, readlink, const char * pathname, char * buf, size_t bufsiz);
+DECLARE(int, rename, const char *oldpath, const char *newpath);
+DECLARE(int, cnd_timedwait, cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point );
+DECLARE(int, thrd_detach, thrd_t thr );
+DECLARE(int, thrd_join, thrd_t thr, int *res );
+DECLARE(int, truncate, const char *path, off_t length);
+DECLARE(int, statvfs, const char * path, struct statvfs * buf);
+DECLARE(int, lstat, const char * pathname, struct stat * statbuf);
+
 
 DLL_PUBLIC FILE * stdin = 0;
 DLL_PUBLIC FILE * stdout = 0;
@@ -123,6 +151,8 @@ __attribute__((constructor)) void init() {
 		memcpy_ms = dlsym(libc, "memcpy");
 		getenv_ms = dlsym(libc, "getenv");
 		thrd_yield_ms = dlsym(libc, "thrd_yield");
+		thrd_current_ms = dlsym(libc, "thrd_current");
+		thrd_sleep_ms = dlsym(libc, "thrd_sleep");
 		cnd_broadcast_ms = dlsym(libc, "cnd_broadcast");
 		cnd_wait_ms = dlsym(libc, "cnd_wait");
 		call_once_ms = dlsym(libc, "call_once");
@@ -143,6 +173,30 @@ __attribute__((constructor)) void init() {
 		remove_ms = dlsym(libc, "remove");
 		getc_ms = dlsym(libc, "getc");
 		ungetc_ms = dlsym(libc, "ungetc");
+		cnd_signal_ms = dlsym(libc, "cnd_signal");
+		cnd_destroy_ms = dlsym(libc, "cnd_destroy");
+		mtx_trylock_ms = dlsym(libc, "mtx_trylock");
+		mtx_destroy_ms = dlsym(libc, "mtx_destroy");
+		thrd_equal_ms = dlsym(libc, "thrd_eq");
+		clock_gettime_ms = dlsym(libc, "clock_gettime");
+		getentropy_ms = dlsym(libc, "getentropy");
+		realpath_ms = dlsym(libc, "realpath");
+		mkdir_ms = dlsym(libc, "mkdir");
+		stat_ms = dlsym(libc, "stat");
+		getcwd_ms = dlsym(libc, "getcwd");
+		readdir_ms = dlsym(libc, "readdir");
+		closedir_ms = dlsym(libc, "closedir");
+		chdir_ms = dlsym(libc, "chdir");
+		opendir_ms = dlsym(libc, "opendir");
+		mtime_ms = dlsym(libc, "mtime");
+		readlink_ms = dlsym(libc, "readlink");
+		rename_ms = dlsym(libc, "rename");
+		cnd_timedwait_ms = dlsym(libc, "cnd_timedwait");
+		thrd_join_ms = dlsym(libc, "thrd_join");
+		thrd_detach_ms = dlsym(libc, "thrd_detach");
+		truncate_ms = dlsym(libc, "truncate");
+		statvfs_ms = dlsym(libc, "statvfs");
+		lstat_ms = dlsym(libc, "lstat");
 		stdin = fdopen( 0, "r" );
 		stdout = fdopen( 1, "a" );
 		stderr = fdopen( 2, "a" );
@@ -163,8 +217,9 @@ __attribute__((constructor)) void init() {
 		memcpy_sysv = dlsym(libc, "memcpy");
 		getenv_sysv = dlsym(libc, "getenv");
 		thrd_yield_sysv = dlsym(libc, "thrd_yield");
+		thrd_current_sysv = dlsym(libc, "thrd_current");
+		thrd_sleep_sysv = dlsym(libc, "thrd_sleep");
 		cnd_broadcast_sysv = dlsym(libc, "cnd_broadcast");
-		cnd_wait_sysv = dlsym(libc, "cnd_wait");
 		call_once_sysv = dlsym(libc, "call_once");
 		tss_create_sysv = dlsym(libc, "tss_create");
 		tss_get_sysv = dlsym(libc, "tss_get");
@@ -183,6 +238,31 @@ __attribute__((constructor)) void init() {
 		remove_sysv = dlsym(libc, "remove");
 		getc_sysv = dlsym(libc, "getc");
 		ungetc_sysv = dlsym(libc, "ungetc");
+		cnd_signal_sysv = dlsym(libc, "cnd_signal");
+		cnd_wait_sysv = dlsym(libc, "cnd_wait");
+		cnd_destroy_sysv = dlsym(libc, "cnd_destroy");
+		mtx_trylock_sysv = dlsym(libc, "mtx_trylock");
+		mtx_destroy_sysv = dlsym(libc, "mtx_destroy");
+		thrd_equal_sysv = dlsym(libc, "thrd_eq");
+		clock_gettime_sysv = dlsym(libc, "clock_gettime");
+		getentropy_sysv = dlsym(libc, "getentropy");
+		realpath_sysv = dlsym(libc, "realpath");
+		mkdir_sysv = dlsym(libc, "mkdir");
+		stat_sysv = dlsym(libc, "stat");
+		getcwd_sysv = dlsym(libc, "getcwd");
+		readdir_sysv = dlsym(libc, "readdir");
+		closedir_sysv = dlsym(libc, "closedir");
+		chdir_sysv = dlsym(libc, "chdir");
+		opendir_sysv = dlsym(libc, "opendir");
+		mtime_sysv = dlsym(libc, "mtime");
+		readlink_sysv = dlsym(libc, "readlink");
+		rename_sysv = dlsym(libc, "rename");
+		cnd_timedwait_sysv = dlsym(libc, "cnd_timedwait");
+		thrd_join_sysv = dlsym(libc, "thrd_join");
+		thrd_detach_sysv = dlsym(libc, "thrd_detach");
+		truncate_sysv = dlsym(libc, "truncate");
+		statvfs_sysv = dlsym(libc, "statvfs");
+		lstat_sysv = dlsym(libc, "lstat");
 		stdin = dlsym(libc, "_IO_2_1_stdin_");
 		stdout = dlsym(libc, "_IO_2_1_stdout_");
 		stderr = dlsym(libc, "_IO_2_1_stderr_");
@@ -404,12 +484,41 @@ void thrd_yield(void) {
 	}
 }
 
+DLL_PUBLIC thrd_t thrd_current(void) IMPLEMENT(thrd_current)
+DLL_PUBLIC int thrd_sleep(const struct timespec* duration, struct timespec* remaining ) IMPLEMENT(thrd_sleep, duration, remaining)
+
 DLL_PUBLIC int cnd_broadcast( cnd_t *cond ) IMPLEMENT(cnd_broadcast, cond)
 DLL_PUBLIC int cnd_wait( cnd_t* cond, mtx_t* mutex ) IMPLEMENT(cnd_wait, cond, mutex)
 DLL_PUBLIC void call_once( once_flag* flag, void (*func)(void) ) IMPLEMENT(call_once, flag, func)
 DLL_PUBLIC int tss_create(tss_t* tss_key, tss_dtor_t destructor) IMPLEMENT(tss_create, tss_key, destructor)
 DLL_PUBLIC void *tss_get(tss_t tss_key) IMPLEMENT(tss_get, tss_key)
 DLL_PUBLIC int tss_set(tss_t tss_id, void *val) IMPLEMENT(tss_set, tss_id, val)
+
+
+DLL_PUBLIC int cnd_signal(cnd_t *cond ) IMPLEMENT(cnd_signal, cond)
+DLL_PUBLIC void cnd_destroy(cnd_t* cond ) IMPLEMENT(cnd_destroy, cond)
+DLL_PUBLIC int mtx_trylock(mtx_t *mutex ) IMPLEMENT(mtx_trylock, mutex)
+DLL_PUBLIC void mtx_destroy(mtx_t *mutex ) IMPLEMENT(mtx_destroy, mutex)
+DLL_PUBLIC int thrd_equal(thrd_t lhs, thrd_t rhs ) IMPLEMENT(thrd_equal, lhs, rhs)
+DLL_PUBLIC int clock_gettime(clockid_t clockid, struct timespec *tp) IMPLEMENT(clock_gettime, clockid, tp)
+DLL_PUBLIC int getentropy(void *buffer, size_t length) IMPLEMENT(getentropy, buffer, length)
+DLL_PUBLIC char* realpath(const char * path, char * resolved_path) IMPLEMENT(realpath, path, resolved_path)
+DLL_PUBLIC int mkdir(const char *pathname, mode_t mode) IMPLEMENT(mkdir, pathname, mode)
+DLL_PUBLIC int stat(const char * pathname, struct stat * statbuf) IMPLEMENT(stat, pathname, statbuf)
+DLL_PUBLIC char* getcwd(char *buf, size_t size) IMPLEMENT(getcwd, buf, size)
+DLL_PUBLIC struct dirent* readdir(DIR * dir) IMPLEMENT(readdir, dir)
+DLL_PUBLIC int closedir(DIR* dir) IMPLEMENT(closedir, dir)
+DLL_PUBLIC int chdir(const char *path) IMPLEMENT(chdir, path)
+DLL_PUBLIC DIR* opendir(const char * path) IMPLEMENT(opendir, path)
+DLL_PUBLIC int mtime(const char *pathname, struct timespec * time) IMPLEMENT(mtime, pathname, time)
+DLL_PUBLIC ssize_t readlink(const char * pathname, char * buf, size_t bufsiz) IMPLEMENT(readlink, pathname, buf, bufsiz)
+DLL_PUBLIC int rename(const char *oldpath, const char *newpath) IMPLEMENT(rename, oldpath, newpath)
+DLL_PUBLIC int cnd_timedwait( cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point ) IMPLEMENT(cnd_timedwait, cond, mutex, time_point)
+DLL_PUBLIC int thrd_detach( thrd_t thr ) IMPLEMENT(thrd_detach, thr)
+DLL_PUBLIC int thrd_join( thrd_t thr, int *res ) IMPLEMENT(thrd_join, thr, res)
+DLL_PUBLIC int truncate(const char *path, off_t length) IMPLEMENT(truncate, path, length)
+DLL_PUBLIC int statvfs(const char * path, struct statvfs * buf) IMPLEMENT(statvfs, path, buf)
+DLL_PUBLIC int lstat(const char * pathname, struct stat * statbuf) IMPLEMENT(lstat, pathname, statbuf)
 
 DLL_PUBLIC
 int mtx_init(mtx_t* mutex, int type) {
@@ -661,11 +770,6 @@ char* strerror_r(int errnum, char* buf, size_t buflen) {
     UNUSED(buf);
     UNUSED(buflen);
     return "unknown error";
-}
-
-DLL_PUBLIC
-locale_t uselocale(locale_t locale) {
-	return locale;
 }
 
 DLL_PUBLIC
@@ -1428,3 +1532,370 @@ int strcoll(const char *s1, const char *s2) {
     // One or both strings have ended, compare their lengths
     return strlen(s1) - strlen(s2);
 }
+
+DLL_PUBLIC size_t wcslen(const wchar_t *s) {
+    size_t length = 0;
+    while (*s != L'\0') {
+        ++length;
+        ++s;
+    }
+    return length;
+}
+
+DLL_PUBLIC int wmemcmp(const wchar_t *s1, const wchar_t *s2, size_t n) {
+    for (size_t i = 0; i < n; ++i) {
+        if (s1[i] != s2[i]) {
+            return s1[i] - s2[i];
+        }
+    }
+    return 0;
+}
+
+DLL_PUBLIC int wcscoll(const wchar_t *s1, const wchar_t *s2) {
+    while (*s1 && (*s1 == *s2)) {
+        ++s1;
+        ++s2;
+    }
+    
+    return (*s1 > *s2) ? 1 : ((*s1 < *s2) ? -1 : 0);
+}
+
+wchar_t* wcscpy(wchar_t* dest, const wchar_t* src) {
+    wchar_t* d = dest;
+    while ((*d++ = *src++))
+        ;
+    return dest;
+}
+
+wchar_t* wcsncpy(wchar_t* dest, const wchar_t* src, size_t n) {
+    wchar_t* d = dest;
+    size_t i = 0;
+    while (i < n && (*d++ = *src++))
+        i++;
+    while (i < n) {
+        *d++ = L'\0';
+        i++;
+    }
+    return dest;
+}
+
+DLL_PUBLIC size_t wcsxfrm(wchar_t *dest, const wchar_t *src, size_t n) {
+    size_t srcLen = wcslen(src);
+    
+    if (n <= srcLen) {
+        // Truncated copy if the buffer size is smaller or equal to the source length
+        wcsncpy(dest, src, n - 1);
+        dest[n - 1] = L'\0';
+        return srcLen;
+    } else {
+        // Full copy if the buffer size is larger than the source length
+        wcscpy(dest, src);
+        return srcLen;
+    }
+}
+
+DLL_PUBLIC int iswlower(wint_t wc) {
+    // Basic Latin alphabet (A-Z)
+    if (wc >= 0x61 && wc <= 0x7A)
+        return 1;
+    return 0;
+}
+
+DLL_PUBLIC int iswupper(wint_t wc) {
+    return (wc >= 'A' && wc <= 'Z');
+}
+
+DLL_PUBLIC int iswprint(wint_t wc) {
+    return (wc >= 0x20 && wc <= 0x7E);
+}
+
+DLL_PUBLIC int iswblank(wint_t wc) {
+    return (wc == ' ' || wc == '\t');
+}
+
+DLL_PUBLIC int iswcntrl(wint_t wc) {
+    return (wc <= 0x1F) || (wc == 0x7F);
+}
+
+DLL_PUBLIC int iswalpha(wint_t wc) {
+    return ((wc >= 'A' && wc <= 'Z') || (wc >= 'a' && wc <= 'z'));
+}
+
+DLL_PUBLIC wint_t towlower(wint_t wc) {
+    if (wc >= L'A' && wc <= L'Z')
+        return wc + 32;
+    return wc;
+}
+
+DLL_PUBLIC int iswxdigit(wint_t wc) {
+    return (wc >= L'0' && wc <= L'9') || (wc >= L'A' && wc <= L'F') || (wc >= L'a' && wc <= L'f');
+}
+
+DLL_PUBLIC int iswpunct(wint_t wc) {
+    return (wc >= 33 && wc <= 47) || (wc >= 58 && wc <= 64) || (wc >= 91 && wc <= 96) || (wc >= 123 && wc <= 126);
+}
+
+char* strncpy(char* dest, const char* src, size_t n) {
+    char* d = dest;
+    const char* s = src;
+    size_t i = 0;
+
+    // Copy at most n characters from src to dest
+    while (*s && i < n) {
+        *d++ = *s++;
+        i++;
+    }
+
+    // If n is greater than the length of src, pad dest with null characters
+    while (i < n) {
+        *d++ = '\0';
+        i++;
+    }
+
+    return dest;
+}
+
+DLL_PUBLIC size_t strxfrm(char* dest, const char* src, size_t n) {
+    strncpy(dest, src, n);
+    return strlen(src);
+}
+
+DLL_PUBLIC
+size_t strftime(char* s, size_t maxsize, const char* format, const struct tm* timeptr) {
+    const char* formatPos = format;
+    char* strPos = s;
+    size_t remainingSize = maxsize;
+    
+    while (*formatPos != '\0' && remainingSize > 1) {
+        if (*formatPos == '%') {
+            formatPos++;  // Move past the '%'
+
+            if (*formatPos == '\0')
+                break;  // Reached the end of format string
+
+            switch (*formatPos) {
+                case 'a':  // Abbreviated weekday name
+                    if (timeptr->tm_wday >= 0 && timeptr->tm_wday <= 6) {
+                        const char* weekdayAbbreviations[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+                        const char* abbreviation = weekdayAbbreviations[timeptr->tm_wday];
+                        size_t copyLength = remainingSize < 4 ? remainingSize - 1 : 3;
+                        strncpy(strPos, abbreviation, copyLength);
+                        strPos += copyLength;
+                        remainingSize -= copyLength;
+                    }
+                    break;
+
+                case 'A':  // Full weekday name
+                    if (timeptr->tm_wday >= 0 && timeptr->tm_wday <= 6) {
+                        const char* weekdayNames[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+                        const char* name = weekdayNames[timeptr->tm_wday];
+                        size_t copyLength = remainingSize < 10 ? remainingSize - 1 : 9;
+                        strncpy(strPos, name, copyLength);
+                        strPos += copyLength;
+                        remainingSize -= copyLength;
+                    }
+                    break;
+
+                case 'b':  // Abbreviated month name
+                    if (timeptr->tm_mon >= 0 && timeptr->tm_mon <= 11) {
+                        const char* monthAbbreviations[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+                        const char* abbreviation = monthAbbreviations[timeptr->tm_mon];
+                        size_t copyLength = remainingSize < 4 ? remainingSize - 1 : 3;
+                        strncpy(strPos, abbreviation, copyLength);
+                        strPos += copyLength;
+                        remainingSize -= copyLength;
+                    }
+                    break;
+
+                case 'B':  // Full month name
+                    if (timeptr->tm_mon >= 0 && timeptr->tm_mon <= 11) {
+                        const char* monthNames[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
+                        const char* name = monthNames[timeptr->tm_mon];
+                        size_t copyLength = remainingSize < 10 ? remainingSize - 1 : 9;
+                        strncpy(strPos, name, copyLength);
+                        strPos += copyLength;
+                        remainingSize -= copyLength;
+                    }
+                    break;
+
+                case 'c':  // Date and time representation
+                    if (strftime(strPos, remainingSize, "%a %b %e %H:%M:%S %Y", timeptr) > 0) {
+                        size_t copiedLength = strlen(strPos);
+                        strPos += copiedLength;
+                        remainingSize -= copiedLength;
+                    }
+                    break;
+
+                case 'd':  // Day of the month (01-31)
+                    snprintf(strPos, remainingSize, "%02d", timeptr->tm_mday);
+                    strPos += 2;
+                    remainingSize -= 2;
+                    break;
+
+                case 'H':  // Hour in 24-hour format (00-23)
+                    snprintf(strPos, remainingSize, "%02d", timeptr->tm_hour);
+                    strPos += 2;
+                    remainingSize -= 2;
+                    break;
+
+                case 'I':  // Hour in 12-hour format (01-12)
+                    int hour12 = timeptr->tm_hour % 12;
+                    if (hour12 == 0)
+                        hour12 = 12;
+                    snprintf(strPos, remainingSize, "%02d", hour12);
+                    strPos += 2;
+                    remainingSize -= 2;
+                    break;
+
+                case 'j':  // Day of the year (001-366)
+                    snprintf(strPos, remainingSize, "%03d", timeptr->tm_yday + 1);
+                    strPos += 3;
+                    remainingSize -= 3;
+                    break;
+
+                case 'm':  // Month (01-12)
+                    snprintf(strPos, remainingSize, "%02d", timeptr->tm_mon + 1);
+                    strPos += 2;
+                    remainingSize -= 2;
+                    break;
+
+                case 'M':  // Minute (00-59)
+                    snprintf(strPos, remainingSize, "%02d", timeptr->tm_min);
+                    strPos += 2;
+                    remainingSize -= 2;
+                    break;
+
+                case 'p':  // AM/PM designation
+                    if (timeptr->tm_hour >= 0 && timeptr->tm_hour <= 11) {
+                        strncpy(strPos, "AM", 2);
+                        strPos += 2;
+                        remainingSize -= 2;
+                    } else {
+                        strncpy(strPos, "PM", 2);
+                        strPos += 2;
+                        remainingSize -= 2;
+                    }
+                    break;
+
+                case 'S':  // Second (00-59)
+                    snprintf(strPos, remainingSize, "%02d", timeptr->tm_sec);
+                    strPos += 2;
+                    remainingSize -= 2;
+                    break;
+
+                case 'U':  // Week number of the year (Sunday as the first day) (00-53)
+                    {
+                        int weekNumber = (timeptr->tm_yday - timeptr->tm_wday + 7) / 7;
+                        snprintf(strPos, remainingSize, "%02d", weekNumber);
+                        strPos += 2;
+                        remainingSize -= 2;
+                    }
+                    break;
+
+                case 'w':  // Weekday as a decimal number (0-6, Sunday is 0)
+                    snprintf(strPos, remainingSize, "%d", timeptr->tm_wday);
+                    strPos += 1;
+                    remainingSize -= 1;
+                    break;
+
+                case 'W':  // Week number of the year (Monday as the first day) (00-53)
+                    {
+                        int weekNumber = (timeptr->tm_yday - (timeptr->tm_wday ? (timeptr->tm_wday - 1) : 6) + 7) / 7;
+                        snprintf(strPos, remainingSize, "%02d", weekNumber);
+                        strPos += 2;
+                        remainingSize -= 2;
+                    }
+                    break;
+
+                case 'x':  // Date representation
+                    if (strftime(strPos, remainingSize, "%m/%d/%y", timeptr) > 0) {
+                        size_t copiedLength = strlen(strPos);
+                        strPos += copiedLength;
+                        remainingSize -= copiedLength;
+                    }
+                    break;
+
+                case 'X':  // Time representation
+                    if (strftime(strPos, remainingSize, "%H:%M:%S", timeptr) > 0) {
+                        size_t copiedLength = strlen(strPos);
+                        strPos += copiedLength;
+                        remainingSize -= copiedLength;
+                    }
+                    break;
+
+                case 'y':  // Year without century (00-99)
+                    snprintf(strPos, remainingSize, "%02d", timeptr->tm_year % 100);
+                    strPos += 2;
+                    remainingSize -= 2;
+                    break;
+
+                case 'Y':  // Year with century
+                    snprintf(strPos, remainingSize, "%04d", timeptr->tm_year + 1900);
+                    strPos += 4;
+                    remainingSize -= 4;
+                    break;
+
+                case 'Z':  // Timezone name or abbreviation
+                    // Not supported in this simplified implementation
+                    break;
+
+                case '%':  // Literal '%'
+                    *strPos++ = '%';
+                    remainingSize--;
+                    break;
+
+                default:
+                    // Invalid format specifier, skip it
+                    break;
+            }
+        } else {
+            *strPos++ = *formatPos;
+            remainingSize--;
+        }
+
+        formatPos++;
+    }
+
+    *strPos = '\0';  // Null-terminate the resulting string
+    return (size_t)(strPos - s);  // Return the length of the resulting string
+}
+
+
+locale_t uselocale(locale_t locale) {
+    UNUSED(locale);
+    fprintf(stderr, "uselocale not implemented");
+    fflush(stderr);
+    abort();
+    return 0;
+}
+locale_t newlocale(int category_mask, const char *locale, locale_t base) {
+    UNUSED(category_mask);
+    UNUSED(locale);
+    UNUSED(base);
+    fprintf(stderr, "newlocale not implemented");
+    fflush(stderr);
+    abort();
+    return 0;
+}
+void freelocale(locale_t locobj) {
+    UNUSED(locobj);
+    fprintf(stderr, "freelocale not implemented");
+    fflush(stderr);
+    abort();
+}
+char *setlocale(int category, const char *locale) {
+    UNUSED(category);
+    UNUSED(locale);
+    fprintf(stderr, "setlocale not implemented");
+    fflush(stderr);
+    abort();
+    return 0;
+}
+
+struct lconv* localeconv() {
+    fprintf(stderr, "localeconv not implemented");
+    fflush(stderr);
+    abort();
+    return 0;
+}
+

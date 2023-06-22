@@ -16,8 +16,7 @@ extern "C" {
 typedef int locale_t;
 
 locale_t uselocale(locale_t locale);
-locale_t newlocale(int category_mask, const char *locale,
-    locale_t base);
+locale_t newlocale(int category_mask, const char *locale, locale_t base);
 void freelocale(locale_t locobj);
 char *setlocale(int category, const char *locale);
 

@@ -3,6 +3,7 @@
 
 #include <systypes.h>
 #include <stdarg.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -59,6 +60,84 @@ int ungetc(int c, FILE *stream);
 
 int fflush(FILE*);
 int remove(const char *pathname);
+
+int mtime(const char *pathname, struct timespec * time);
+int setmtime(const char *pathname, struct timespec * time);
+
+typedef int DIR;
+struct dirent {
+	char d_name[256];
+	char d_type;
+};
+DIR* opendir(const char * path);
+struct dirent* readdir(DIR * dir);
+int closedir(DIR* dir);
+//int chmod(const char *pathname, mode_t mode);
+
+
+typedef uint64_t mode_t;
+#define S_ISLNK(mode) (mode == 1)
+#define S_ISREG(mode) (mode == 2)
+#define S_ISDIR(mode) (mode == 3)
+#define S_ISBLK(mode) (mode == 4)
+#define S_ISCHR(mode) (mode == 5)
+#define S_ISFIFO(mode) (mode == 6)
+#define S_ISSOCK(mode) (mode == 7)
+
+int open(const char *pathname, int flags, mode_t mode);
+int close(int fd);
+
+struct stat {
+	mode_t    st_mode;        /* File type and mode */
+	int st_dev;
+	int st_ino;
+	int st_nlink;
+	int st_size;
+	timespec st_mtim;
+};
+typedef int64_t off_t;
+
+int stat(const char * pathname, struct stat * statbuf);
+int lstat(const char * pathname, struct stat * statbuf);
+int fstat(int fd, struct stat *statbuf);
+int mkdir(const char *pathname, mode_t mode);
+char *realpath(const char * path,
+               char * resolved_path);
+char *getcwd(char *buf, size_t size);
+int chdir(const char *path);
+ssize_t readlink(const char * pathname, char * buf, size_t bufsiz);
+int rename(const char *oldpath, const char *newpath);
+int truncate(const char *path, off_t length);
+typedef unsigned long fsblkcnt_t;
+typedef unsigned long fsfilcnt_t;
+struct statvfs {
+               unsigned long  f_bsize;    /* Filesystem block size */
+               unsigned long  f_frsize;   /* Fragment size */
+               fsblkcnt_t     f_blocks;   /* Size of fs in f_frsize units */
+               fsblkcnt_t     f_bfree;    /* Number of free blocks */
+               fsblkcnt_t     f_bavail;   /* Number of free blocks for
+                                             unprivileged users */
+               fsfilcnt_t     f_files;    /* Number of inodes */
+               fsfilcnt_t     f_ffree;    /* Number of free inodes */
+               fsfilcnt_t     f_favail;   /* Number of free inodes for
+                                             unprivileged users */
+               unsigned long  f_fsid;     /* Filesystem ID */
+               unsigned long  f_flag;     /* Mount flags */
+               unsigned long  f_namemax;  /* Maximum filename length */
+           };
+int statvfs(const char * path, struct statvfs * buf);
+
+
+#define O_CLOEXEC 524288
+#define O_RDONLY 0
+#define O_DIRECTORY 65536
+#define O_NOFOLLOW 131072
+
+#define PATH_MAX 4096
+
+
+
+
 
 #ifdef __cplusplus
 }
