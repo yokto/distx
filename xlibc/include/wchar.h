@@ -2,6 +2,7 @@
 #define WCHAR_H
 
 #include <stdarg.h>
+#include <systypes.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,7 +12,9 @@ extern "C" {
 
 typedef int mbstate_t;
 typedef unsigned int wint_t;
-//typedef __WCHAR_TYPE__ wchar_t;
+#ifndef __cplusplus
+typedef __WCHAR_TYPE__ wchar_t;
+#endif
 
 wchar_t* wcschr(const wchar_t* str, wchar_t wc);
 wchar_t* wcspbrk(const wchar_t* str, const wchar_t* chars);

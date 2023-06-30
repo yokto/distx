@@ -23,7 +23,7 @@ int main() {
 
 	printf("hello wörld\n");
 	printf("3 = %d\n", 3);
-	int a = *(int*)0;
+	//int a = *(int*)0;
 	return 3;
 	printf("foo = %d\n", foobar_foo());
 	printf("baz = %d\n", foobar_baz());

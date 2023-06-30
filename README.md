@@ -276,3 +276,9 @@ separate debug from exec data as follows
     objcopy --strip-debug a.out a.exe
     objcopy --only-keep-debug a.out a.dbg
     objcopy --add-gnu-debuglink="a.dbg" "a.exe"
+
+# REFERENCES
+
+### Thread local Storage
+
+https://chao-tic.github.io/blog/2018/12/25/tls

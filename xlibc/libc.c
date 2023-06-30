@@ -22,7 +22,7 @@
 
 #define IMPLEMENT(name, ...) \
 { \
-	if (concat(name, _ms)) { \
+	if (isWin) { \
 		return concat(name, _ms)(__VA_ARGS__); \
 	} else { \
 		return concat(name, _sysv)(__VA_ARGS__); \
@@ -96,12 +96,12 @@ DECLARE(struct dirent*, readdir, DIR * dir);
 DECLARE(int, closedir, DIR* dir);
 DECLARE(int, chdir, const char *path);
 DECLARE(DIR*, opendir, const char * path);
-DECLARE(int, mtime, const char *pathname, struct timespec * time);
 DECLARE(ssize_t, readlink, const char * pathname, char * buf, size_t bufsiz);
 DECLARE(int, rename, const char *oldpath, const char *newpath);
 DECLARE(int, cnd_timedwait, cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point );
 DECLARE(int, thrd_detach, thrd_t thr );
 DECLARE(int, thrd_join, thrd_t thr, int *res );
+DECLARE(int, thrd_create, thrd_t *thr, thrd_start_t func, void *arg);
 DECLARE(int, truncate, const char *path, off_t length);
 DECLARE(int, statvfs, const char * path, struct statvfs * buf);
 DECLARE(int, lstat, const char * pathname, struct stat * statbuf);
@@ -177,7 +177,7 @@ __attribute__((constructor)) void init() {
 		cnd_destroy_ms = dlsym(libc, "cnd_destroy");
 		mtx_trylock_ms = dlsym(libc, "mtx_trylock");
 		mtx_destroy_ms = dlsym(libc, "mtx_destroy");
-		thrd_equal_ms = dlsym(libc, "thrd_eq");
+		thrd_equal_ms = dlsym(libc, "thrd_equal");
 		clock_gettime_ms = dlsym(libc, "clock_gettime");
 		getentropy_ms = dlsym(libc, "getentropy");
 		realpath_ms = dlsym(libc, "realpath");
@@ -188,11 +188,11 @@ __attribute__((constructor)) void init() {
 		closedir_ms = dlsym(libc, "closedir");
 		chdir_ms = dlsym(libc, "chdir");
 		opendir_ms = dlsym(libc, "opendir");
-		mtime_ms = dlsym(libc, "mtime");
 		readlink_ms = dlsym(libc, "readlink");
 		rename_ms = dlsym(libc, "rename");
 		cnd_timedwait_ms = dlsym(libc, "cnd_timedwait");
 		thrd_join_ms = dlsym(libc, "thrd_join");
+		thrd_create_ms = dlsym(libc, "thrd_create");
 		thrd_detach_ms = dlsym(libc, "thrd_detach");
 		truncate_ms = dlsym(libc, "truncate");
 		statvfs_ms = dlsym(libc, "statvfs");
@@ -243,7 +243,7 @@ __attribute__((constructor)) void init() {
 		cnd_destroy_sysv = dlsym(libc, "cnd_destroy");
 		mtx_trylock_sysv = dlsym(libc, "mtx_trylock");
 		mtx_destroy_sysv = dlsym(libc, "mtx_destroy");
-		thrd_equal_sysv = dlsym(libc, "thrd_eq");
+		thrd_equal_sysv = dlsym(libc, "thrd_equal");
 		clock_gettime_sysv = dlsym(libc, "clock_gettime");
 		getentropy_sysv = dlsym(libc, "getentropy");
 		realpath_sysv = dlsym(libc, "realpath");
@@ -254,11 +254,11 @@ __attribute__((constructor)) void init() {
 		closedir_sysv = dlsym(libc, "closedir");
 		chdir_sysv = dlsym(libc, "chdir");
 		opendir_sysv = dlsym(libc, "opendir");
-		mtime_sysv = dlsym(libc, "mtime");
 		readlink_sysv = dlsym(libc, "readlink");
 		rename_sysv = dlsym(libc, "rename");
 		cnd_timedwait_sysv = dlsym(libc, "cnd_timedwait");
 		thrd_join_sysv = dlsym(libc, "thrd_join");
+		thrd_create_sysv = dlsym(libc, "thrd_create");
 		thrd_detach_sysv = dlsym(libc, "thrd_detach");
 		truncate_sysv = dlsym(libc, "truncate");
 		statvfs_sysv = dlsym(libc, "statvfs");
@@ -510,12 +510,12 @@ DLL_PUBLIC struct dirent* readdir(DIR * dir) IMPLEMENT(readdir, dir)
 DLL_PUBLIC int closedir(DIR* dir) IMPLEMENT(closedir, dir)
 DLL_PUBLIC int chdir(const char *path) IMPLEMENT(chdir, path)
 DLL_PUBLIC DIR* opendir(const char * path) IMPLEMENT(opendir, path)
-DLL_PUBLIC int mtime(const char *pathname, struct timespec * time) IMPLEMENT(mtime, pathname, time)
 DLL_PUBLIC ssize_t readlink(const char * pathname, char * buf, size_t bufsiz) IMPLEMENT(readlink, pathname, buf, bufsiz)
 DLL_PUBLIC int rename(const char *oldpath, const char *newpath) IMPLEMENT(rename, oldpath, newpath)
 DLL_PUBLIC int cnd_timedwait( cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point ) IMPLEMENT(cnd_timedwait, cond, mutex, time_point)
 DLL_PUBLIC int thrd_detach( thrd_t thr ) IMPLEMENT(thrd_detach, thr)
 DLL_PUBLIC int thrd_join( thrd_t thr, int *res ) IMPLEMENT(thrd_join, thr, res)
+DLL_PUBLIC int thrd_create(thrd_t *thr, thrd_start_t func, void *arg) IMPLEMENT(thrd_create, thr, func, arg)
 DLL_PUBLIC int truncate(const char *path, off_t length) IMPLEMENT(truncate, path, length)
 DLL_PUBLIC int statvfs(const char * path, struct statvfs * buf) IMPLEMENT(statvfs, path, buf)
 DLL_PUBLIC int lstat(const char * pathname, struct stat * statbuf) IMPLEMENT(lstat, pathname, statbuf)
@@ -1899,3 +1899,11 @@ struct lconv* localeconv() {
     return 0;
 }
 
+DLL_PUBLIC int mtime(const char *pathname, struct timespec * time) {
+    UNUSED(pathname);
+    UNUSED(time);
+    fprintf(stderr, "mtime not implemented");
+    fflush(stderr);
+    abort();
+    return 0;
+}

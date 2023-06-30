@@ -63,4 +63,4 @@ struct r_debug
     void* r_ldbase;        /* Base address the linker is loaded at.  */
   };
 extern void _dl_debug_state (void) __attribute__ ((weak));
-struct r_debug _r_debug __attribute__ ((weak)) = { 1, 0, 0, 0, 0 };
+extern struct r_debug _r_debug __attribute__ ((weak));

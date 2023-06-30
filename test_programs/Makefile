@@ -8,12 +8,13 @@ LIBC := $(DEPDIR)/xlibc/lib/libc.so
 #LIBBASE := $(BUILDDIR)/libbase/lib/libbase.so
 HELLORUST := $(BUILDDIR)/hellorust/bin/hellorust
 HELLOCPP := $(BUILDDIR)/hellocpp/bin/hellocpp
+THREAD := $(BUILDDIR)/bin/thread
 #HELLOGLIBC := $(BUILDDIR)/helloglibc/bin/helloglibc
 CONSTANTS := $(BUILDDIR)constants
 
 #.PHONY: libbase
 
-all: $(HELLOC) $(HELLORUST) $(HELLOCPP) $(LIBBASE) $(CONSTANTS) # $(HELLOGLIBC) #libbase
+all: $(HELLOC) $(HELLORUST) $(HELLOCPP) $(LIBBASE) $(CONSTANTS) $(THREAD) # $(HELLOGLIBC) #libbase
 
 #nolibc: foobar.so nolibc.c ../lib/* Makefile
 #	gcc -shared -nostdlib '-Wl,--dynamic-linker=/home/silvio/stuff/sources/elf/executables/load_elf.so' -fvisibility=hidden -fPIC -o nolibc -lfoobar -L. nolibc.c
@@ -83,6 +84,9 @@ $(HELLOCPP): hellocpp.cpp Makefile hellocpp.map
 #		-o $(HELLOGLIBC) \
 #		-lc -L$(dir $(GLIBC)) \
 #		-lbase -L$(dir $(LIBBASE))
+
+$(THREAD): thread.c
+	${CC} -g -o $(THREAD) thread.c
 
 $(CONSTANTS): constants.c
 	gcc -o $(CONSTANTS) constants.c

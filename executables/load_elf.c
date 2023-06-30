@@ -167,6 +167,8 @@ void * reserve_memory(size_t size) {
 #ifndef WIN32
 void add_local_libs() {
 	_r_debug.r_state = RT_ADD;
+	printf("brk %p", _r_debug);
+	fflush(stdout);
 	((void(*)())(_r_debug.r_brk))();
 	struct link_map* current_map = _r_debug.r_map;
 	if (current_map == 0) {
@@ -505,8 +507,11 @@ Elf64_Half lookup(char* name, loaded_lib* lib) {
 				return idx;
 			//}
 		}
+		printf("index %d\n", idx);
 		idx = lib->hash[2 + nbucket + idx];
+		printf("index %d\n", idx);
 	}
+	ERR("name not found %s", name);
 }
 
 __attribute__((sysv_abi))
@@ -568,63 +573,78 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 	int sym = ELF64_R_SYM(rela->r_info);
 	int type = ELF64_R_TYPE(rela->r_info);
 
-	//printf("rela info %lx, offset %lx, addend %lx, sym %lx, type %lx\n", rela->r_info, rela->r_offset, rela->r_addend, sym, type);
-	if (sym == 0 && rela->r_addend != 0) {
+	printf("rela info %lx, offset %lx, addend %lx, sym %lx, type %lx\n", rela->r_info, rela->r_offset, rela->r_addend, sym, type);
+	if (type == R_X86_64_RELATIVE && sym == 0 && rela->r_addend != 0) {
 		return lib->base + rela->r_addend;
 	}
-	char* sym_name = lib->strtab + lib->symtab[sym].st_name;
-	printf("\t\tlinking symbol: %s\n", sym_name);
+	else if (type == R_X86_64_32 || type == R_X86_64_JUMP_SLOT || type == R_X86_64_GLOB_DAT || type == R_X86_64_64) {
+		char* sym_name = lib->strtab + lib->symtab[sym].st_name;
+		printf("\t\tlinking symbol: %s\n", sym_name);
 
-	void* ret = 0;
-	if (strncmp(sym_name, EXTERNAL_PREFIX, EXTERNAL_PREFIX_LEN) == 0) {
-		void* libc = dlopen2("libc.so.6");
-		if (!libc) {
-			// on android
-			libc = dlopen2("libc.so");
-		}
-		if (!libc) {
-			ERR("could not open libc\n");
-		}
-		void* val = dlsym2(libc, sym_name+ EXTERNAL_PREFIX_LEN);
-		if (!val) {
-			ERR("could not load external %s\n", sym_name+ EXTERNAL_PREFIX_LEN);
-		}
-		//printf("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, val);
-		ret = val;
-		dlclose2(libc);
-	} else if (strcmp(sym_name, "__printf") == 0) {
-		ret = &printf2;
-	} else if (strcmp(sym_name, "__dlsym") == 0) {
-		ret = &dlsym2;
-	} else if (strcmp(sym_name, "__dlopen") == 0) {
-		ret = &dlopen2;
-	} else if (strcmp(sym_name, "__exit") == 0) {
-		ret = &exit2;
-	} else if (strncmp(sym_name, "external_", 9) == 0) {
-		// ignore
-	} else {
-		char * file = verneedstr(sym, lib);
-		if (!file) {
-			file = verdefstr(sym, lib);
-		}
-		if (!file) {
-			STRICT_ERR("could not link symbol\n", sym_name);
-			return 0;
+		void* ret = 0;
+		if (strncmp(sym_name, EXTERNAL_PREFIX, EXTERNAL_PREFIX_LEN) == 0) {
+			void* libc = dlopen2("libc.so.6");
+			if (!libc) {
+				// on android
+				libc = dlopen2("libc.so");
+			}
+			if (!libc) {
+				ERR("could not open libc\n");
+			}
+			void* val = dlsym2(libc, sym_name+ EXTERNAL_PREFIX_LEN);
+			if (!val) {
+				ERR("could not load external %s\n", sym_name+ EXTERNAL_PREFIX_LEN);
+			}
+			//printf("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, val);
+			ret = val;
+			dlclose2(libc);
+		} else if (strcmp(sym_name, "__printf") == 0) {
+			ret = &printf2;
+		} else if (strcmp(sym_name, "__dlsym") == 0) {
+			ret = &dlsym2;
+		} else if (strcmp(sym_name, "__dlopen") == 0) {
+			ret = &dlopen2;
+		} else if (strcmp(sym_name, "__exit") == 0) {
+			ret = &exit2;
+		} else if (strncmp(sym_name, "external_", 9) == 0) {
+			// ignore
 		} else {
-			for (size_t i = 0; i < libs->libs_count; i++) {
-				loaded_lib* l = &libs->libs[i];
-				if (strcmp(file, l->path) == 0) {
-					Elf64_Half f = lookup(sym_name, l);
-					void * f_addr = l->base + l->symtab[f].st_value;
-					//printf("setting name %s, at %x from base %x to %x\n", sym_name, rela->r_offset, lib->base, f_addr);
-					printf("\t\t\tfound symbol in %s\n", l->name);
-					ret = f_addr;
+			char * file = verneedstr(sym, lib);
+			if (!file) {
+				file = verdefstr(sym, lib);
+			}
+			if (!file) {
+				STRICT_ERR("could not link symbol\n", sym_name);
+				return 0;
+			} else {
+				for (size_t i = 0; i < libs->libs_count; i++) {
+					loaded_lib* l = &libs->libs[i];
+					if (strcmp(file, l->path) == 0) {
+						Elf64_Half f = lookup(sym_name, l);
+						void * f_addr = l->base + l->symtab[f].st_value;
+						//printf("setting name %s, at %x from base %x to %x\n", sym_name, rela->r_offset, lib->base, f_addr);
+						printf("\t\t\tfound symbol in %s\n", l->name);
+						ret = f_addr;
+					}
 				}
 			}
 		}
+		printf("\t\t\tsetting symbol %s to %p with offset\n", sym_name, ret, rela->r_addend);
+		return ret + rela->r_addend;
+	} else {
+		ERR("unknown relocation %d", type);
 	}
-	printf("\t\t\tsetting symbol %s to %p\n", sym_name, ret);
-	return ret;
+}
+
+void setSymbol(Elf64_Rela * rela, void* sym, loaded_lib* lib) {
+	int type = ELF64_R_TYPE(rela->r_info);
+	if (type == R_X86_64_32) {
+		uint32_t* offsetTableLoc = (uint32_t*)(lib->base + rela->r_offset);
+		*offsetTableLoc = sym;
+	} else {
+		uint64_t* offsetTableLoc = (uint64_t*)(lib->base + rela->r_offset);
+		*offsetTableLoc = sym;
+	}
 }
 
 void link(loaded_lib* lib, loaded_libs* libs) {
@@ -633,22 +653,15 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 	printf("\trela plt count %d\n", lib->rela_plt_count);
 	for (int i = 0 ; i < lib->rela_count ; i++) {
 		Elf64_Rela * rela = lib->rela + i;
-		void** offsetTableLoc = lib->base + rela->r_offset;
-
 		void * sym = findSymbol(rela, lib, libs);
-		if (sym) {
-			*offsetTableLoc = sym;
-		}
+		setSymbol(rela, sym, lib);
+
 		// printf("\t\toffset: %lx, info %lx, addend: %lx\n", lib->rela[i].r_offset, lib->rela[i].r_info, lib->rela[i].r_addend);
 	}
 	for (int i = 0 ; i < lib->rela_plt_count ; i++) {
 		Elf64_Rela * rela = lib->rela_plt + i;
-		void** offsetTableLoc = lib->base + rela->r_offset;
-
 		void * sym = findSymbol(rela, lib, libs);
-		if (sym) {
-			*offsetTableLoc = sym;
-		}
+		setSymbol(rela, sym, lib);
 	}
 
 
@@ -656,7 +669,6 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 }
 
 void init_lib(loaded_lib* lib, loaded_libs* libs) {
-	printf("\tstart init %s\n", lib->name);
 	if (lib->init_started) { return; }
 	lib->init_started = true;
 
@@ -675,12 +687,12 @@ void init_lib(loaded_lib* lib, loaded_libs* libs) {
 	}
 
 	// init self
-	printf("\tinit %s\n", lib->name);
+	printf("\t\tinit %s\n", lib->name);
 	if (lib->init_array) {
 		for (int j = 0; j * sizeof(void*) < lib->init_arraysz ; j++) {
 			// this is already absolute because of relocation
-			printf("\tinit %d from %s\n", j, lib->name);
 			size_t rel_f = lib->init_array[j];
+			printf("\t\tinit %d from library %s with pointer %p\n", j, lib->name, (void*)rel_f - lib->base);
 			//printf("exec init at %llx for lib %s\n", rel_f, lib->name);
 			((void (*)())(rel_f))();
 		}
@@ -690,7 +702,9 @@ void init_lib(loaded_lib* lib, loaded_libs* libs) {
 void init_libs(loaded_libs* libs) {
 	for (int i = 0; i < libs->libs_count; i++) {
 		loaded_lib* lib = &libs->libs[i];
+		printf("\tstart init %s\n", lib->name);
 		init_lib(lib, libs);
+		printf("\tend init %s\n", lib->name);
 	}
 }
 
@@ -728,18 +742,20 @@ int main(int argc, char ** argv) {
 		link(&libs.libs[i], &libs);
 	}
 #ifndef WIN32
+	printf("f %p\n", _r_debug.r_map);
 	add_local_libs();
 	printf("f %p\n", _r_debug.r_brk);
 	printf("f %p\n", &_dl_debug_state);
 #endif
-	Elf64_Half main_idx = lookup("main", lib);
-	printf("init\n");
+	printf("start init libs\n");
 	init_libs(&libs);
+	printf("end init libs\n");
 
+	Elf64_Half main_idx = lookup("main", lib);
 	int (*main_f)(void) __attribute__((sysv_abi));
 	void * main_addr = lib->base + lib->symtab[main_idx].st_value;
 	main_f = main_addr;
-	printf("main\n");
+	printf("main at %d %p\n", main_idx , main_addr - lib->base);
 	int ret = main_f();
 	printf("main returned %d\n", ret);
 	printf("fini\n");
