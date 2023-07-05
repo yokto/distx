@@ -22,6 +22,8 @@
 
 #define IMPLEMENT(name, ...) \
 { \
+	__printf("execute os %s\n", #name); \
+	fflush(stdout); \
 	if (isWin) { \
 		return concat(name, _ms)(__VA_ARGS__); \
 	} else { \
@@ -64,10 +66,11 @@ DECLARE(thrd_t, thrd_current, void);
 DECLARE(int, thrd_sleep, const struct timespec* duration, struct timespec* remaining );
 DECLARE(int, cnd_broadcast, cnd_t *cond )
 DECLARE(int, cnd_wait, cnd_t* cond, mtx_t* mutex )
-DECLARE(void, call_once, once_flag* flag, void (*func)(void) );
+DECLARE(void, call_once, once_flag* flag, void (*func)(void) )
 DECLARE(int, tss_create, tss_t* tss_key, tss_dtor_t destructor)
-DECLARE(void *, tss_get, tss_t tss_key );
-DECLARE(int, tss_set, tss_t tss_id, void *val );
+DECLARE(void, tss_delete, tss_t tss_id )
+DECLARE(void *, tss_get, tss_t tss_key )
+DECLARE(int, tss_set, tss_t tss_id, void *val )
 DECLARE(int, mtx_init, mtx_t* mutex, int type)
 DECLARE(int, mtx_unlock, mtx_t *mutex)
 DECLARE(int, mtx_lock, mtx_t* mutex)
@@ -157,6 +160,7 @@ __attribute__((constructor)) void init() {
 		cnd_wait_ms = dlsym(libc, "cnd_wait");
 		call_once_ms = dlsym(libc, "call_once");
 		tss_create_ms = dlsym(libc, "tss_create");
+		tss_delete_ms = dlsym(libc, "tss_delete");
 		tss_get_ms = dlsym(libc, "tss_get");
 		tss_set_ms = dlsym(libc, "tss_set");
 		mtx_init_ms = dlsym(libc, "mtx_init");
@@ -214,6 +218,7 @@ __attribute__((constructor)) void init() {
 		realloc_sysv = dlsym(libc, "realloc");
 		free_sysv = dlsym(libc, "free");
 		fflush_sysv = dlsym(libc, "fflush");
+		memset_sysv = dlsym(libc, "memset");
 		memcpy_sysv = dlsym(libc, "memcpy");
 		getenv_sysv = dlsym(libc, "getenv");
 		thrd_yield_sysv = dlsym(libc, "thrd_yield");
@@ -222,6 +227,7 @@ __attribute__((constructor)) void init() {
 		cnd_broadcast_sysv = dlsym(libc, "cnd_broadcast");
 		call_once_sysv = dlsym(libc, "call_once");
 		tss_create_sysv = dlsym(libc, "tss_create");
+		tss_delete_sysv = dlsym(libc, "tss_delete");
 		tss_get_sysv = dlsym(libc, "tss_get");
 		tss_set_sysv = dlsym(libc, "tss_set");
 		mtx_init_sysv = dlsym(libc, "mtx_init");
@@ -366,14 +372,7 @@ void free(void* ptr) {
 }
 
 
-DLL_PUBLIC
-void* malloc(size_t new_size) {
-	if (isWin) {
-		return malloc_ms(new_size);
-	} else {
-		return malloc_sysv(new_size);
-	}
-}
+DLL_PUBLIC void* malloc(size_t new_size) IMPLEMENT(malloc, new_size)
 
 DLL_PUBLIC void *calloc(size_t nmemb, size_t size) IMPLEMENT(calloc, nmemb, size)
 
@@ -491,6 +490,7 @@ DLL_PUBLIC int cnd_broadcast( cnd_t *cond ) IMPLEMENT(cnd_broadcast, cond)
 DLL_PUBLIC int cnd_wait( cnd_t* cond, mtx_t* mutex ) IMPLEMENT(cnd_wait, cond, mutex)
 DLL_PUBLIC void call_once( once_flag* flag, void (*func)(void) ) IMPLEMENT(call_once, flag, func)
 DLL_PUBLIC int tss_create(tss_t* tss_key, tss_dtor_t destructor) IMPLEMENT(tss_create, tss_key, destructor)
+DLL_PUBLIC void tss_delete(tss_t tss_id) IMPLEMENT(tss_delete, tss_id)
 DLL_PUBLIC void *tss_get(tss_t tss_key) IMPLEMENT(tss_get, tss_key)
 DLL_PUBLIC int tss_set(tss_t tss_id, void *val) IMPLEMENT(tss_set, tss_id, val)
 
@@ -520,14 +520,7 @@ DLL_PUBLIC int truncate(const char *path, off_t length) IMPLEMENT(truncate, path
 DLL_PUBLIC int statvfs(const char * path, struct statvfs * buf) IMPLEMENT(statvfs, path, buf)
 DLL_PUBLIC int lstat(const char * pathname, struct stat * statbuf) IMPLEMENT(lstat, pathname, statbuf)
 
-DLL_PUBLIC
-int mtx_init(mtx_t* mutex, int type) {
-	if (isWin) {
-		return mtx_init_ms(mutex, type);
-	} else {
-		return mtx_init_sysv(mutex, type);
-	}
-}
+DLL_PUBLIC int mtx_init(mtx_t* mutex, int type) IMPLEMENT(mtx_init, mutex, type)
 
 DLL_PUBLIC
 int mtx_lock(mtx_t* mutex) {

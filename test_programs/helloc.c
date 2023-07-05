@@ -18,8 +18,14 @@ __attribute__((destructor)) void fini_foo() {
 	free(foo);
 }
 
+int bar() {
+	int a = 1;
+	return a / (a - a);
+}
+
 int main() {
 //	realloc(0, 232);
+	bar();
 
 	printf("hello wörld\n");
 	printf("3 = %d\n", 3);

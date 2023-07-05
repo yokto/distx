@@ -318,10 +318,14 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 				(void*)maddr,
 				msize,
 				PROT_READ | PROT_WRITE | PROT_EXEC, // todo remove wrong ones
-				MAP_PRIVATE | MAP_DENYWRITE | MAP_FIXED,
+				MAP_PRIVATE | MAP_FIXED,
 				fileno(fd),
 				file_offset);
 #endif
+			// if p_filesz smaller than p_memsz we need to set the rest to zero. I.e. bss. section
+			if (ph->p_filesz < ph->p_memsz) {
+				memset(maddr + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz);
+			}
 		}	
 		if (ph->p_type == PT_DYNAMIC) {
 			lib->dynamic = (Elf64_Dyn*)(memory + ph->p_vaddr);

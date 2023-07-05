@@ -277,8 +277,16 @@ separate debug from exec data as follows
     objcopy --only-keep-debug a.out a.dbg
     objcopy --add-gnu-debuglink="a.dbg" "a.exe"
 
+# MISC
+
+### Program Header
+
+FileSiz can be shorter than MemSiz. This happens for instance for the .bss section of uninitialized variables. The loader needs to set them to 0.
+
 # REFERENCES
 
 ### Thread local Storage
 
 https://chao-tic.github.io/blog/2018/12/25/tls
+
+

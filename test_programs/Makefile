@@ -9,12 +9,14 @@ LIBC := $(DEPDIR)/xlibc/lib/libc.so
 HELLORUST := $(BUILDDIR)/hellorust/bin/hellorust
 HELLOCPP := $(BUILDDIR)/hellocpp/bin/hellocpp
 THREAD := $(BUILDDIR)/bin/thread
+TLS := $(BUILDDIR)/bin/tls
+TSS := $(BUILDDIR)/bin/tss
 #HELLOGLIBC := $(BUILDDIR)/helloglibc/bin/helloglibc
 CONSTANTS := $(BUILDDIR)constants
 
 #.PHONY: libbase
 
-all: $(HELLOC) $(HELLORUST) $(HELLOCPP) $(LIBBASE) $(CONSTANTS) $(THREAD) # $(HELLOGLIBC) #libbase
+all: $(HELLOC) $(HELLORUST) $(HELLOCPP) $(LIBBASE) $(CONSTANTS) $(THREAD) $(TLS) $(TSS) # $(HELLOGLIBC) #libbase
 
 #nolibc: foobar.so nolibc.c ../lib/* Makefile
 #	gcc -shared -nostdlib '-Wl,--dynamic-linker=/home/silvio/stuff/sources/elf/executables/load_elf.so' -fvisibility=hidden -fPIC -o nolibc -lfoobar -L. nolibc.c
@@ -87,6 +89,18 @@ $(HELLOCPP): hellocpp.cpp Makefile hellocpp.map
 
 $(THREAD): thread.c
 	${CC} -g -o $(THREAD) thread.c
+
+$(TLS): tls.c
+	${CC} -g \
+		tls.c \
+		-femulated-tls \
+		-Wl,-soname,test_programs/bin/tls \
+		-shared \
+		-fPIC \
+		-o $(TLS)
+
+$(TSS): tss.c
+	${CC} -g -o $(TSS) tss.c -femulated-tls
 
 $(CONSTANTS): constants.c
 	gcc -o $(CONSTANTS) constants.c
