@@ -324,7 +324,8 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 #endif
 			// if p_filesz smaller than p_memsz we need to set the rest to zero. I.e. bss. section
 			if (ph->p_filesz < ph->p_memsz) {
-				memset(maddr + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz);
+				printf("setting %p for %x to zero\n", ph->p_vaddr + ph->p_filesz, ph->p_memsz - ph->p_filesz);
+				memset(memory + ph->p_vaddr + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz);
 			}
 		}	
 		if (ph->p_type == PT_DYNAMIC) {
