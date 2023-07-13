@@ -12,6 +12,7 @@
 #include <wctype.h>
 
 #define DLL_PUBLIC __attribute__ ((visibility ("default")))
+#define UNUSED(x) (void)(x)
 
 #define concat2(X, Y) X ## Y
 #define concat(X, Y) concat2(X, Y)
@@ -521,6 +522,7 @@ DLL_PUBLIC int statvfs(const char * path, struct statvfs * buf) IMPLEMENT(statvf
 DLL_PUBLIC int lstat(const char * pathname, struct stat * statbuf) IMPLEMENT(lstat, pathname, statbuf)
 
 DLL_PUBLIC int mtx_init(mtx_t* mutex, int type) IMPLEMENT(mtx_init, mutex, type)
+//{ UNUSED(mutex); UNUSED(type); return 0; }
 
 DLL_PUBLIC
 int mtx_lock(mtx_t* mutex) {
@@ -729,10 +731,12 @@ void __tls_get_addr() {
 }
 
 DLL_PUBLIC
-void __cxa_atexit() {
-    fprintf(stderr, "__tls_get_addr not implemented");
-    fflush(stderr);
-    abort();
+int __cxa_atexit(void (*func) (void *), void * arg, void * dso_handle) {
+    UNUSED(dso_handle); // todo
+    UNUSED(func);
+    UNUSED(arg);
+    fprintf(stderr, "cxa_atexit not implemented properly");
+    return 0;
 }
 
 DLL_PUBLIC
@@ -756,7 +760,6 @@ void *memchr(const void *s, int c, size_t n) {
     return NULL;
 }
 
-#define UNUSED(x) (void)(x)
 DLL_PUBLIC
 char* strerror_r(int errnum, char* buf, size_t buflen) {
     UNUSED(errnum);
@@ -1731,13 +1734,15 @@ size_t strftime(char* s, size_t maxsize, const char* format, const struct tm* ti
                     remainingSize -= 2;
                     break;
 
-                case 'I':  // Hour in 12-hour format (01-12)
-                    int hour12 = timeptr->tm_hour % 12;
-                    if (hour12 == 0)
-                        hour12 = 12;
-                    snprintf(strPos, remainingSize, "%02d", hour12);
-                    strPos += 2;
-                    remainingSize -= 2;
+                case 'I': // Hour in 12-hour format (01-12)
+		    {
+                    	int hour12 = timeptr->tm_hour % 12;
+                    	if (hour12 == 0)
+                    	    hour12 = 12;
+                    	snprintf(strPos, remainingSize, "%02d", hour12);
+                    	strPos += 2;
+                    	remainingSize -= 2;
+		    }
                     break;
 
                 case 'j':  // Day of the year (001-366)
@@ -1853,22 +1858,18 @@ size_t strftime(char* s, size_t maxsize, const char* format, const struct tm* ti
     return (size_t)(strPos - s);  // Return the length of the resulting string
 }
 
-
 locale_t uselocale(locale_t locale) {
     UNUSED(locale);
     fprintf(stderr, "uselocale not implemented");
     fflush(stderr);
-    abort();
-    return 0;
+    return 1;
 }
 locale_t newlocale(int category_mask, const char *locale, locale_t base) {
     UNUSED(category_mask);
     UNUSED(locale);
     UNUSED(base);
     fprintf(stderr, "newlocale not implemented");
-    fflush(stderr);
-    abort();
-    return 0;
+    return 1;
 }
 void freelocale(locale_t locobj) {
     UNUSED(locobj);

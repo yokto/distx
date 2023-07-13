@@ -1,4 +1,4 @@
-CC ?= clang
+CC := clang
 INSTALL := $(dir ${PWD})
 LIBC := $(INSTALL)lib/libc.so
 LIBM := $(INSTALL)lib/libm.so
@@ -9,6 +9,7 @@ all: $(LIBC) $(HEADERS)
 
 $(LIBC): libc.c Makefile libc.map
 	mkdir -p $(dir $(LIBC))
+	echo ${CC}
 	${CC} \
 		-g \
 		-Wall -Wextra -Werror \

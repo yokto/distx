@@ -4,7 +4,7 @@ all: load_elf #load_elf_android load_elf.exe
 
 load_elf: load_elf.c
 	mkdir -p ../build
-	${CC} -ldl -g -fPIC -fpie -o ../build/load_elf -fno-builtin load_elf.c
+	${CC} -ldl -g -o ../build/load_elf load_elf.c
 
 #load_elf.exe: load_elf.c
 #	mkdir -p ../build

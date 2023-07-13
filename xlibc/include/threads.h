@@ -30,7 +30,7 @@ enum {
 };
 
 // Mutex
-typedef size_t mtx_t;
+typedef struct { char foo[40]; } mtx_t; // this is a hack because it has this size on linux. we should dynamically allocate it on mtx_init
 int mtx_init( mtx_t* mutex, int type );
 int mtx_lock( mtx_t* mutex );
 int mtx_timedlock( mtx_t * mutex,

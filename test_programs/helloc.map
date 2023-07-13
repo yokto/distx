@@ -1,5 +1,3 @@
-helloc_1.0.0 {
-      global:
-main;
-      local: *;
-    };
+fooasdfa_Asd_faS_D_asdf_asdf_ll {
+  global: *;
+};

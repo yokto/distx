@@ -4,8 +4,6 @@
 // Define a thread-local variable
 _Thread_local int threadLocalVariable;
 
-static int foo = 0x42;
-
 int thread_function(void* arg) {
     // Access and modify the thread-local variable
     threadLocalVariable = *(int*)arg;
@@ -16,8 +14,6 @@ int thread_function(void* arg) {
 }
 
 int main() {
-	foo++;
-	printf("\n\nfoo: %d\n\n ", foo);
     thrd_t thread1, thread2;
     int arg1 = 5, arg2 = 10;
 

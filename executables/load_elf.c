@@ -418,7 +418,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 #ifndef WIN32
 	struct link_map* new_map = malloc(sizeof(struct link_map));
 	memset(new_map, 0, sizeof(struct link_map));
-	const char * pwd = "/home/silvio/stuff/sources/elfx86/test_programs/";
+	const char * pwd = "/home/silvio/stuff/sources/elfx86/";
 	const int pwd_len = strlen(pwd);
 	const int lib_len = strlen(lib_path);
 	char * full_path = malloc(pwd_len + lib_len + 1);
@@ -684,7 +684,7 @@ void init_lib(loaded_lib* lib, loaded_libs* libs) {
 			char* needed = lib->strtab + dynamic->d_un.d_ptr;
 			for (int j = 0; j < libs->libs_count; j++) {
 				loaded_lib* lib2 = &libs->libs[j];
-				if (strcmp(lib2->path,  needed)) {
+				if (strcmp(lib2->path,  needed) == 0) {
 					init_lib(lib2, libs);
 				}
 			}
@@ -764,6 +764,7 @@ int main(int argc, char ** argv) {
 	int ret = main_f();
 	printf("main returned %d\n", ret);
 	printf("fini\n");
+	fflush(stdout);
 	fini_libs(&libs);
-	printf("don\n");
+	printf("done\n");
 }

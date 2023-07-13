@@ -1,4 +1,5 @@
-CC ?= gcc
+CC := clang
+CXX := clang++
 BUILDDIR := $(realpath $(dir ${PWD}))
 DEPDIR := $(realpath $(dir ${PWD})/..)
 LIBFOOBAR := $(BUILDDIR)/lib/libfoobar.so
@@ -11,12 +12,23 @@ HELLOCPP := $(BUILDDIR)/hellocpp/bin/hellocpp
 THREAD := $(BUILDDIR)/bin/thread
 TLS := $(BUILDDIR)/bin/tls
 TSS := $(BUILDDIR)/bin/tss
+TEST_MTX := $(BUILDDIR)/bin/test_mtx
+TEST_IOSTREAM := $(BUILDDIR)/bin/test_iostream
 #HELLOGLIBC := $(BUILDDIR)/helloglibc/bin/helloglibc
-CONSTANTS := $(BUILDDIR)constants
+CONSTANTS := $(BUILDDIR)/bin/constants
 
 #.PHONY: libbase
 
-all: $(HELLOC) $(HELLORUST) $(HELLOCPP) $(LIBBASE) $(CONSTANTS) $(THREAD) $(TLS) $(TSS) # $(HELLOGLIBC) #libbase
+all: $(HELLOC) \
+	$(HELLORUST) \
+	$(HELLOCPP) \
+	$(LIBBASE) \
+	$(CONSTANTS) \
+	$(THREAD) \
+	$(TLS) \
+	$(TSS) \
+	$(TEST_MTX) \
+	$(TEST_IOSTREAM) # $(HELLOGLIBC) #libbase
 
 #nolibc: foobar.so nolibc.c ../lib/* Makefile
 #	gcc -shared -nostdlib '-Wl,--dynamic-linker=/home/silvio/stuff/sources/elf/executables/load_elf.so' -fvisibility=hidden -fPIC -o nolibc -lfoobar -L. nolibc.c
@@ -52,20 +64,20 @@ $(HELLORUST): hellorust.rs Makefile
 	mkdir -p $(dir $(HELLORUST))
 	rustc hellorust.rs --crate-type cdylib -o $(HELLORUST)
 
-$(HELLOCPP): hellocpp.cpp Makefile hellocpp.map
-	mkdir -p $(dir $(HELLOCPP))
-	g++ \
-		hellocpp.cpp \
-		-g \
-		-Wl,-soname,hellocpp/bin/libhellocpp.so \
-		-Wl,--version-script=hellocpp.map \
-		-Wl,-Bsymbolic \
-		-Wl,-Bsymbolic-functions \
-		-shared \
-		-nolibc \
-		-fPIC \
-		-lc -L$(dir $(LIBC)) \
-		-o $(HELLOCPP)
+#$(HELLOCPP): hellocpp.cpp Makefile hellocpp.map
+#	mkdir -p $(dir $(HELLOCPP))
+#	${CXX} \
+#		hellocpp.cpp \
+#		-g \
+#		-Wl,-soname,hellocpp/bin/libhellocpp.so \
+#		-Wl,--version-script=hellocpp.map \
+#		-Wl,-Bsymbolic \
+#		-Wl,-Bsymbolic-functions \
+#		-shared \
+#		-nolibc \
+#		-fPIC \
+#		-lc -L$(dir $(LIBC)) \
+#		-o $(HELLOCPP)
 
 #libbase:
 #	$(MAKE) -C libbase/src
@@ -95,12 +107,19 @@ $(TLS): tls.c
 		tls.c \
 		-femulated-tls \
 		-Wl,-soname,test_programs/bin/tls \
-		-shared \
-		-fPIC \
 		-o $(TLS)
 
 $(TSS): tss.c
-	${CC} -g -o $(TSS) tss.c -femulated-tls
+	echo ${CC}
+	${CC} -g -o $(TSS) tss.c
+
+$(TEST_MTX): test_mtx.c
+	${CC} -g -o $(TEST_MTX) test_mtx.c
+
+$(TEST_IOSTREAM): test_iostream.cpp
+	mkdir -p $(dir $(TEST_IOSTREAM))
+	echo ${PATH}
+	clang++ -femulated-tls -g -o $(TEST_IOSTREAM) test_iostream.cpp
 
 $(CONSTANTS): constants.c
 	gcc -o $(CONSTANTS) constants.c
