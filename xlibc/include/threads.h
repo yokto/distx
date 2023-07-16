@@ -21,16 +21,15 @@ _Noreturn void thrd_exit( int res );
 int thrd_detach( thrd_t thr );
 int thrd_join( thrd_t thr, int *res );
 enum {
-
     thrd_success = 0 /* unspecified */,
-    thrd_nomem = 1 /* unspecified */,
-    thrd_timedout = 2 /* unspecified */,
-    thrd_busy = 3 /* unspecified */,
-    thrd_error = 4 /* unspecified */
+    thrd_nomem = 3 /* unspecified */,
+    thrd_timedout = 4 /* unspecified */,
+    thrd_busy = 1 /* unspecified */,
+    thrd_error = 2 /* unspecified */
 };
 
 // Mutex
-typedef struct { char foo[40]; } mtx_t; // this is a hack because it has this size on linux. we should dynamically allocate it on mtx_init
+typedef void* mtx_t; // this is a hack because it has this size on linux. we should dynamically allocate it on mtx_init
 int mtx_init( mtx_t* mutex, int type );
 int mtx_lock( mtx_t* mutex );
 int mtx_timedlock( mtx_t * mutex,
@@ -46,7 +45,7 @@ enum {
 
 // call once
 #define ONCE_FLAG_INIT 0
-typedef size_t once_flag;
+typedef uint8_t once_flag;
 void call_once( once_flag* flag, void (*func)(void) );
 
 // conditional variables

@@ -32,7 +32,7 @@ int main() {
         printf("Mutex locked with trylock.\n");
         mtx_unlock(&mtx);
     } else {
-        printf("trylock failed. Mutex is already locked.\n");
+        printf("trylock failed. Mutex is already locked. res %d\n", result);
     }
 
     mtx_destroy(&mtx);

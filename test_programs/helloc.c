@@ -20,7 +20,7 @@ __attribute__((destructor)) void fini_foo() {
 
 int bar() {
 	int a = 1;
-	return a / (a - a);
+	return a / (a - 3);
 }
 
 int main() {

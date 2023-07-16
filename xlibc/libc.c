@@ -10,9 +10,9 @@
 #include <wchar.h>
 #include <ctype.h>
 #include <wctype.h>
+#include <libc_printf.h>
+#include <common.h>
 
-#define DLL_PUBLIC __attribute__ ((visibility ("default")))
-#define UNUSED(x) (void)(x)
 
 #define concat2(X, Y) X ## Y
 #define concat(X, Y) concat2(X, Y)
@@ -23,8 +23,7 @@
 
 #define IMPLEMENT(name, ...) \
 { \
-	__printf("execute os %s\n", #name); \
-	fflush(stdout); \
+	__debug_printf("execute os %s\n", #name); \
 	if (isWin) { \
 		return concat(name, _ms)(__VA_ARGS__); \
 	} else { \
@@ -32,6 +31,12 @@
 	} \
 }
 
+DLL_PUBLIC
+void abort() {
+    __builtin_trap();
+}
+
+void print_backtrace();
 
 void* __dlopen(char* name) __attribute__ ((weak));
 void* __dlopen(char* name __attribute__((unused))) { return 0; }
@@ -39,17 +44,13 @@ void* __dlsym(void* handle, char* name) __attribute__ ((weak));
 void* __dlsym(void* handle __attribute__((unused)), char* name __attribute__((unused))) { return 0; }
 int __printf(char* restrict fmt, ...) __attribute__ ((weak));
 int __printf(char* restrict fmt __attribute__((unused)), ...) { return 0; }
-void __exit(int ret) __attribute__ ((weak));
+int __write(char* str __attribute__((unused)), size_t num __attribute__((unused))) { return 0; }
 void __exit(int ret __attribute__((unused))) { return; }
 
 static bool isWin = false;
 
 DECLARE(int, vfprintf, FILE* file, const char *restrict fmt, va_list p)
-DECLARE(int, snprintf, char * s, size_t n, const char * format, ...)
-DECLARE(int, vsnprintf, char * s, size_t n, const char * format, va_list arg)
 DECLARE(int, vswprintf, wchar_t * ws, size_t len, const wchar_t * format, va_list arg);
-DECLARE(int, vasprintf, char ** strp, const char * format, va_list arg )
-DECLARE(int, vsscanf, const char *s, const char *format, va_list arg)
 DECLARE(void*, malloc, size_t new_size)
 DECLARE(void*, calloc, size_t nmemb, size_t size)
 DECLARE(void*, aligned_alloc, size_t alignment, size_t size); // strictly speaking ms version has exchanged arguments
@@ -62,19 +63,6 @@ DECLARE(char, getc, FILE* file)
 DECLARE(int, ungetc, int c, FILE *stream)
 DECLARE(int, fflush, FILE* file)
 DECLARE(char *, getenv, const char *name)
-DECLARE(void, thrd_yield, void)
-DECLARE(thrd_t, thrd_current, void);
-DECLARE(int, thrd_sleep, const struct timespec* duration, struct timespec* remaining );
-DECLARE(int, cnd_broadcast, cnd_t *cond )
-DECLARE(int, cnd_wait, cnd_t* cond, mtx_t* mutex )
-DECLARE(void, call_once, once_flag* flag, void (*func)(void) )
-DECLARE(int, tss_create, tss_t* tss_key, tss_dtor_t destructor)
-DECLARE(void, tss_delete, tss_t tss_id )
-DECLARE(void *, tss_get, tss_t tss_key )
-DECLARE(int, tss_set, tss_t tss_id, void *val )
-DECLARE(int, mtx_init, mtx_t* mutex, int type)
-DECLARE(int, mtx_unlock, mtx_t *mutex)
-DECLARE(int, mtx_lock, mtx_t* mutex)
 DECLARE(size_t, fwrite, const void * ptr, size_t size, size_t nmemb, FILE * stream)
 DECLARE(FILE*, fopen, const char *filename, const char *mode)
 DECLARE(FILE*, fdopen, int fd, const char *mode)
@@ -84,12 +72,17 @@ DECLARE(int, fseek, FILE *stream, long int offset, int whence)
 DECLARE(size_t, fread, void * ptr, size_t size, size_t nmemb, FILE * stream)
 DECLARE(int, fputc, int c, FILE *stream)
 DECLARE(int, remove, const char *pathname)
+DECLARE(int, cnd_broadcast, cnd_t *cond )
+DECLARE(int, cnd_wait, cnd_t* cond, mtx_t* mutex )
 DECLARE(int, cnd_signal, cnd_t *cond );
 DECLARE(int, cnd_wait, cnd_t* cond, mtx_t* mutex );
 DECLARE(void, cnd_destroy, cnd_t* cond );
+DECLARE(int, cnd_timedwait, cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point );
+DECLARE(int, mtx_init, mtx_t* mutex, int type)
+DECLARE(int, mtx_unlock, mtx_t *mutex)
+DECLARE(int, mtx_lock, mtx_t* mutex)
 DECLARE(int, mtx_trylock, mtx_t *mutex );
 DECLARE(void, mtx_destroy, mtx_t *mutex );
-DECLARE(int, thrd_equal, thrd_t lhs, thrd_t rhs );
 DECLARE(int, clock_gettime, clockid_t clockid, struct timespec *tp);
 DECLARE(int, getentropy, void *buffer, size_t length);
 DECLARE(char*, realpath, const char * path, char * resolved_path);
@@ -102,13 +95,42 @@ DECLARE(int, chdir, const char *path);
 DECLARE(DIR*, opendir, const char * path);
 DECLARE(ssize_t, readlink, const char * pathname, char * buf, size_t bufsiz);
 DECLARE(int, rename, const char *oldpath, const char *newpath);
-DECLARE(int, cnd_timedwait, cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point );
-DECLARE(int, thrd_detach, thrd_t thr );
-DECLARE(int, thrd_join, thrd_t thr, int *res );
-DECLARE(int, thrd_create, thrd_t *thr, thrd_start_t func, void *arg);
 DECLARE(int, truncate, const char *path, off_t length);
 DECLARE(int, statvfs, const char * path, struct statvfs * buf);
 DECLARE(int, lstat, const char * pathname, struct stat * statbuf);
+
+DECLARE(void, tss_delete, tss_t tss_id )
+DECLARE(void *, tss_get, tss_t tss_key )
+DECLARE(int, tss_set, tss_t tss_id, void *val )
+int tss_create(tss_t* tss_key, tss_dtor_t destructor);
+static int (*tss_create_sysv)(tss_t* tss_key, tss_dtor_t destructor);
+static uint32_t (*tss_create_ms)() __attribute((ms_abi));
+
+// THRD
+DECLARE(void, thrd_yield, void)
+DECLARE(thrd_t, thrd_current, void);
+DECLARE(int, thrd_detach, thrd_t thr );
+DECLARE(int, thrd_equal, thrd_t lhs, thrd_t rhs );
+static uint32_t (*GetThreadId_ms)(thrd_t thr) __attribute((ms_abi));
+
+DECLARE(int, thrd_join, thrd_t thr, int *res );
+static uint32_t (*thrd_join_wait_ms)(int handle, uint32_t ms) __attribute((ms_abi));
+
+int thrd_sleep(const struct timespec* duration, struct timespec* remaining);
+static int (*thrd_sleep_sysv)(const struct timespec* duration, struct timespec* remaining);
+static uint32_t (*thrd_sleep_ms)(uint32_t dwMilliseconds, bool bAlertable) __attribute((ms_abi));
+
+int thrd_create(thrd_t *thr, thrd_start_t func, void *arg);
+static int (*thrd_create_sysv)(thrd_t *thr, thrd_start_t func, void *arg);
+static uint64_t (*thrd_create_ms)(
+		void* lpThreadAttributes,
+		size_t dwStackSize,
+		int (*lpStartAddress)(void *) __attribute__((ms_abi)), 
+		void* lpParameter,
+		uint32_t dwCreationFlags,
+		uint32_t* lpThreadId) __attribute((ms_abi));
+/// TRD END
+
 
 
 DLL_PUBLIC FILE * stdin = 0;
@@ -118,15 +140,18 @@ DLL_PUBLIC FILE * stderr = 0;
 static void* dlsym(void* lib, char* name) {
 	void* ret = __dlsym(lib, name);
 	if (ret) { return ret; }
-	__printf("couldn't find symbol %s\n", name);
+	__debug_printf("couldn't find symbol %s\n", name);
 	__exit(-1);
 	return 0;
 }
 
 __attribute__((constructor)) void init() {
-	__printf("hello\n"); void* libc = 0;
+	__debug_printf("init inside %s\n", "xlibc");
+	void* libc = 0;
+	void* kernel32 = 0;
 	if (!libc) {
 		libc = __dlopen("msvcrt.dll");
+		kernel32 = __dlopen("KERNEL32.DLL");
 		isWin = true;
 	}
 	if (!libc) {
@@ -136,37 +161,31 @@ __attribute__((constructor)) void init() {
 	if (!libc) {
 		__builtin_trap();
 	}
+	if (isWin && kernel32 == 0) { 
+		__debug_printf("couldn't open kernel32\n");
+		__exit(-1);
+	}
 
 	if (isWin) {
 		vfprintf_ms = dlsym(libc, "vfprintf");
-		snprintf_ms = dlsym(libc, "snprintf");
-		vsnprintf_ms = dlsym(libc, "vsnprintf");
 		vswprintf_ms = dlsym(libc, "vswprintf");
-		vasprintf_ms = dlsym(libc, "vasprintf");
-		vsscanf_ms = dlsym(libc, "vsscanf");
 		malloc_ms = dlsym(libc, "malloc");
 		calloc_ms = dlsym(libc, "calloc");
-		aligned_alloc_ms = dlsym(libc, "_aligne_malloc");
-		aligned_free_ms = dlsym(libc, "_aligne_free");
+		aligned_alloc_ms = dlsym(libc, "_aligned_malloc");
+		aligned_free_ms = dlsym(libc, "_aligned_free");
 		realloc_ms = dlsym(libc, "realloc");
 		free_ms = dlsym(libc, "free");
 		fflush_ms = dlsym(libc, "fflush");
 		memset_ms = dlsym(libc, "memset");
 		memcpy_ms = dlsym(libc, "memcpy");
 		getenv_ms = dlsym(libc, "getenv");
-		thrd_yield_ms = dlsym(libc, "thrd_yield");
-		thrd_current_ms = dlsym(libc, "thrd_current");
-		thrd_sleep_ms = dlsym(libc, "thrd_sleep");
-		cnd_broadcast_ms = dlsym(libc, "cnd_broadcast");
-		cnd_wait_ms = dlsym(libc, "cnd_wait");
-		call_once_ms = dlsym(libc, "call_once");
-		tss_create_ms = dlsym(libc, "tss_create");
-		tss_delete_ms = dlsym(libc, "tss_delete");
-		tss_get_ms = dlsym(libc, "tss_get");
-		tss_set_ms = dlsym(libc, "tss_set");
-		mtx_init_ms = dlsym(libc, "mtx_init");
-		mtx_lock_ms = dlsym(libc, "mtx_lock");
-		mtx_unlock_ms = dlsym(libc, "mtx_unlock");
+		thrd_yield_ms = dlsym(kernel32, "SwitchToThread");
+		thrd_current_ms = dlsym(kernel32, "GetCurrentThread");
+		thrd_sleep_ms = dlsym(kernel32, "SleepEx");
+		tss_create_ms = dlsym(kernel32, "TlsAlloc");
+		tss_delete_ms = dlsym(kernel32, "TlsFree");
+		tss_get_ms = dlsym(kernel32, "TlsGetValue");
+		tss_set_ms = dlsym(kernel32, "TlsSetValue");
 		fwrite_ms = dlsym(libc, "fwrite");
 		fopen_ms = dlsym(libc, "fopen");
 		fdopen_ms = dlsym(libc, "_fdopen");
@@ -178,40 +197,43 @@ __attribute__((constructor)) void init() {
 		remove_ms = dlsym(libc, "remove");
 		getc_ms = dlsym(libc, "getc");
 		ungetc_ms = dlsym(libc, "ungetc");
-		cnd_signal_ms = dlsym(libc, "cnd_signal");
-		cnd_destroy_ms = dlsym(libc, "cnd_destroy");
-		mtx_trylock_ms = dlsym(libc, "mtx_trylock");
-		mtx_destroy_ms = dlsym(libc, "mtx_destroy");
-		thrd_equal_ms = dlsym(libc, "thrd_equal");
-		clock_gettime_ms = dlsym(libc, "clock_gettime");
-		getentropy_ms = dlsym(libc, "getentropy");
-		realpath_ms = dlsym(libc, "realpath");
-		mkdir_ms = dlsym(libc, "mkdir");
-		stat_ms = dlsym(libc, "stat");
-		getcwd_ms = dlsym(libc, "getcwd");
-		readdir_ms = dlsym(libc, "readdir");
-		closedir_ms = dlsym(libc, "closedir");
-		chdir_ms = dlsym(libc, "chdir");
-		opendir_ms = dlsym(libc, "opendir");
-		readlink_ms = dlsym(libc, "readlink");
-		rename_ms = dlsym(libc, "rename");
-		cnd_timedwait_ms = dlsym(libc, "cnd_timedwait");
-		thrd_join_ms = dlsym(libc, "thrd_join");
-		thrd_create_ms = dlsym(libc, "thrd_create");
-		thrd_detach_ms = dlsym(libc, "thrd_detach");
-		truncate_ms = dlsym(libc, "truncate");
-		statvfs_ms = dlsym(libc, "statvfs");
-		lstat_ms = dlsym(libc, "lstat");
+		cnd_broadcast_ms = 0; //dlsym(kernel32, "cnd_broadcast");
+		cnd_wait_ms = 0; //dlsym(libc, "cnd_wait");
+		cnd_signal_ms = 0; //dlsym(libc, "cnd_signal");
+		cnd_destroy_ms = 0; //dlsym(libc, "cnd_destroy");
+		cnd_timedwait_ms = 0; // dlsym(libc, "cnd_timedwait");
+		mtx_init_ms = dlsym(kernel32, "InitializeCriticalSection");
+		mtx_lock_ms = dlsym(kernel32, "EnterCriticalSection");
+		mtx_unlock_ms = dlsym(kernel32, "LeaveCriticalSection");
+		mtx_trylock_ms = dlsym(kernel32, "TryEnterCriticalSection");
+		mtx_destroy_ms = dlsym(kernel32, "DeleteCriticalSection");
+		thrd_equal_ms = 0;
+		GetThreadId_ms = dlsym(kernel32, "GetThreadId");
+		clock_gettime_ms = 0; //dlsym(libc, "clock_gettime");
+		getentropy_ms = 0; //dlsym(libc, "getentropy");
+		realpath_ms = 0; //dlsym(libc, "realpath");
+		mkdir_ms = 0; //dlsym(libc, "mkdir");
+		stat_ms = 0; //dlsym(libc, "stat");
+		getcwd_ms = 0; //dlsym(libc, "getcwd");
+		readdir_ms = 0; //dlsym(libc, "readdir");
+		closedir_ms = 0; //dlsym(libc, "closedir");
+		chdir_ms = 0; //dlsym(libc, "chdir");
+		opendir_ms = 0; //dlsym(libc, "opendir");
+		readlink_ms = 0; //dlsym(libc, "readlink");
+		rename_ms = 0;//dlsym(libc, "rename");
+		truncate_ms = 0; //dlsym(libc, "truncate");
+		statvfs_ms = 0; //dlsym(libc, "statvfs");
+		lstat_ms = 0; //dlsym(libc, "lstat");
+		thrd_join_ms = dlsym(kernel32, "GetExitCodeThread");
+		thrd_join_wait_ms = dlsym(kernel32, "WaitForSingleObject");
+		thrd_create_ms = dlsym(kernel32, "CreateThread");
+		thrd_detach_ms = dlsym(kernel32, "CloseHandle");
 		stdin = fdopen( 0, "r" );
 		stdout = fdopen( 1, "a" );
 		stderr = fdopen( 2, "a" );
 	} else {
 		vfprintf_sysv = dlsym(libc, "vfprintf");
-		snprintf_sysv = dlsym(libc, "snprintf");
-		vsnprintf_sysv = dlsym(libc, "vsnprintf");
 		vswprintf_sysv = dlsym(libc, "vswprintf");
-		vasprintf_sysv = dlsym(libc, "vasprintf");
-		vsscanf_sysv = dlsym(libc, "vsscanf");
 		malloc_sysv = dlsym(libc, "malloc");
 		calloc_sysv = dlsym(libc, "calloc");
 		aligned_alloc_sysv = dlsym(libc, "aligned_alloc");
@@ -225,15 +247,10 @@ __attribute__((constructor)) void init() {
 		thrd_yield_sysv = dlsym(libc, "thrd_yield");
 		thrd_current_sysv = dlsym(libc, "thrd_current");
 		thrd_sleep_sysv = dlsym(libc, "thrd_sleep");
-		cnd_broadcast_sysv = dlsym(libc, "cnd_broadcast");
-		call_once_sysv = dlsym(libc, "call_once");
 		tss_create_sysv = dlsym(libc, "tss_create");
 		tss_delete_sysv = dlsym(libc, "tss_delete");
 		tss_get_sysv = dlsym(libc, "tss_get");
 		tss_set_sysv = dlsym(libc, "tss_set");
-		mtx_init_sysv = dlsym(libc, "mtx_init");
-		mtx_lock_sysv = dlsym(libc, "mtx_lock");
-		mtx_unlock_sysv = dlsym(libc, "mtx_unlock");
 		fwrite_sysv = dlsym(libc, "fwrite");
 		fopen_sysv = dlsym(libc, "fopen");
 		fdopen_ms = dlsym(libc, "fdopen");
@@ -245,9 +262,14 @@ __attribute__((constructor)) void init() {
 		remove_sysv = dlsym(libc, "remove");
 		getc_sysv = dlsym(libc, "getc");
 		ungetc_sysv = dlsym(libc, "ungetc");
+		cnd_broadcast_sysv = dlsym(libc, "cnd_broadcast");
 		cnd_signal_sysv = dlsym(libc, "cnd_signal");
 		cnd_wait_sysv = dlsym(libc, "cnd_wait");
 		cnd_destroy_sysv = dlsym(libc, "cnd_destroy");
+		cnd_timedwait_sysv = dlsym(libc, "cnd_timedwait");
+		mtx_init_sysv = dlsym(libc, "mtx_init");
+		mtx_lock_sysv = dlsym(libc, "mtx_lock");
+		mtx_unlock_sysv = dlsym(libc, "mtx_unlock");
 		mtx_trylock_sysv = dlsym(libc, "mtx_trylock");
 		mtx_destroy_sysv = dlsym(libc, "mtx_destroy");
 		thrd_equal_sysv = dlsym(libc, "thrd_equal");
@@ -263,7 +285,6 @@ __attribute__((constructor)) void init() {
 		opendir_sysv = dlsym(libc, "opendir");
 		readlink_sysv = dlsym(libc, "readlink");
 		rename_sysv = dlsym(libc, "rename");
-		cnd_timedwait_sysv = dlsym(libc, "cnd_timedwait");
 		thrd_join_sysv = dlsym(libc, "thrd_join");
 		thrd_create_sysv = dlsym(libc, "thrd_create");
 		thrd_detach_sysv = dlsym(libc, "thrd_detach");
@@ -289,29 +310,15 @@ char getchar() {
 	return getc(stdin);
 }
 
-DLL_PUBLIC
-int vfprintf(FILE* stream, const char *restrict format, va_list argp) {
-	if (isWin) {
-		return vfprintf_ms(stream, format, argp);
-	} else {
-		return vfprintf_sysv(stream, format, argp);
-	}
-}
+//DLL_PUBLIC
+//int vfprintf(FILE* stream, const char *restrict format, va_list argp) {
+//	if (isWin) {
+//		return vfprintf_ms(stream, format, argp);
+//	} else {
+//		return vfprintf_sysv(stream, format, argp);
+//	}
+//}
 
-DLL_PUBLIC
-int snprintf(char * s, size_t n, const char *restrict format, ...) {
-    	va_list argp;
-    	va_start(argp, format);
-	if (isWin) {
-		return snprintf_ms(s, n, format, argp);
-	} else {
-		return snprintf_sysv(s, n, format, argp);
-	}
-	va_end(argp);
-}
-
-DLL_PUBLIC
-int vsnprintf(char * s, size_t n, const char *restrict format, va_list argp) IMPLEMENT(vsnprintf, s, n, format, argp)
 
 DLL_PUBLIC
 int vswprintf(wchar_t * ws, size_t len, const wchar_t * format, va_list arg) IMPLEMENT(vswprintf, ws, len, format, arg)
@@ -328,10 +335,15 @@ int swprintf(wchar_t* ws, size_t len, const wchar_t* format, ...) {
 }
 
 DLL_PUBLIC
-int vasprintf(char ** strp, const char * format, va_list arg) IMPLEMENT(vasprintf, strp, format, arg)
-
-DLL_PUBLIC
-int vsscanf(const char *s, const char *format, va_list arg) IMPLEMENT(vsscanf, s, format, arg)
+int vsscanf(const char *s, const char *format, va_list arg) {
+    UNUSED(s);
+    UNUSED(format);
+    UNUSED(arg);
+    fprintf(stderr, "vsscanf not implemented");
+    fflush(stderr);
+    abort();
+    return 0;
+}
 
 int sscanf(const char *str, const char *format, ...) {
     va_list args;
@@ -344,14 +356,6 @@ int sscanf(const char *str, const char *format, ...) {
 }
 
 
-DLL_PUBLIC
-int printf(const char *restrict format, ...) {
-	va_list args;
-	va_start(args, format);
-	int ret = vfprintf(stdout, format, args);
-	va_end(args);
-	return ret;
-}
 //
 //// found when compiling for arm64 just ignore flags and don't do checks
 //DLL_PUBLIC
@@ -365,6 +369,7 @@ int printf(const char *restrict format, ...) {
 //
 DLL_PUBLIC
 void free(void* ptr) {
+	__debug_printf("execute os free\n");
 	if (isWin) {
 		return free_ms(ptr);
 	} else {
@@ -379,6 +384,7 @@ DLL_PUBLIC void *calloc(size_t nmemb, size_t size) IMPLEMENT(calloc, nmemb, size
 
 DLL_PUBLIC
 void* aligned_alloc(size_t alignment, size_t new_size) {
+	__debug_printf("execute os aligned_alloc\n");
 	if (isWin) {
 		return aligned_alloc_ms(new_size, alignment);
 	} else {
@@ -388,6 +394,7 @@ void* aligned_alloc(size_t alignment, size_t new_size) {
 
 DLL_PUBLIC
 void aligned_free(void* ptr) {
+	__debug_printf("execute os aligned_free\n");
 	if (isWin) {
 		return aligned_free_ms(ptr);
 	} else {
@@ -397,6 +404,7 @@ void aligned_free(void* ptr) {
 
 DLL_PUBLIC
 void *realloc(void *ptr, size_t size) {
+	__debug_printf("execute os realloc\n");
 	if (isWin) {
 		return realloc_ms(ptr, size);
 	} else {
@@ -415,6 +423,7 @@ int fprintf(FILE *stream, const char *format, ...) {
 
 DLL_PUBLIC
 int fflush(FILE* file) {
+	__debug_printf("execute os fflush\n");
 	if (isWin) {
 		return fflush_ms(file);
 	} else {
@@ -445,38 +454,14 @@ size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE *restrict strea
 DLL_PUBLIC
 size_t fwrite(const void * ptr, size_t size, size_t nmemb, FILE *restrict stream) IMPLEMENT(fwrite, ptr, size, nmemb, stream)
 
-DLL_PUBLIC
-int fputc(int c, FILE *stream) IMPLEMENT(fputc, c, stream)
-
-DLL_PUBLIC
-void *memset(void *ptr, int value, size_t num) {
-	if (isWin) {
-		return memset_ms(ptr, value, num);
-	} else {
-		return memset_sysv(ptr, value, num);
-	}
-}
-
-DLL_PUBLIC
-void *memcpy(void *restrict dest, const void *restrict src, size_t n) {
-	if (isWin) {
-		return memcpy_ms(dest, src, n);
-	} else {
-		return memcpy_sysv(dest, src, n);
-	}
-}
-
-DLL_PUBLIC
-char *getenv(const char *name) {
-	if (isWin) {
-		return getenv_ms(name);
-	} else {
-		return getenv_sysv(name);
-	}
-}
+DLL_PUBLIC int fputc(int c, FILE *stream) IMPLEMENT(fputc, c, stream)
+DLL_PUBLIC void *memset(void *ptr, int value, size_t num) IMPLEMENT(memset, ptr, value, num)
+DLL_PUBLIC void *memcpy(void *restrict dest, const void *restrict src, size_t n) IMPLEMENT(memcpy, dest, src, n)
+DLL_PUBLIC char *getenv(const char *name) IMPLEMENT(getenv, name)
 
 DLL_PUBLIC
 void thrd_yield(void) {
+	__debug_printf("execute os thrd_yield\n");
 	if (isWin) {
 		return thrd_yield_ms();
 	} else {
@@ -484,23 +469,151 @@ void thrd_yield(void) {
 	}
 }
 
+DLL_PUBLIC int thrd_equal(thrd_t lhs, thrd_t rhs ) {
+	__debug_printf("execute os thrd_equal\n");
+	if (isWin) {
+		return GetThreadId_ms(lhs) == GetThreadId_ms(rhs);
+	} else {
+		return thrd_equal_sysv(lhs, rhs);
+	}
+}
+
 DLL_PUBLIC thrd_t thrd_current(void) IMPLEMENT(thrd_current)
-DLL_PUBLIC int thrd_sleep(const struct timespec* duration, struct timespec* remaining ) IMPLEMENT(thrd_sleep, duration, remaining)
+
+DLL_PUBLIC int thrd_sleep(const struct timespec* duration, struct timespec* remaining ) {
+	__debug_printf("execute os thrd_sleep\n");
+	if (isWin) {
+		// long milliseconds = duration->tv_sec * 1000 + duration->tv_nsec / 1000000;
+		uint64_t milliseconds = duration->tv_sec * 1000 + duration->tv_nsec / 1000000;
+		uint64_t result = thrd_sleep_ms(milliseconds, true);
+
+		if (remaining != NULL) {
+			remaining->tv_sec = result / 1000;
+			remaining->tv_nsec = (result % 1000) * 1000000;
+		}
+    
+		return 0;
+	} else {
+		return thrd_sleep_sysv(duration, remaining);
+	}
+}
+
+struct ms_thrd_func_state {
+	thrd_start_t f;
+	void* arg;
+};
+__attribute((ms_abi)) int ms_thrd_func(void * arg) { // ****ing calling convention
+	struct ms_thrd_func_state* state = (struct ms_thrd_func_state*)arg;
+	thrd_start_t f = state->f;
+	void* arg2 = state->arg;
+	free(arg);
+	return f(arg2);
+}
+DLL_PUBLIC int thrd_create(thrd_t *thr, thrd_start_t func, void *arg) {
+	__debug_printf("execute os thrd_create\n");
+	if (isWin) {
+		struct ms_thrd_func_state* state = malloc(sizeof(struct ms_thrd_func_state));
+		state->f = func;
+		state->arg = arg;
+		size_t hThread = thrd_create_ms(NULL, 0, ms_thrd_func, state, 0, NULL);
+
+		if (hThread == NULL) {
+			// Thread creation failed
+			return -1;
+		}
+
+		// Store the handle in thrd_t
+	*thr = hThread;
+
+		return 0;
+	} else {
+		return thrd_create_sysv(thr, func, arg);
+	}
+}
+
+DLL_PUBLIC int thrd_join( thrd_t thr, int *res ) {
+	__debug_printf("execute os thrd_join\n");
+	if (isWin) {
+		uint32_t INFINITE = -1;
+		uint32_t result = thrd_join_wait_ms(thr, INFINITE);
+
+		uint32_t WAIT_OBJECT_0 = 0;
+		if (result == WAIT_OBJECT_0) {
+			// Thread has terminated successfully
+
+			if (res != NULL) {
+				// Get the thread's exit code
+				int32_t exitCode;
+				thrd_join_ms(thr, &exitCode);
+
+				// Store the exit code in the provided pointer
+				*res = (int)exitCode;
+			}
+
+			// Close the thread handle
+			thrd_detach(thr);
+
+			return 0;
+		}
+		else {
+			// Error occurred while waiting for the thread
+			return -1;
+		}
+	} else {
+		return thrd_join_sysv(thr, res);
+	}
+}
+
+DLL_PUBLIC void call_once(once_flag* flag, void (*func)(void))
+{
+    if (__atomic_test_and_set(flag, __ATOMIC_ACQUIRE)) {
+        // Another thread has already executed the function, do nothing.
+        return;
+    }
+    
+    // Call the initialization function
+    func();
+    
+    // Clear the flag after initialization
+    //__atomic_clear(flag, __ATOMIC_RELEASE);
+}
+
+DLL_PUBLIC int tss_create(tss_t* tss_key, tss_dtor_t destructor) {
+	if (isWin) {
+		*tss_key = tss_create_ms();
+
+		if (tss_set(*tss_key, NULL) != thrd_success) {
+			tss_delete(*tss_key);
+			return -1;  // TSS initialization failed
+		}
+
+		if (destructor != NULL) {
+			__debug_printf("no tss destructor on windows\n");
+		}
+
+		return 0;  // Success
+	} else {
+		return tss_create_sysv(tss_key, destructor);
+	}
+}
+DLL_PUBLIC void tss_delete(tss_t tss_id) IMPLEMENT(tss_delete, tss_id)
+DLL_PUBLIC void *tss_get(tss_t tss_key) IMPLEMENT(tss_get, tss_key)
+DLL_PUBLIC int tss_set(tss_t tss_id, void *val) {
+	__debug_printf("execute os tss_set\n");
+	if (isWin) {
+		return tss_set_ms(tss_id, val) ? thrd_success : thrd_error;
+	} else {
+		return tss_set_sysv(tss_id, val);
+	}
+}
+
 
 DLL_PUBLIC int cnd_broadcast( cnd_t *cond ) IMPLEMENT(cnd_broadcast, cond)
 DLL_PUBLIC int cnd_wait( cnd_t* cond, mtx_t* mutex ) IMPLEMENT(cnd_wait, cond, mutex)
-DLL_PUBLIC void call_once( once_flag* flag, void (*func)(void) ) IMPLEMENT(call_once, flag, func)
-DLL_PUBLIC int tss_create(tss_t* tss_key, tss_dtor_t destructor) IMPLEMENT(tss_create, tss_key, destructor)
-DLL_PUBLIC void tss_delete(tss_t tss_id) IMPLEMENT(tss_delete, tss_id)
-DLL_PUBLIC void *tss_get(tss_t tss_key) IMPLEMENT(tss_get, tss_key)
-DLL_PUBLIC int tss_set(tss_t tss_id, void *val) IMPLEMENT(tss_set, tss_id, val)
-
-
 DLL_PUBLIC int cnd_signal(cnd_t *cond ) IMPLEMENT(cnd_signal, cond)
 DLL_PUBLIC void cnd_destroy(cnd_t* cond ) IMPLEMENT(cnd_destroy, cond)
-DLL_PUBLIC int mtx_trylock(mtx_t *mutex ) IMPLEMENT(mtx_trylock, mutex)
-DLL_PUBLIC void mtx_destroy(mtx_t *mutex ) IMPLEMENT(mtx_destroy, mutex)
-DLL_PUBLIC int thrd_equal(thrd_t lhs, thrd_t rhs ) IMPLEMENT(thrd_equal, lhs, rhs)
+DLL_PUBLIC int cnd_timedwait( cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point ) IMPLEMENT(cnd_timedwait, cond, mutex, time_point)
+
 DLL_PUBLIC int clock_gettime(clockid_t clockid, struct timespec *tp) IMPLEMENT(clock_gettime, clockid, tp)
 DLL_PUBLIC int getentropy(void *buffer, size_t length) IMPLEMENT(getentropy, buffer, length)
 DLL_PUBLIC char* realpath(const char * path, char * resolved_path) IMPLEMENT(realpath, path, resolved_path)
@@ -513,32 +626,84 @@ DLL_PUBLIC int chdir(const char *path) IMPLEMENT(chdir, path)
 DLL_PUBLIC DIR* opendir(const char * path) IMPLEMENT(opendir, path)
 DLL_PUBLIC ssize_t readlink(const char * pathname, char * buf, size_t bufsiz) IMPLEMENT(readlink, pathname, buf, bufsiz)
 DLL_PUBLIC int rename(const char *oldpath, const char *newpath) IMPLEMENT(rename, oldpath, newpath)
-DLL_PUBLIC int cnd_timedwait( cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point ) IMPLEMENT(cnd_timedwait, cond, mutex, time_point)
 DLL_PUBLIC int thrd_detach( thrd_t thr ) IMPLEMENT(thrd_detach, thr)
-DLL_PUBLIC int thrd_join( thrd_t thr, int *res ) IMPLEMENT(thrd_join, thr, res)
-DLL_PUBLIC int thrd_create(thrd_t *thr, thrd_start_t func, void *arg) IMPLEMENT(thrd_create, thr, func, arg)
 DLL_PUBLIC int truncate(const char *path, off_t length) IMPLEMENT(truncate, path, length)
 DLL_PUBLIC int statvfs(const char * path, struct statvfs * buf) IMPLEMENT(statvfs, path, buf)
 DLL_PUBLIC int lstat(const char * pathname, struct stat * statbuf) IMPLEMENT(lstat, pathname, statbuf)
 
-DLL_PUBLIC int mtx_init(mtx_t* mutex, int type) IMPLEMENT(mtx_init, mutex, type)
-//{ UNUSED(mutex); UNUSED(type); return 0; }
-
-DLL_PUBLIC
-int mtx_lock(mtx_t* mutex) {
+DLL_PUBLIC void mtx_destroy(mtx_t *mutex ) {
+	__debug_printf("execute os mtx_destroy\n");
+	if (mutex == NULL) { return; }
 	if (isWin) {
-		return mtx_lock_ms(mutex);
+		mtx_destroy_ms((mtx_t*)*mutex);
 	} else {
-		return mtx_lock_sysv(mutex);
+		mtx_destroy_sysv((mtx_t*)*mutex);
 	}
+	free(*mutex);
 }
 
-DLL_PUBLIC
-int mtx_unlock(mtx_t* mutex) {
+int mtx_init_if_needed(mtx_t* mutex) {
+	__debug_printf("execute os mtx_init_if_needed %p at %p\n", *mutex, mutex);
+	if (*mutex == NULL) {
+		mtx_t m = NULL;
+		void* null = NULL;
+		int ret = mtx_init(&m, 0);
+		if (!__atomic_compare_exchange_n(mutex, &null, m, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+			mtx_destroy(&m);
+		}
+		return ret;
+	}
+	return thrd_success;
+}
+DLL_PUBLIC int mtx_init(mtx_t* mutex, int type) {
+	__debug_printf("execute os mtx_init %p at %p\n", *mutex, mutex);
+	mtx_t mtx = malloc(80);
+	__debug_printf("malloced %p\n", mtx);
+	if (!mtx) { return thrd_error; }
+	int ret;
 	if (isWin) {
-		return mtx_unlock_ms(mutex);
+		ret = mtx_init_ms((mtx_t*)mtx, type);
 	} else {
-		return mtx_unlock_sysv(mutex);
+		ret = mtx_init_sysv((mtx_t*)mtx, type);
+	}
+	if (ret != thrd_success) {
+		__debug_printf("failed to init\n\n\n");
+		free(mtx);
+	}
+	*mutex = mtx;
+	return ret;
+}
+//{ UNUSED(mutex); UNUSED(type); return 0; }
+
+DLL_PUBLIC int mtx_lock(mtx_t* mutex) {
+	UNUSED(mutex);
+	__debug_printf("execute os mtx_lock %p at %p\n", *mutex, mutex);
+	mtx_init_if_needed(mutex);
+	if (isWin) {
+		mtx_lock_ms((mtx_t*)*mutex);
+		return thrd_success;
+	} else {
+		return mtx_lock_sysv((mtx_t*)*mutex);
+	}
+	return 0;
+}
+DLL_PUBLIC int mtx_trylock(mtx_t *mutex ) {
+	__debug_printf("execute os mtx_trylock %p at %p\n", *mutex, mutex);
+	mtx_init_if_needed(mutex);
+	if (isWin) {
+		return !mtx_trylock_ms((mtx_t*)*mutex);
+	} else {
+		return mtx_trylock_sysv((mtx_t*)*mutex);
+	}
+}
+DLL_PUBLIC int mtx_unlock(mtx_t* mutex) {
+	__debug_printf("execute os mtx_unlock %p at %p\n", *mutex, mutex);
+	if (*mutex == NULL) { return thrd_error; }
+	if (isWin) {
+		mtx_unlock_ms((mtx_t*)*mutex);
+		return thrd_success;
+	} else {
+		return mtx_unlock_sysv((mtx_t*)*mutex);
 	}
 }
 
@@ -719,11 +884,6 @@ int memcmp(const void* ptr1, const void* ptr2, size_t size) {
 }
 
 DLL_PUBLIC
-void abort() {
-    __builtin_trap();
-}
-
-DLL_PUBLIC
 void __tls_get_addr() {
     fprintf(stderr, "__tls_get_addr not implemented");
     fflush(stderr);
@@ -735,7 +895,7 @@ int __cxa_atexit(void (*func) (void *), void * arg, void * dso_handle) {
     UNUSED(dso_handle); // todo
     UNUSED(func);
     UNUSED(arg);
-    fprintf(stderr, "cxa_atexit not implemented properly");
+    fprintf(stderr, "cxa_atexit not implemented properly\n");
     return 0;
 }
 
@@ -747,6 +907,11 @@ int fputs(const char *s, FILE *stream) {
         return EOF;
     }
     return 0;
+}
+
+DLL_PUBLIC
+int puts(const char *s) {
+	return fputs(s, stdout);
 }
 
 DLL_PUBLIC
@@ -1900,4 +2065,29 @@ DLL_PUBLIC int mtime(const char *pathname, struct timespec * time) {
     fflush(stderr);
     abort();
     return 0;
+}
+
+void print_addr(void * ptr) {
+	const char * lib = 0;
+	size_t offset = 0;
+	__resolve(ptr, &lib, &offset);
+	if (lib) {
+        	__debug_printf("\t%p %s(%p)\n", ptr, lib, offset);
+	} else {
+        	__debug_printf("\t%p\n", ptr);
+	}
+}
+#define MAX_BACKTRACE_FRAMES 128
+DLL_PUBLIC
+void print_backtrace()
+{
+	__debug_printf("Backtrace:\n");
+        print_addr(__builtin_return_address(0));
+        print_addr(__builtin_return_address(1));
+        print_addr(__builtin_return_address(2));
+        print_addr(__builtin_return_address(3));
+        print_addr(__builtin_return_address(4));
+        print_addr(__builtin_return_address(5));
+        print_addr(__builtin_return_address(6));
+        print_addr(__builtin_return_address(7));
 }

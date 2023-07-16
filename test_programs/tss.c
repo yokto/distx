@@ -21,7 +21,7 @@ int thread_function(void* arg) {
     void* retrievedData = tss_get(dataKey);
     if (retrievedData != NULL) {
         int* value = (int*)retrievedData;
-        printf("Thread-specific data retrieved for thread %lu: %d\n",
+        printf("Thread-specific data retrieved for thread %ld: %d\n",
                thrd_current(), *value);
     } else {
         fprintf(stderr, "Failed to get thread-specific data\n");

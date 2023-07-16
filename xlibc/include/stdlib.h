@@ -70,7 +70,7 @@ int mbtowc(wchar_t *pwc, const char *s, size_t n);
 unsigned long int strtoul(const char* str, char** endptr, int base);
 long long int strtoll(const char* str, char** endptr, int base);
 #define strtoll_l(str, endptr, base, locale) (strtoll(str, endptr, base))
-#define strtold_l(str, endptr, base, locale) (strtold(str, endptr, base))
+//#define strtold_l(str, endptr, base, locale) (strtold(str, endptr, base))
 #define strtoull_l(str, endptr, base, locale) (strtoull(str, endptr, base))
 #define strtof_l(str, endptr, locale) (strtof(str, endptr))
 #define strtod_l(str, endptr, locale) (strtod(str, endptr))

@@ -56,6 +56,7 @@ static size_t rounddown_pagesize(size_t s) {
 
 typedef struct loaded_lib {
 	void* base;
+	size_t size;
 	Elf64_Dyn* dynamic;
 	Elf64_Sym* symtab;
 	Elf64_Half* versym;
@@ -84,6 +85,9 @@ typedef struct loaded_libs {
 	int libs_count;
 	int vec_length;
 } loaded_libs;
+
+loaded_libs zwolf_global_libs;
+
 
 #ifndef WIN32
 struct link_map* global_libs = 0;
@@ -286,6 +290,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 
 	void * memory = reserve_memory(maxAddr - minAddr);
 	lib->base = memory;
+	lib->size = maxAddr - minAddr;
 
 	for (int i = 0 ; i < phnum ; i++) {
 		const Elf64_Phdr *ph = &phs[i];
@@ -533,9 +538,33 @@ int printf2(const char *restrict format, ...) {
 }
 
 __attribute__((sysv_abi))
+int write2(const char *s, size_t num) {
+	return fwrite(s, 1, num, stdout);
+}
+
+__attribute__((sysv_abi))
+int resolve_addr(void* ptr, const char ** libfile, size_t* offset) {
+	for (size_t i = 0; i < zwolf_global_libs.libs_count; i++) {
+		loaded_lib* l = &zwolf_global_libs.libs[i];
+		if (l->base <= ptr && l->base + l->size > ptr) {
+			*libfile = l->path;
+			*offset = ptr - l->base;
+			return;
+		}
+	}
+	*libfile = 0;
+	*offset = 0;
+}
+
+__attribute__((sysv_abi))
 void* dlopen2(char* name) {
 	printf("dlopening %s\n", name);
 #if defined(WIN32)
+	if (strcmp("KERNEL32.DLL", name) == 0) {
+		printf("\t\tgetting lib %s\n", name);
+	        return GetModuleHandle("KERNEL32.DLL");
+	}
+
 	printf("\t\tgetting lib %s\n", name);
 	return LoadLibrary("msvcrt.dll");
 #else
@@ -605,6 +634,10 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 			dlclose2(libc);
 		} else if (strcmp(sym_name, "__printf") == 0) {
 			ret = &printf2;
+		} else if (strcmp(sym_name, "__write") == 0) {
+			ret = &write2;
+		} else if (strcmp(sym_name, "__resolve") == 0) {
+			ret = &resolve_addr;
 		} else if (strcmp(sym_name, "__dlsym") == 0) {
 			ret = &dlsym2;
 		} else if (strcmp(sym_name, "__dlopen") == 0) {
@@ -727,6 +760,11 @@ void fini_libs(loaded_libs* libs) {
 }
 
 int main(int argc, char ** argv) {
+#ifdef WIN32
+        printf("kernel: %p\n", GetModuleHandle("KERNEL32.DLL"));
+        printf("kernel: switch %p\n", GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "SwitchToThread"));
+#endif
+
 //#if defined(WIN32)
 //	SetConsoleOutputCP(65001);
 //#endif
@@ -736,15 +774,15 @@ int main(int argc, char ** argv) {
 		ERR("./loadelf file\n");
 	}
 
-	loaded_libs libs;
-	alloc_loaded_libs(&libs);
+	loaded_libs* libs = &zwolf_global_libs;
+	alloc_loaded_libs(libs);
 
 	printf("loading\n");
-	loaded_lib* lib = load(argv[1], &libs);
+	loaded_lib* lib = load(argv[1], libs);
 
 	printf("linking\n");
-	for (size_t i = 0 ; i < libs.libs_count ; i++) {
-		link(&libs.libs[i], &libs);
+	for (size_t i = 0 ; i < libs->libs_count ; i++) {
+		link(&libs->libs[i], libs);
 	}
 #ifndef WIN32
 	printf("f %p\n", _r_debug.r_map);
@@ -753,7 +791,7 @@ int main(int argc, char ** argv) {
 	printf("f %p\n", &_dl_debug_state);
 #endif
 	printf("start init libs\n");
-	init_libs(&libs);
+	init_libs(libs);
 	printf("end init libs\n");
 
 	Elf64_Half main_idx = lookup("main", lib);
@@ -765,6 +803,6 @@ int main(int argc, char ** argv) {
 	printf("main returned %d\n", ret);
 	printf("fini\n");
 	fflush(stdout);
-	fini_libs(&libs);
+	fini_libs(libs);
 	printf("done\n");
 }

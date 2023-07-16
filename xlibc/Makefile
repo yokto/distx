@@ -7,12 +7,13 @@ HEADERS = $(addprefix $(INSTALL),$(wildcard include/*.h))
 
 all: $(LIBC) $(HEADERS)
 
-$(LIBC): libc.c Makefile libc.map
+$(LIBC): libc.c libc_printf.c Makefile libc.map
 	mkdir -p $(dir $(LIBC))
 	echo ${CC}
 	${CC} \
 		-g \
 		-Wall -Wextra -Werror \
+		-Wno-frame-address \
 		-Wl,-soname,xlibc/lib/libc.so \
 		-Wl,--version-script=libc.map \
 		-Wl,--hash-style=sysv \
@@ -23,10 +24,11 @@ $(LIBC): libc.c Makefile libc.map
 		-fPIC \
 		-fno-builtin \
 		-Ilibc \
+		-I. \
 		-Iinclude \
 		-o $(LIBC) \
 		libc.c \
-		-lc -L$(dir $(LIBC)) 
+		libc_printf.c
 
 $(LIBM): libm.c Makefile libm.map
 	mkdir -p $(dir $(LIBC))
