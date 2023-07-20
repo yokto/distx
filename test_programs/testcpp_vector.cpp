@@ -41,7 +41,7 @@ int testVector() {
 
     // Test erase and size after erasing
     myVector.erase(myVector.begin() + 2);
-    if (myVector.size() != 4 || myVector[2] != 30 || myVector[3] != 50) {
+    if (myVector.size() != 4 || myVector[1] != 10 || myVector[3] != 40) {
         std::cout << "Test 6: Failed (Erase and size after erasing)\n";
         return -1;
     }

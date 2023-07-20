@@ -6,10 +6,13 @@
 #include <stdbool.h>
 #include <stdarg.h>
 
+#define DEBUG(...) { \
+	fprintf(stderr, __VA_ARGS__); \
+	fflush(stderr); \
+}
 #define WARN(...) { \
 	fprintf(stderr, __VA_ARGS__); \
 }
-
 #define ERR(...) { \
 	fprintf(stderr, __VA_ARGS__); \
 	exit(-1); \
@@ -149,8 +152,7 @@ void * reserve_memory(size_t size) {
 //	VirtualFree(memory, size, MEM_RELEASE);
 	void* memory = VirtualAlloc(0, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 	if (memory == 0) {
-		fprintf(stderr, "can't map memory");
-		return 0;
+		ERR("can't map memory")
 	}
 #else
 	void* memory = mmap(
@@ -161,8 +163,7 @@ void * reserve_memory(size_t size) {
 			-1,
 			0);
 	if (memory == MAP_FAILED) {
-		fprintf(stderr, "can't map memory\n");
-		return 0;
+		ERR("can't map memory\n");
 	}
 #endif
 	return memory;
@@ -171,8 +172,7 @@ void * reserve_memory(size_t size) {
 #ifndef WIN32
 void add_local_libs() {
 	_r_debug.r_state = RT_ADD;
-	printf("brk %p", _r_debug);
-	fflush(stdout);
+	DEBUG("brk %p", _r_debug)
 	((void(*)())(_r_debug.r_brk))();
 	struct link_map* current_map = _r_debug.r_map;
 	if (current_map == 0) {
@@ -187,14 +187,12 @@ void add_local_libs() {
 	_r_debug.r_state = RT_CONSISTENT;
 	((void(*)())(_r_debug.r_brk))();
 
-
-	
-	printf("\n\n\n readding\n", _r_debug.r_brk);
+	DEBUG("readding debug info\n", _r_debug.r_brk)
 	struct link_map* m = _r_debug.r_map;
 	while (m) {
-		printf("map %s\n", m->l_name);
-		printf("addr %p\n", m->l_addr);
-		printf("dynamic %p\n", m->l_ld);
+		DEBUG("\tmap %s\n", m->l_name)
+		DEBUG("\taddr %p\n", m->l_addr)
+		DEBUG("\tdynamic %p\n", m->l_ld)
 		m = m->l_next;
 	}
 }
@@ -216,12 +214,12 @@ void remove_local_libs() {
 	
 
 
-	printf("\n\n\n removing\n", _r_debug.r_brk);
+	DEBUG("removing debug info\n", _r_debug.r_brk)
 	struct link_map* m = _r_debug.r_map;
 	while (m) {
-		printf("map %s\n", m->l_name);
-		printf("addr %p\n", m->l_addr);
-		printf("dynamic %p\n", m->l_ld);
+		DEBUG("\tmap %s\n", m->l_name)
+		DEBUG("\taddr %p\n", m->l_addr)
+		DEBUG("\tdynamic %p\n", m->l_ld)
 		m = m->l_next;
 	}
 }
@@ -231,13 +229,13 @@ void remove_local_libs() {
 loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	for (int i = 0 ; i < libs->libs_count ; i++) {
 		if (libs->libs[i].path && strcmp(libs->libs[i].path, lib_path) == 0) {
-			printf("already loaded library %s\n", lib_path);
+			DEBUG("already loaded library %s\n", lib_path)
 			return &libs->libs[i];
 		}
 	}
 	loaded_lib* lib = add_loaded_lib(libs);
 	memset(lib, 0, sizeof(loaded_lib));
-	printf("\tloading library %s\n", lib_path);
+	DEBUG("\tloading library %s\n", lib_path)
 
 	// needs to happen before recursive call to load
 	lib->path = malloc(strlen(lib_path) + 1);
@@ -271,8 +269,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 		}	
 	}
 	if (maxAddr <= minAddr) {
-		fprintf(stderr, "library seems to be empty %s", lib_path);
-		return 0;
+		ERR("library seems to be empty %s", lib_path);
 	} // nothing to do?
 
 #if defined(WIN32)
@@ -329,7 +326,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 #endif
 			// if p_filesz smaller than p_memsz we need to set the rest to zero. I.e. bss. section
 			if (ph->p_filesz < ph->p_memsz) {
-				printf("setting %p for %x to zero\n", ph->p_vaddr + ph->p_filesz, ph->p_memsz - ph->p_filesz);
+				DEBUG("setting %p for %x to zero\n", ph->p_vaddr + ph->p_filesz, ph->p_memsz - ph->p_filesz)
 				memset(memory + ph->p_vaddr + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz);
 			}
 		}	
@@ -355,15 +352,15 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 					lib->name = malloc(lib_name_len + 1);
 					strncpy(lib->name, lib_name, lib_name_len);
 					lib->name[lib_name_len] = '\0';
-					printf("libname %s\n", lib->name);
+					DEBUG("libname %s\n", lib->name)
 					if (lib_name_len <= 0){ 
 						WARN("Could not figure out libname of %s", soname);
 					}
 				}
 				if (dynamic->d_tag == DT_HASH) {
 					lib->hash = (Elf64_Word*)(memory + dynamic->d_un.d_ptr);
-					//printf("symtabbuckets %i\n", ((Elf64_Word*)(memory + dynamic->d_un.d_ptr))[0]);
-					//printf("symtabcount %i\n", lib->symtab_count);
+					//DEBUG("symtabbuckets %i\n", ((Elf64_Word*)(memory + dynamic->d_un.d_ptr))[0])
+					//DEBUG("symtabcount %i\n", lib->symtab_count)
 				}
 				if (dynamic->d_tag == DT_RELA) {
 					lib->rela = (Elf64_Rela*)(memory + dynamic->d_un.d_ptr);
@@ -378,11 +375,11 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 				}
 				if (dynamic->d_tag == DT_PLTRELSZ) {
 					lib->rela_plt_count = dynamic->d_un.d_val / sizeof(Elf64_Rela);
-					//printf("sz %x\n", dynamic->d_un.d_val);
+					//DEBUG("sz %x\n", dynamic->d_un.d_val)
 				}
 				if (dynamic->d_tag == DT_JMPREL) {
 					lib->rela_plt = (Elf64_Rela*)(memory + dynamic->d_un.d_ptr);
-					//printf("rela_plt %x\n", dynamic->d_un.d_ptr);
+					//DEBUG("rela_plt %x\n", dynamic->d_un.d_ptr)
 				}
 				if (dynamic->d_tag == DT_PLTGOT) {
 					lib->pltgot = (Elf64_Rela*)(memory + dynamic->d_un.d_ptr);
@@ -417,7 +414,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	}
 
 	if (!lib->name) {
-		fprintf(stderr, "library %s has no soname", lib_path);
+		WARN("library %s has no soname", lib_path);
 	}
 
 #ifndef WIN32
@@ -463,7 +460,7 @@ char * verdefstr(size_t sym_idx, loaded_lib* lib) {
 //	Elf64_Verdaux * aux = (Elf64_Verdaux*)((void*)v + v->vd_aux);
 //
 //	char * ver = &lib->strtab[aux->vda_name];
-//	//printf("version name %s\n", v);
+//	//DEBUG("version name %s\n", v)
 //	return ver;
 }
 
@@ -476,7 +473,7 @@ char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 			lib->strtab + lib->symtab[sym_idx].st_name, lib->name);
 		return 0;
 	}
-	printf("\t\t\tneeded index %zd residex %d \n", sym_idx, lib->versym[sym_idx]);
+	DEBUG("\t\t\tneeded index %zd residex %d \n", sym_idx, lib->versym[sym_idx])
 
 	size_t version = lib->versym[sym_idx];
 	while (true) {
@@ -506,20 +503,20 @@ Elf64_Half lookup(char* name, loaded_lib* lib) {
 	const unsigned long hash = elf_Hash(name);
 
 	Elf64_Half idx = lib->hash[2 + (hash % nbucket)];
-	printf("\t\t\tlooking for %s in library %s\n",name, lib->name);
+	DEBUG("\t\t\tlooking for %s in library %s\n",name, lib->name)
 	while (idx != 0) {
-		printf("\t\t\tname %s, foundname %s\n", name, lib->strtab + lib->symtab[idx].st_name);
+		DEBUG("\t\t\tname %s, foundname %s\n", name, lib->strtab + lib->symtab[idx].st_name)
 		if (strcmp(name, lib->strtab + lib->symtab[idx].st_name) == 0) {
 			//char* version2 = verdefstr(idx, lib);
-			//printf("wanted version %s, existing version %s\n", version, version2);
+			//DEBUG("wanted version %s, existing version %s\n", version, version2)
 			//if (!version || strcmp(version2, version) == 0) {
-				//printf("found version %s\n", version, version2);
+				//DEBUG("found version %s\n", version, version2)
 				return idx;
 			//}
 		}
-		printf("index %d\n", idx);
+		DEBUG("index %d\n", idx)
 		idx = lib->hash[2 + nbucket + idx];
-		printf("index %d\n", idx);
+		DEBUG("index %d\n", idx)
 	}
 	ERR("name not found %s", name);
 }
@@ -539,7 +536,7 @@ int printf2(const char *restrict format, ...) {
 
 __attribute__((sysv_abi))
 int write2(const char *s, size_t num) {
-	return fwrite(s, 1, num, stdout);
+	return fwrite(s, 1, num, stderr);
 }
 
 __attribute__((sysv_abi))
@@ -558,14 +555,14 @@ int resolve_addr(void* ptr, const char ** libfile, size_t* offset) {
 
 __attribute__((sysv_abi))
 void* dlopen2(char* name) {
-	printf("dlopening %s\n", name);
+	DEBUG("dlopening %s\n", name)
 #if defined(WIN32)
 	if (strcmp("KERNEL32.DLL", name) == 0) {
-		printf("\t\tgetting lib %s\n", name);
+		DEBUG("\t\tgetting lib %s\n", name)
 	        return GetModuleHandle("KERNEL32.DLL");
 	}
 
-	printf("\t\tgetting lib %s\n", name);
+	DEBUG("\t\tgetting lib %s\n", name)
 	return LoadLibrary("msvcrt.dll");
 #else
 	remove_local_libs();
@@ -577,9 +574,9 @@ void* dlopen2(char* name) {
 
 __attribute__((sysv_abi))
 void* dlsym2(void* lib, char* name) {
-	printf("dlsyming %s\n", name);
+	DEBUG("dlsyming %s\n", name)
 #if defined(WIN32)
-	printf("\t\tgetting sym %s from lib %p\n", name, lib);
+	DEBUG("\t\tgetting sym %s from lib %p\n", name, lib)
 	return GetProcAddress(lib, name);
 #else
 	return dlsym(lib, name);
@@ -607,13 +604,13 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 	int sym = ELF64_R_SYM(rela->r_info);
 	int type = ELF64_R_TYPE(rela->r_info);
 
-	printf("rela info %lx, offset %lx, addend %lx, sym %lx, type %lx\n", rela->r_info, rela->r_offset, rela->r_addend, sym, type);
+	DEBUG("rela info %lx, offset %lx, addend %lx, sym %lx, type %lx\n", rela->r_info, rela->r_offset, rela->r_addend, sym, type)
 	if (type == R_X86_64_RELATIVE && sym == 0 && rela->r_addend != 0) {
 		return lib->base + rela->r_addend;
 	}
 	else if (type == R_X86_64_32 || type == R_X86_64_JUMP_SLOT || type == R_X86_64_GLOB_DAT || type == R_X86_64_64) {
 		char* sym_name = lib->strtab + lib->symtab[sym].st_name;
-		printf("\t\tlinking symbol: %s\n", sym_name);
+		DEBUG("\t\tlinking symbol: %s\n", sym_name)
 
 		void* ret = 0;
 		if (strncmp(sym_name, EXTERNAL_PREFIX, EXTERNAL_PREFIX_LEN) == 0) {
@@ -629,7 +626,7 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 			if (!val) {
 				ERR("could not load external %s\n", sym_name+ EXTERNAL_PREFIX_LEN);
 			}
-			//printf("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, val);
+			//DEBUG("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, val)
 			ret = val;
 			dlclose2(libc);
 		} else if (strcmp(sym_name, "__printf") == 0) {
@@ -660,14 +657,14 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 					if (strcmp(file, l->path) == 0) {
 						Elf64_Half f = lookup(sym_name, l);
 						void * f_addr = l->base + l->symtab[f].st_value;
-						//printf("setting name %s, at %x from base %x to %x\n", sym_name, rela->r_offset, lib->base, f_addr);
-						printf("\t\t\tfound symbol in %s\n", l->name);
+						//DEBUG("setting name %s, at %x from base %x to %x\n", sym_name, rela->r_offset, lib->base, f_addr)
+						DEBUG("\t\t\tfound symbol in %s\n", l->name)
 						ret = f_addr;
 					}
 				}
 			}
 		}
-		printf("\t\t\tsetting symbol %s to %p with offset\n", sym_name, ret, rela->r_addend);
+		DEBUG("\t\t\tsetting symbol %s to %p with offset\n", sym_name, ret, rela->r_addend)
 		return ret + rela->r_addend;
 	} else {
 		ERR("unknown relocation %d", type);
@@ -686,15 +683,15 @@ void setSymbol(Elf64_Rela * rela, void* sym, loaded_lib* lib) {
 }
 
 void link(loaded_lib* lib, loaded_libs* libs) {
-	printf("\tlinking library %s\n", lib->path);
-	printf("\trela count %d\n", lib->rela_count);
-	printf("\trela plt count %d\n", lib->rela_plt_count);
+	DEBUG("\tlinking library %s\n", lib->path)
+	DEBUG("\trela count %d\n", lib->rela_count)
+	DEBUG("\trela plt count %d\n", lib->rela_plt_count)
 	for (int i = 0 ; i < lib->rela_count ; i++) {
 		Elf64_Rela * rela = lib->rela + i;
 		void * sym = findSymbol(rela, lib, libs);
 		setSymbol(rela, sym, lib);
 
-		// printf("\t\toffset: %lx, info %lx, addend: %lx\n", lib->rela[i].r_offset, lib->rela[i].r_info, lib->rela[i].r_addend);
+		// DEBUG("\t\toffset: %lx, info %lx, addend: %lx\n", lib->rela[i].r_offset, lib->rela[i].r_info, lib->rela[i].r_addend)
 	}
 	for (int i = 0 ; i < lib->rela_plt_count ; i++) {
 		Elf64_Rela * rela = lib->rela_plt + i;
@@ -725,13 +722,13 @@ void init_lib(loaded_lib* lib, loaded_libs* libs) {
 	}
 
 	// init self
-	printf("\t\tinit %s\n", lib->name);
+	DEBUG("\t\tinit %s\n", lib->name)
 	if (lib->init_array) {
 		for (int j = 0; j * sizeof(void*) < lib->init_arraysz ; j++) {
 			// this is already absolute because of relocation
 			size_t rel_f = lib->init_array[j];
-			printf("\t\tinit %d from library %s with pointer %p\n", j, lib->name, (void*)rel_f - lib->base);
-			//printf("exec init at %llx for lib %s\n", rel_f, lib->name);
+			DEBUG("\t\tinit %d from library %s with pointer %p\n", j, lib->name, (void*)rel_f - lib->base)
+			//DEBUG("exec init at %llx for lib %s\n", rel_f, lib->name)
 			((void (*)())(rel_f))();
 		}
 	}
@@ -740,9 +737,9 @@ void init_lib(loaded_lib* lib, loaded_libs* libs) {
 void init_libs(loaded_libs* libs) {
 	for (int i = 0; i < libs->libs_count; i++) {
 		loaded_lib* lib = &libs->libs[i];
-		printf("\tstart init %s\n", lib->name);
+		DEBUG("\tstart init %s\n", lib->name)
 		init_lib(lib, libs);
-		printf("\tend init %s\n", lib->name);
+		DEBUG("\tend init %s\n", lib->name)
 	}
 }
 
@@ -760,16 +757,16 @@ void fini_libs(loaded_libs* libs) {
 }
 
 int main(int argc, char ** argv) {
-#ifdef WIN32
-        printf("kernel: %p\n", GetModuleHandle("KERNEL32.DLL"));
-        printf("kernel: switch %p\n", GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "SwitchToThread"));
-#endif
+//#ifdef WIN32
+//        DEBUG("kernel: %p\n", GetModuleHandle("KERNEL32.DLL"))
+//        DEBUG("kernel: switch %p\n", GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "SwitchToThread"))
+//#endif
 
 //#if defined(WIN32)
 //	SetConsoleOutputCP(65001);
 //#endif
-	//printf("printf %s\n", &printf);
-	printf("stdin %p, stdout %p, stderr %p\n", stdin, stdout, stderr);
+	//DEBUG("printf %s\n", &printf)
+	DEBUG("stdin %p, stdout %p, stderr %p\n", stdin, stdout, stderr)
 	if (argc != 2) {
 		ERR("./loadelf file\n");
 	}
@@ -777,32 +774,32 @@ int main(int argc, char ** argv) {
 	loaded_libs* libs = &zwolf_global_libs;
 	alloc_loaded_libs(libs);
 
-	printf("loading\n");
+	DEBUG("loading\n")
 	loaded_lib* lib = load(argv[1], libs);
 
-	printf("linking\n");
+	DEBUG("linking\n")
 	for (size_t i = 0 ; i < libs->libs_count ; i++) {
 		link(&libs->libs[i], libs);
 	}
 #ifndef WIN32
-	printf("f %p\n", _r_debug.r_map);
+	DEBUG("f %p\n", _r_debug.r_map)
 	add_local_libs();
-	printf("f %p\n", _r_debug.r_brk);
-	printf("f %p\n", &_dl_debug_state);
+	DEBUG("f %p\n", _r_debug.r_brk)
+	DEBUG("f %p\n", &_dl_debug_state)
 #endif
-	printf("start init libs\n");
+	DEBUG("start init libs\n")
 	init_libs(libs);
-	printf("end init libs\n");
+	DEBUG("end init libs\n")
 
 	Elf64_Half main_idx = lookup("main", lib);
 	int (*main_f)(void) __attribute__((sysv_abi));
 	void * main_addr = lib->base + lib->symtab[main_idx].st_value;
 	main_f = main_addr;
-	printf("main at %d %p\n", main_idx , main_addr - lib->base);
+	DEBUG("main at %d %p\n", main_idx , main_addr - lib->base)
 	int ret = main_f();
-	printf("main returned %d\n", ret);
-	printf("fini\n");
+	DEBUG("main returned %d\n", ret)
+	DEBUG("fini\n")
 	fflush(stdout);
 	fini_libs(libs);
-	printf("done\n");
+	DEBUG("done\n")
 }
