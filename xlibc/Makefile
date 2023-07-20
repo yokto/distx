@@ -1,4 +1,4 @@
-CC := clang
+CC := gcc
 INSTALL := $(dir ${PWD})
 LIBC := $(INSTALL)lib/libc.so
 LIBM := $(INSTALL)lib/libm.so

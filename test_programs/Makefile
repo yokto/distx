@@ -13,9 +13,12 @@ THREAD := $(BUILDDIR)/bin/thread
 TLS := $(BUILDDIR)/bin/tls
 TSS := $(BUILDDIR)/bin/tss
 TEST_MTX := $(BUILDDIR)/bin/test_mtx
-TEST_IOSTREAM := $(BUILDDIR)/bin/test_iostream
+#TEST_IOSTREAM := $(BUILDDIR)/bin/test_iostream
 #HELLOGLIBC := $(BUILDDIR)/helloglibc/bin/helloglibc
 CONSTANTS := $(BUILDDIR)/bin/constants
+
+TESTCPP_SOURCES := $(wildcard testcpp_*.cpp)
+TESTCPP_EXECS := $(patsubst %.cpp, $(BUILDDIR)/bin/%, $(TESTCPP_SOURCES))
 
 #.PHONY: libbase
 
@@ -28,13 +31,16 @@ all: $(HELLOC) \
 	$(TLS) \
 	$(TSS) \
 	$(TEST_MTX) \
-	$(TEST_IOSTREAM) # $(HELLOGLIBC) #libbase
+	$(TESTCPP_EXECS) \
+	#$(TEST_IOSTREAM) # $(HELLOGLIBC) #libbase
 
 #nolibc: foobar.so nolibc.c ../lib/* Makefile
 #	gcc -shared -nostdlib '-Wl,--dynamic-linker=/home/silvio/stuff/sources/elf/executables/load_elf.so' -fvisibility=hidden -fPIC -o nolibc -lfoobar -L. nolibc.c
 
 # -fno-stack-protection is for aarch64
 $(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile helloc.map foobar.h
+	echo source ${TESTCPP_SOURCES}
+	echo execs ${TESTCPP_EXECS}
 	mkdir -p $(dir $(HELLOC))
 	${CC} \
 		-g \
@@ -63,6 +69,7 @@ $(LIBFOOBAR): foobar.c Makefile foobar.map
 $(HELLORUST): hellorust.rs Makefile
 	mkdir -p $(dir $(HELLORUST))
 	rustc hellorust.rs --crate-type cdylib -o $(HELLORUST)
+
 
 #$(HELLOCPP): hellocpp.cpp Makefile hellocpp.map
 #	mkdir -p $(dir $(HELLOCPP))
@@ -116,10 +123,14 @@ $(TSS): tss.c
 $(TEST_MTX): test_mtx.c
 	${CC} -g -o $(TEST_MTX) test_mtx.c
 
-$(TEST_IOSTREAM): test_iostream.cpp
-	mkdir -p $(dir $(TEST_IOSTREAM))
-	echo ${PATH}
-	clang++ -femulated-tls -g -o $(TEST_IOSTREAM) test_iostream.cpp
+$(BUILDDIR)/bin/testcpp_%: testcpp_%.cpp
+	mkdir -p $(dir $(BUILDDIR)/bin)
+	clang++ -femulated-tls -g -o $@ $<
+
+#$(TEST_IOSTREAM): test_iostream.cpp
+#	mkdir -p $(dir $(TEST_IOSTREAM))
+#	echo ${PATH}
+#	clang++ -femulated-tls -g -o $(TEST_IOSTREAM) test_iostream.cpp
 
 $(CONSTANTS): constants.c
 	gcc -o $(CONSTANTS) constants.c

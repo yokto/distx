@@ -72,12 +72,13 @@ DECLARE(int, fseek, FILE *stream, long int offset, int whence)
 DECLARE(size_t, fread, void * ptr, size_t size, size_t nmemb, FILE * stream)
 DECLARE(int, fputc, int c, FILE *stream)
 DECLARE(int, remove, const char *pathname)
+DECLARE(int, cnd_init, cnd_t* cond)
 DECLARE(int, cnd_broadcast, cnd_t *cond )
 DECLARE(int, cnd_wait, cnd_t* cond, mtx_t* mutex )
 DECLARE(int, cnd_signal, cnd_t *cond );
-DECLARE(int, cnd_wait, cnd_t* cond, mtx_t* mutex );
 DECLARE(void, cnd_destroy, cnd_t* cond );
 DECLARE(int, cnd_timedwait, cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point );
+bool (*SleepConditionVariableCS)(cnd_t* cond, mtx_t*, uint32_t) __attribute((ms_abi));
 DECLARE(int, mtx_init, mtx_t* mutex, int type)
 DECLARE(int, mtx_unlock, mtx_t *mutex)
 DECLARE(int, mtx_lock, mtx_t* mutex)
@@ -197,11 +198,13 @@ __attribute__((constructor)) void init() {
 		remove_ms = dlsym(libc, "remove");
 		getc_ms = dlsym(libc, "getc");
 		ungetc_ms = dlsym(libc, "ungetc");
-		cnd_broadcast_ms = 0; //dlsym(kernel32, "cnd_broadcast");
-		cnd_wait_ms = 0; //dlsym(libc, "cnd_wait");
-		cnd_signal_ms = 0; //dlsym(libc, "cnd_signal");
-		cnd_destroy_ms = 0; //dlsym(libc, "cnd_destroy");
-		cnd_timedwait_ms = 0; // dlsym(libc, "cnd_timedwait");
+		cnd_init_ms = dlsym(kernel32, "InitializeConditionVariable");
+		cnd_broadcast_ms = dlsym(kernel32, "WakeAllConditionVariable");
+		SleepConditionVariableCS = dlsym(kernel32, "SleepConditionVariableCS");
+		cnd_wait_ms = 0;
+		cnd_signal_ms = dlsym(kernel32, "WakeConditionVariable");
+		cnd_destroy_ms = 0; // not needed
+		cnd_timedwait_ms = 0;
 		mtx_init_ms = dlsym(kernel32, "InitializeCriticalSection");
 		mtx_lock_ms = dlsym(kernel32, "EnterCriticalSection");
 		mtx_unlock_ms = dlsym(kernel32, "LeaveCriticalSection");
@@ -262,6 +265,7 @@ __attribute__((constructor)) void init() {
 		remove_sysv = dlsym(libc, "remove");
 		getc_sysv = dlsym(libc, "getc");
 		ungetc_sysv = dlsym(libc, "ungetc");
+		cnd_init_ms = dlsym(libc, "cnd_init");
 		cnd_broadcast_sysv = dlsym(libc, "cnd_broadcast");
 		cnd_signal_sysv = dlsym(libc, "cnd_signal");
 		cnd_wait_sysv = dlsym(libc, "cnd_wait");
@@ -608,11 +612,59 @@ DLL_PUBLIC int tss_set(tss_t tss_id, void *val) {
 }
 
 
-DLL_PUBLIC int cnd_broadcast( cnd_t *cond ) IMPLEMENT(cnd_broadcast, cond)
-DLL_PUBLIC int cnd_wait( cnd_t* cond, mtx_t* mutex ) IMPLEMENT(cnd_wait, cond, mutex)
-DLL_PUBLIC int cnd_signal(cnd_t *cond ) IMPLEMENT(cnd_signal, cond)
-DLL_PUBLIC void cnd_destroy(cnd_t* cond ) IMPLEMENT(cnd_destroy, cond)
-DLL_PUBLIC int cnd_timedwait( cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point ) IMPLEMENT(cnd_timedwait, cond, mutex, time_point)
+DLL_PUBLIC int cnd_init(cnd_t* cond) {
+	__debug_printf("execute os cnd_init\n");
+	if (isWin) {
+		cnd_init_ms(cond);
+		return thrd_success;
+	} else {
+		return cnd_init_sysv(cond);
+	}
+}
+DLL_PUBLIC int cnd_broadcast( cnd_t *cond ) {
+	__debug_printf("execute os cnd_broadcast\n");
+	if (isWin) {
+		cnd_broadcast_ms(cond);
+		return thrd_success;
+	} else {
+		return cnd_broadcast_sysv(cond);
+	}
+}
+DLL_PUBLIC int cnd_wait( cnd_t* cond, mtx_t* mutex ) {
+	__debug_printf("execute os cnd_wait\n");
+	if (isWin) {
+		SleepConditionVariableCS(cond, (mtx_t*)*mutex, -1);
+		return thrd_success;
+	} else {
+		return cnd_wait_sysv(cond, (mtx_t*)*mutex);
+	}
+}
+DLL_PUBLIC int cnd_signal(cnd_t *cond ) {
+	__debug_printf("execute os cnd_signal\n");
+	if (isWin) {
+		cnd_signal_ms(cond);
+		return thrd_success;
+	} else {
+		return cnd_signal_sysv(cond);
+	}
+}
+DLL_PUBLIC void cnd_destroy(cnd_t* cond ) {
+	__debug_printf("execute os cnd_destroy\n");
+	if (isWin) {
+		// nothing to do
+	} else {
+		return cnd_destroy_sysv(cond);
+	}
+}
+DLL_PUBLIC int cnd_timedwait( cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point ) {
+	__debug_printf("execute os cnd_wait\n");
+	if (isWin) {
+		uint32_t milliseconds = (uint32_t)(time_point->tv_sec * 1000) + (uint32_t)(time_point->tv_nsec / 1000000);
+		return SleepConditionVariableCS(cond, (mtx_t*)*mutex, milliseconds) == 0 ? thrd_timedout : thrd_success;
+	} else {
+		return cnd_timedwait_sysv(cond, (mtx_t*)*mutex, time_point);
+	}
+}
 
 DLL_PUBLIC int clock_gettime(clockid_t clockid, struct timespec *tp) IMPLEMENT(clock_gettime, clockid, tp)
 DLL_PUBLIC int getentropy(void *buffer, size_t length) IMPLEMENT(getentropy, buffer, length)
