@@ -87,6 +87,7 @@ typedef struct loaded_libs {
 	loaded_lib * libs;
 	int libs_count;
 	int vec_length;
+	char* basedir;
 } loaded_libs;
 
 loaded_libs zwolf_global_libs;
@@ -120,13 +121,20 @@ int alloc_loaded_libs(loaded_libs* libs) {
 	libs->libs = calloc(8, sizeof(loaded_lib));
 	libs->libs_count = 0;
 	libs->vec_length = 8;
+	libs->basedir = 0;
 }
 
 int free_loaded_libs(loaded_libs* libs) {
-	free(libs->libs);
-	libs->libs = 0;
+	if (libs->libs) {
+		free(libs->libs);
+		libs->libs = 0;
+	}
 	libs->libs_count = 0;
 	libs->vec_length = 0;
+	if (libs->basedir) {
+		free(libs->basedir);
+		libs->basedir = 0;
+	}
 }
 
 loaded_lib* add_loaded_lib(loaded_libs* libs) {
@@ -225,7 +233,41 @@ void remove_local_libs() {
 }
 #endif
 
+void toUnix(char* path) {
+	for (size_t i = 0; i < strlen(path); i++) {
+		if (path[i] == '\\') {
+			path[i] = '/';
+		}
+	}
+}
 
+void set_basedir(loaded_libs * libs, char * path, char * soname) {
+	if (libs->basedir) {
+		ERR("only call when basedir is not set")
+	}
+#ifndef WIN32
+	char * realp = realpath(path, 0);
+#else
+	char * realp = _fullpath(0, path, 0);
+	toUnix(realp);
+	DEBUG("fullpath for %s is %s\n", path, realp);
+#endif
+	int real_len = strlen(realp);
+	int soname_len = strlen(soname);
+	int base_len = real_len - soname_len;
+	if (real_len < soname_len || strcmp(realp + base_len, soname) != 0) {
+		ERR("soname (%s) should be a substring of realpath (%s)", soname, realp)
+		free(realp);
+	}
+	libs->basedir = malloc(base_len + 1);
+	libs->basedir[base_len] = '\0';
+	memcpy(libs->basedir, realp, base_len);
+	DEBUG("basedir %s\n", libs->basedir);
+	free(realp);
+}
+
+// for main lib_path is the argument to this program
+// for all others it's NEEDED of some library
 loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	for (int i = 0 ; i < libs->libs_count ; i++) {
 		if (libs->libs[i].path && strcmp(libs->libs[i].path, lib_path) == 0) {
@@ -241,7 +283,20 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	lib->path = malloc(strlen(lib_path) + 1);
 	strcpy(lib->path, lib_path);
 
-	FILE* fd = fopen(lib_path, "rb");
+
+	FILE* fd;
+	if (libs->basedir) {
+		int base_len = strlen(libs->basedir);
+		int path_len = strlen(lib_path);
+		const real_path = malloc(base_len + path_len + 1);
+		memcpy(real_path, libs->basedir, base_len);
+		memcpy(real_path + base_len, lib_path, path_len + 1);
+		DEBUG("\topening %s\n", real_path);
+		fd = fopen(real_path, "rb");
+		free(real_path);
+	} else {
+		fd = fopen(lib_path, "rb");
+	}
 	if (fd == 0) {
 		ERR("can't open %s", lib_path);
 	}
@@ -340,9 +395,6 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 			}
 
 			for (dynamic = lib->dynamic; dynamic->d_tag != DT_NULL; dynamic++) {
-				if (dynamic->d_tag == DT_SYMTAB) {
-					lib->symtab = (Elf64_Sym*)(memory + dynamic->d_un.d_ptr);
-				}
 				if (dynamic->d_tag == DT_SONAME) {
 					char * soname = lib->strtab + dynamic->d_un.d_ptr;
 					char * last_slash = strrchr(soname, '/');
@@ -354,8 +406,16 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 					lib->name[lib_name_len] = '\0';
 					DEBUG("libname %s\n", lib->name)
 					if (lib_name_len <= 0){ 
-						WARN("Could not figure out libname of %s", soname);
+						WARN("Could not figure out libname of %s\n", soname);
 					}
+					if (!libs->basedir) { // for main program
+						set_basedir(libs, lib_path, soname);
+					}
+				}
+			}
+			for (dynamic = lib->dynamic; dynamic->d_tag != DT_NULL; dynamic++) {
+				if (dynamic->d_tag == DT_SYMTAB) {
+					lib->symtab = (Elf64_Sym*)(memory + dynamic->d_un.d_ptr);
 				}
 				if (dynamic->d_tag == DT_HASH) {
 					lib->hash = (Elf64_Word*)(memory + dynamic->d_un.d_ptr);
@@ -414,8 +474,9 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	}
 
 	if (!lib->name) {
-		WARN("library %s has no soname", lib_path);
+		ERR("library %s has no soname", lib_path);
 	}
+
 
 #ifndef WIN32
 	struct link_map* new_map = malloc(sizeof(struct link_map));
@@ -795,7 +856,7 @@ int main(int argc, char ** argv) {
 	int (*main_f)(void) __attribute__((sysv_abi));
 	void * main_addr = lib->base + lib->symtab[main_idx].st_value;
 	main_f = main_addr;
-	DEBUG("main at %d %p\n", main_idx , main_addr - lib->base)
+	DEBUG("main at %d %p\n", main_idx , (void*)(main_addr - lib->base))
 	int ret = main_f();
 	DEBUG("main returned %d\n", ret)
 	DEBUG("fini\n")

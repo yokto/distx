@@ -125,7 +125,9 @@ $(TEST_MTX): test_mtx.c
 
 $(BUILDDIR)/bin/testcpp_%: testcpp_%.cpp
 	mkdir -p $(dir $(BUILDDIR)/bin)
-	clang++ -femulated-tls -g -o $@ $<
+	clang++ -femulated-tls -g \
+		"-Wl,-soname,test_programs/bin/testcpp_$*" \
+		-o "$@" "$<"
 
 #$(TEST_IOSTREAM): test_iostream.cpp
 #	mkdir -p $(dir $(TEST_IOSTREAM))
