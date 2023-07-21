@@ -5,42 +5,32 @@ DEPDIR := $(realpath $(dir ${PWD})/..)
 LIBFOOBAR := $(BUILDDIR)/lib/libfoobar.so
 HELLOC := $(BUILDDIR)/bin/helloc
 LIBC := $(DEPDIR)/xlibc/lib/libc.so
-#GLIBC := $(BUILDDIR)/glibc/lib/libc.so
 #LIBBASE := $(BUILDDIR)/libbase/lib/libbase.so
 HELLORUST := $(BUILDDIR)/hellorust/bin/hellorust
 HELLOCPP := $(BUILDDIR)/hellocpp/bin/hellocpp
-THREAD := $(BUILDDIR)/bin/thread
-TLS := $(BUILDDIR)/bin/tls
-TSS := $(BUILDDIR)/bin/tss
-TEST_MTX := $(BUILDDIR)/bin/test_mtx
 #TEST_IOSTREAM := $(BUILDDIR)/bin/test_iostream
-#HELLOGLIBC := $(BUILDDIR)/helloglibc/bin/helloglibc
 CONSTANTS := $(BUILDDIR)/bin/constants
 
 TESTCPP_SOURCES := $(wildcard testcpp_*.cpp)
 TESTCPP_EXECS := $(patsubst %.cpp, $(BUILDDIR)/bin/%, $(TESTCPP_SOURCES))
+TESTC_SOURCES := $(wildcard testc_*.c)
+TESTC_EXECS := $(patsubst %.c, $(BUILDDIR)/bin/%, $(TESTC_SOURCES))
 
 #.PHONY: libbase
 
 all: $(HELLOC) \
 	$(HELLORUST) \
-	$(HELLOCPP) \
+	#$(HELLOCPP) \
 	$(LIBBASE) \
 	$(CONSTANTS) \
-	$(THREAD) \
-	$(TLS) \
-	$(TSS) \
-	$(TEST_MTX) \
 	$(TESTCPP_EXECS) \
-	#$(TEST_IOSTREAM) # $(HELLOGLIBC) #libbase
+	$(TESTC_EXECS) \
 
 #nolibc: foobar.so nolibc.c ../lib/* Makefile
 #	gcc -shared -nostdlib '-Wl,--dynamic-linker=/home/silvio/stuff/sources/elf/executables/load_elf.so' -fvisibility=hidden -fPIC -o nolibc -lfoobar -L. nolibc.c
 
 # -fno-stack-protection is for aarch64
 $(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile helloc.map foobar.h
-	echo source ${TESTCPP_SOURCES}
-	echo execs ${TESTCPP_EXECS}
 	mkdir -p $(dir $(HELLOC))
 	${CC} \
 		-g \
@@ -89,50 +79,17 @@ $(HELLORUST): hellorust.rs Makefile
 #libbase:
 #	$(MAKE) -C libbase/src
 
-#$(HELLOGLIBC): helloglibc.c Makefile helloglibc.map
-#	mkdir -p $(dir $(HELLOGLIBC))
-#	${CC} \
-#		helloglibc.c \
-#		-Wl,--no-undefined \
-#		-Wl,-soname,helloglibc/bin/libhelloglibc.so \
-#		-Wl,--version-script=helloglibc.map \
-#		-Wl,-Bsymbolic \
-#		-Wl,-Bsymbolic-functions \
-#		-Wl,--hash-style=sysv \
-#		-nostdlib \
-#		-shared \
-#		-fPIC \
-#		-o $(HELLOGLIBC) \
-#		-lc -L$(dir $(GLIBC)) \
-#		-lbase -L$(dir $(LIBBASE))
-
-$(THREAD): thread.c
-	${CC} -g -o $(THREAD) thread.c
-
-$(TLS): tls.c
-	${CC} -g \
-		tls.c \
-		-femulated-tls \
-		-Wl,-soname,test_programs/bin/tls \
-		-o $(TLS)
-
-$(TSS): tss.c
-	echo ${CC}
-	${CC} -g -o $(TSS) tss.c
-
-$(TEST_MTX): test_mtx.c
-	${CC} -g -o $(TEST_MTX) test_mtx.c
+$(BUILDDIR)/bin/testc_%: testc_%.c
+	mkdir -p $(dir $(BUILDDIR)/bin)
+	clang -femulated-tls -g \
+		"-Wl,-soname,test_programs/bin/testc_$*" \
+		-o "$@" "$<"
 
 $(BUILDDIR)/bin/testcpp_%: testcpp_%.cpp
 	mkdir -p $(dir $(BUILDDIR)/bin)
 	clang++ -femulated-tls -g \
 		"-Wl,-soname,test_programs/bin/testcpp_$*" \
 		-o "$@" "$<"
-
-#$(TEST_IOSTREAM): test_iostream.cpp
-#	mkdir -p $(dir $(TEST_IOSTREAM))
-#	echo ${PATH}
-#	clang++ -femulated-tls -g -o $(TEST_IOSTREAM) test_iostream.cpp
 
 $(CONSTANTS): constants.c
 	gcc -o $(CONSTANTS) constants.c
