@@ -4,12 +4,15 @@
 extern "C" {
 #endif
 
-extern int errno;
+extern __thread int errno;
 #define ERANGE 1
-#define EINVAL 22
+#define ENOENT  2
 #define ENOMEM 12
 #define	EBUSY 16
 #define	EILSEQ 17
+#define EINVAL 22
+#define ENOTDIR 20
+
 
 #ifdef __cplusplus
 }

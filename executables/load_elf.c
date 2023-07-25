@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdarg.h>
@@ -601,6 +602,11 @@ int write2(const char *s, size_t num) {
 }
 
 __attribute__((sysv_abi))
+int errno2() {
+	return errno;
+}
+
+__attribute__((sysv_abi))
 int resolve_addr(void* ptr, const char ** libfile, size_t* offset) {
 	for (size_t i = 0; i < zwolf_global_libs.libs_count; i++) {
 		loaded_lib* l = &zwolf_global_libs.libs[i];
@@ -694,6 +700,8 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 			ret = &printf2;
 		} else if (strcmp(sym_name, "__write") == 0) {
 			ret = &write2;
+		} else if (strcmp(sym_name, "__errno") == 0) {
+			ret = &errno2;
 		} else if (strcmp(sym_name, "__resolve") == 0) {
 			ret = &resolve_addr;
 		} else if (strcmp(sym_name, "__dlsym") == 0) {

@@ -1,4 +1,4 @@
-CC := gcc
+CC := clang
 INSTALL := $(dir ${PWD})
 LIBC := $(INSTALL)lib/libc.so
 LIBM := $(INSTALL)lib/libm.so
@@ -12,23 +12,20 @@ $(LIBC): libc.c libc_printf.c Makefile libc.map
 	echo ${CC}
 	${CC} \
 		-g \
-		-Wall -Wextra -Werror \
-		-Wno-frame-address \
+		-Wall -Wextra \
 		-Wl,-soname,xlibc/lib/libc.so \
-		-Wl,--version-script=libc.map \
-		-Wl,--hash-style=sysv \
 		-Wl,--export-dynamic-symbol=__* \
-		-Wl,-Bsymbolic \
-		-nostdlib -shared \
-		-fno-stack-protector \
-		-fPIC \
-		-fno-builtin \
+		-nolibc -shared \
+		-femulated-tls \
 		-Ilibc \
 		-I. \
+		-fPIC \
 		-Iinclude \
 		-o $(LIBC) \
 		libc.c \
 		libc_printf.c
+
+#               -Werror \
 
 $(LIBM): libm.c Makefile libm.map
 	mkdir -p $(dir $(LIBC))

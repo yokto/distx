@@ -64,10 +64,14 @@ int remove(const char *pathname);
 int mtime(const char *pathname, struct timespec * time);
 int setmtime(const char *pathname, struct timespec * time);
 
-typedef int DIR;
+typedef void* DIR;
 struct dirent {
-	char d_name[256];
-	char d_type;
+	uint64_t       d_ino;       /* Inode number */
+	uint64_t       d_off;       /* Not an offset; see below */
+	unsigned short d_reclen;    /* Length of this record */
+	unsigned char  d_type;      /* Type of file; not supported
+				       by all filesystem types */
+	char           d_name[256];
 };
 DIR* opendir(const char * path);
 struct dirent* readdir(DIR * dir);

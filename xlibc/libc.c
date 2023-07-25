@@ -13,6 +13,8 @@
 #include <libc_printf.h>
 #include <common.h>
 
+DLL_PUBLIC
+__thread int errno = 0;
 
 #define concat2(X, Y) X ## Y
 #define concat(X, Y) concat2(X, Y)
@@ -35,6 +37,59 @@ DLL_PUBLIC
 void abort() {
     __builtin_trap();
 }
+
+typedef uint64_t linux_dev_t;
+typedef uint64_t linux_ino_t;
+typedef uint32_t linux_mode_t;
+typedef uint64_t linux_nlink_t;
+typedef uint32_t linux_uid_t;
+typedef uint32_t linux_gid_t;
+typedef uint64_t linux_dev_t;
+typedef uint64_t linux_off_t;
+typedef uint64_t linux_blksize_t;
+typedef uint64_t linux_blkcnt_t;
+struct linux_stat {
+               linux_dev_t     st_dev;         /* ID of device containing file */
+               linux_ino_t     st_ino;         /* Inode number */
+               linux_mode_t    st_mode;        /* File type and mode */
+               linux_nlink_t   st_nlink;       /* Number of hard links */
+               linux_uid_t     st_uid;         /* User ID of owner */
+               linux_gid_t     st_gid;         /* Group ID of owner */
+               linux_dev_t     st_rdev;        /* Device ID (if special file) */
+               linux_off_t     st_size;        /* Total size, in bytes */
+               linux_blksize_t st_blksize;     /* Block size for filesystem I/O */
+               linux_blkcnt_t  st_blocks;      /* Number of 512B blocks allocated */
+
+               /* Since Linux 2.6, the kernel supports nanosecond
+                  precision for the following timestamp fields.
+                  For the details before Linux 2.6, see NOTES. */
+
+               struct timespec st_atim;  /* Time of last access */
+               struct timespec st_mtim;  /* Time of last modification */
+               struct timespec st_ctim;  /* Time of last status change */
+	       char padding[144];
+};
+typedef uint32_t windows_dev_t;
+typedef uint16_t windows_ino_t;
+typedef uint32_t windows_dev_t;
+typedef uint32_t windows_off_t;
+typedef uint64_t windowstime_t;
+struct windows_stat {
+    windows_dev_t st_dev;         // Device ID of the file
+    windows_ino_t st_ino;         // Inode number
+    unsigned short st_mode; // File mode (permissions and file type)
+    short st_nlink;        // Number of hard links
+    short st_uid;          // User ID of the file's owner
+    short st_gid;          // Group ID of the file's owner
+    windows_dev_t st_rdev;        // Device ID (if file is a special file)
+    windows_off_t st_size;        // File size in bytes
+    windowstime_t st_atime;       // Last access time
+    windowstime_t st_mtime;       // Last modification time
+    windowstime_t st_ctime;       // Last status change time
+    char padding[48];
+};
+
+
 
 void print_backtrace();
 
@@ -72,6 +127,7 @@ DECLARE(int, fseek, FILE *stream, long int offset, int whence)
 DECLARE(size_t, fread, void * ptr, size_t size, size_t nmemb, FILE * stream)
 DECLARE(int, fputc, int c, FILE *stream)
 DECLARE(int, remove, const char *pathname)
+int (*_rmdir_ms)(const char *pathname) __attribute((ms_abi));
 DECLARE(int, cnd_init, cnd_t* cond)
 DECLARE(int, cnd_broadcast, cnd_t *cond )
 DECLARE(int, cnd_wait, cnd_t* cond, mtx_t* mutex )
@@ -88,12 +144,21 @@ DECLARE(int, clock_gettime, clockid_t clockid, struct timespec *tp);
 DECLARE(int, getentropy, void *buffer, size_t length);
 DECLARE(char*, realpath, const char * path, char * resolved_path);
 DECLARE(int, mkdir, const char *pathname, mode_t mode);
+int (*_mkdir_ms)(const char *pathname) __attribute((ms_abi));
 DECLARE(int, stat, const char * pathname, struct stat * statbuf);
 DECLARE(char*, getcwd, char *buf, size_t size);
 DECLARE(struct dirent*, readdir, DIR * dir);
 DECLARE(int, closedir, DIR* dir);
 DECLARE(int, chdir, const char *path);
 DECLARE(DIR*, opendir, const char * path);
+#define MAX_WIN_PATH 260
+typedef struct WIN32_FIND_DATA {
+	char somedata[44];
+	char name[MAX_WIN_PATH];
+	char restdata[16];
+} WIN32_FIND_DATA;
+int32_t (*FindFirstFileA_ms)(char * path, WIN32_FIND_DATA* lpFindFileData) __attribute((ms_abi));
+bool (*FindNextFileA_ms)(int32_t hFindFile, WIN32_FIND_DATA* lpFindFileData) __attribute((ms_abi));
 DECLARE(ssize_t, readlink, const char * pathname, char * buf, size_t bufsiz);
 DECLARE(int, rename, const char *oldpath, const char *newpath);
 DECLARE(int, truncate, const char *path, off_t length);
@@ -196,6 +261,7 @@ __attribute__((constructor)) void init() {
 		fread_ms = dlsym(libc, "fread");
 		fputc_ms = dlsym(libc, "fputc");
 		remove_ms = dlsym(libc, "remove");
+		_rmdir_ms = dlsym(libc, "_rmdir");
 		getc_ms = dlsym(libc, "getc");
 		ungetc_ms = dlsym(libc, "ungetc");
 		cnd_init_ms = dlsym(kernel32, "InitializeConditionVariable");
@@ -215,15 +281,17 @@ __attribute__((constructor)) void init() {
 		clock_gettime_ms = 0; //dlsym(libc, "clock_gettime");
 		getentropy_ms = 0; //dlsym(libc, "getentropy");
 		realpath_ms = 0; //dlsym(libc, "realpath");
-		mkdir_ms = 0; //dlsym(libc, "mkdir");
-		stat_ms = 0; //dlsym(libc, "stat");
+		_mkdir_ms = dlsym(libc, "_mkdir");
+		stat_ms = dlsym(libc, "_stat");
 		getcwd_ms = 0; //dlsym(libc, "getcwd");
 		readdir_ms = 0; //dlsym(libc, "readdir");
 		closedir_ms = 0; //dlsym(libc, "closedir");
 		chdir_ms = 0; //dlsym(libc, "chdir");
 		opendir_ms = 0; //dlsym(libc, "opendir");
+		FindFirstFileA_ms = dlsym(kernel32, "FindFirstFileA");
+		FindNextFileA_ms = dlsym(kernel32, "FindNextFileA");
 		readlink_ms = 0; //dlsym(libc, "readlink");
-		rename_ms = 0;//dlsym(libc, "rename");
+		rename_ms = dlsym(libc, "rename");
 		truncate_ms = 0; //dlsym(libc, "truncate");
 		statvfs_ms = 0; //dlsym(libc, "statvfs");
 		lstat_ms = 0; //dlsym(libc, "lstat");
@@ -312,6 +380,33 @@ int ungetc(int c, FILE *stream) IMPLEMENT(ungetc, c, stream)
 DLL_PUBLIC
 char getchar() {
 	return getc(stdin);
+}
+
+DLL_PUBLIC
+size_t strlen(const char* str) {
+    const char* s;
+    for (s = str; *s; ++s) {}
+    return (s - str);
+}
+
+char* strncpy(char* dest, const char* src, size_t n) {
+    char* d = dest;
+    const char* s = src;
+    size_t i = 0;
+
+    // Copy at most n characters from src to dest
+    while (*s && i < n) {
+        *d++ = *s++;
+        i++;
+    }
+
+    // If n is greater than the length of src, pad dest with null characters
+    while (i < n) {
+        *d++ = '\0';
+        i++;
+    }
+
+    return dest;
 }
 
 //DLL_PUBLIC
@@ -435,7 +530,16 @@ int fflush(FILE* file) {
 	}
 }
 
-DLL_PUBLIC int remove(const char *pathname) IMPLEMENT(remove, pathname)
+DLL_PUBLIC int remove(const char *pathname) {
+	__debug_printf("execute os remove\n");
+	if (isWin) {
+		int ret = remove_ms(pathname);
+		if (ret == 0) { return 0; }
+		return _rmdir_ms(pathname);
+	} else {
+		return remove_sysv(pathname);
+	}
+}
 
 DLL_PUBLIC
 FILE *fopen(const char *filename, const char *mode) IMPLEMENT(fopen, filename, mode)
@@ -666,22 +770,147 @@ DLL_PUBLIC int cnd_timedwait( cnd_t*  cond, mtx_t*  mutex, const struct timespec
 	}
 }
 
+DLL_PUBLIC int stat(const char * pathname, struct stat * statbuf) {
+		printf("bar\n\n\n");
+	__debug_printf("execute os stat on path %s buf %p\n", pathname, statbuf);
+	if (isWin) {
+		struct windows_stat ls;
+		printf("bar\n\n\n");
+		const int ret = stat_ms(pathname, (struct stat*)&ls);
+		printf("bar\n\n\n");
+		if (ret == -1) { errno = __errno(); }
+		statbuf->st_mode = ls.st_mode;        /* File type and mode */
+		statbuf->st_dev = ls.st_dev;
+		statbuf->st_ino = ls.st_ino;
+		statbuf->st_nlink = ls.st_nlink;
+		statbuf->st_size = ls.st_size;
+		statbuf->st_mtim.tv_sec = ls.st_mtime / 1000;
+		statbuf->st_mtim.tv_nsec = (ls.st_mtime % 1000) * 1000000;
+		__debug_printf("stat returned %d %p mode %lx\n", ret, statbuf, ls.st_mode);
+		return ret;
+	} else {
+		struct linux_stat ls;
+		const int ret = stat_sysv(pathname, (struct stat*)&ls);
+		if (ret == -1) { errno = __errno(); }
+		statbuf->st_mode = ls.st_mode;        /* File type and mode */
+		statbuf->st_dev = ls.st_dev;
+		statbuf->st_ino = ls.st_ino;
+		statbuf->st_nlink = ls.st_nlink;
+		statbuf->st_size = ls.st_size;
+		statbuf->st_mtim = ls.st_mtim;
+		__debug_printf("stat returned %d %p mode foo %ld\n", ret, statbuf, ls.st_mode);
+		return ret;
+	}
+}
 DLL_PUBLIC int clock_gettime(clockid_t clockid, struct timespec *tp) IMPLEMENT(clock_gettime, clockid, tp)
 DLL_PUBLIC int getentropy(void *buffer, size_t length) IMPLEMENT(getentropy, buffer, length)
 DLL_PUBLIC char* realpath(const char * path, char * resolved_path) IMPLEMENT(realpath, path, resolved_path)
-DLL_PUBLIC int mkdir(const char *pathname, mode_t mode) IMPLEMENT(mkdir, pathname, mode)
-DLL_PUBLIC int stat(const char * pathname, struct stat * statbuf) IMPLEMENT(stat, pathname, statbuf)
+struct win_dir {
+	struct dirent linux_dirent;
+	WIN32_FIND_DATA win_dirent;
+	int32_t handle;
+	bool initialized;
+	char path[MAX_WIN_PATH];
+};
+DLL_PUBLIC int mkdir(const char *pathname, mode_t mode) {
+	__debug_printf("execute os mkdir\n");
+	if (isWin) {
+		// nothing to do
+		__debug_printf("execute os mkdir %p %s \n", _mkdir_ms, pathname);
+		return _mkdir_ms(pathname);
+	} else {
+		return mkdir_sysv(pathname, mode);
+	}
+}
 DLL_PUBLIC char* getcwd(char *buf, size_t size) IMPLEMENT(getcwd, buf, size)
-DLL_PUBLIC struct dirent* readdir(DIR * dir) IMPLEMENT(readdir, dir)
-DLL_PUBLIC int closedir(DIR* dir) IMPLEMENT(closedir, dir)
+DLL_PUBLIC struct dirent* readdir(DIR * dir) {
+	__debug_printf("execute os readdir\n");
+	if (isWin) {
+		struct win_dir* windir = (struct win_dir*)dir;
+		if (windir->initialized) {
+			bool hasNext = FindNextFileA_ms(windir->handle, &windir->win_dirent);
+			if (!hasNext) {
+				return 0;
+			}
+			strncpy(&windir->linux_dirent.d_name, windir->win_dirent.name, 256);
+			return &windir->linux_dirent;
+		} else {
+			int32_t handle = FindFirstFileA_ms(windir->path, &windir->win_dirent);
+			if (handle == -1) {
+				return 0;
+			}
+			strncpy(&windir->linux_dirent.d_name, windir->win_dirent.name, 256);
+			windir->handle = handle;
+			windir->initialized = true;
+			return &windir->linux_dirent;
+		}
+	} else {
+		return readdir_sysv(dir);
+	}
+}
+DLL_PUBLIC int closedir(DIR* dir) {
+	__debug_printf("execute os opendir\n");
+	if (isWin) {
+		free(dir);
+		return 0;
+	} else {
+		return closedir_sysv(dir);
+	}
+}
 DLL_PUBLIC int chdir(const char *path) IMPLEMENT(chdir, path)
-DLL_PUBLIC DIR* opendir(const char * path) IMPLEMENT(opendir, path)
+DLL_PUBLIC DIR* opendir(const char * path) {
+	__debug_printf("execute os opendir\n");
+	if (isWin) {
+		struct win_dir* dir = calloc(1, sizeof(struct win_dir));
+		size_t len = strlen(path);
+		if (len >= MAX_WIN_PATH - 3) {
+			fprintf(stderr, "path too long");
+			fflush(stderr);
+			abort();
+		}
+		strncpy(&dir->path, path, MAX_WIN_PATH);
+		dir->path[len] = '\\';
+		dir->path[len+1] = '*';
+		dir->path[len+2] = '\0';
+		return (void*)dir;
+	} else {
+		return opendir_sysv(path);
+	}
+}
 DLL_PUBLIC ssize_t readlink(const char * pathname, char * buf, size_t bufsiz) IMPLEMENT(readlink, pathname, buf, bufsiz)
 DLL_PUBLIC int rename(const char *oldpath, const char *newpath) IMPLEMENT(rename, oldpath, newpath)
 DLL_PUBLIC int thrd_detach( thrd_t thr ) IMPLEMENT(thrd_detach, thr)
 DLL_PUBLIC int truncate(const char *path, off_t length) IMPLEMENT(truncate, path, length)
 DLL_PUBLIC int statvfs(const char * path, struct statvfs * buf) IMPLEMENT(statvfs, path, buf)
-DLL_PUBLIC int lstat(const char * pathname, struct stat * statbuf) IMPLEMENT(lstat, pathname, statbuf)
+DLL_PUBLIC int lstat(const char * pathname, struct stat * statbuf) {
+	__debug_printf("execute os stat on path %s buf %p\n", pathname, statbuf);
+	if (isWin) {
+		struct windows_stat ls;
+		const int ret = stat_ms(pathname, (struct stat*)&ls);
+		if (ret == -1) { errno = __errno(); }
+		statbuf->st_mode = ls.st_mode;        /* File type and mode */
+		statbuf->st_dev = ls.st_dev;
+		statbuf->st_ino = ls.st_ino;
+		statbuf->st_nlink = ls.st_nlink;
+		statbuf->st_size = ls.st_size;
+		statbuf->st_mtim.tv_sec = ls.st_mtime / 1000;
+		statbuf->st_mtim.tv_nsec = (ls.st_mtime % 1000) * 1000000;
+		__debug_printf("stat returned %d %p mode %lx\n", ret, statbuf, ls.st_mode);
+		return ret;
+	} else {
+		struct linux_stat ls;
+		const int ret = lstat_sysv(pathname, (struct stat*)&ls);
+		if (ret == -1) { errno = __errno(); }
+		statbuf->st_mode = ls.st_mode;        /* File type and mode */
+		statbuf->st_dev = ls.st_dev;
+		statbuf->st_ino = ls.st_ino;
+		statbuf->st_nlink = ls.st_nlink;
+		statbuf->st_size = ls.st_size;
+		statbuf->st_mtim = ls.st_mtim;
+		__debug_printf("stat returned %d %p mode %lx\n", ret, statbuf, ls.st_mode);
+		return ret;
+	}
+}
 
 DLL_PUBLIC void mtx_destroy(mtx_t *mutex ) {
 	__debug_printf("execute os mtx_destroy\n");
@@ -757,13 +986,6 @@ DLL_PUBLIC int mtx_unlock(mtx_t* mutex) {
 	} else {
 		return mtx_unlock_sysv((mtx_t*)*mutex);
 	}
-}
-
-DLL_PUBLIC
-size_t strlen(const char* str) {
-    const char* s;
-    for (s = str; *s; ++s) {}
-    return (s - str);
 }
 
 DLL_PUBLIC
@@ -1078,8 +1300,8 @@ unsigned long long int strtoull(const char* str, char** endptr, int base) {
     return (unsigned long long int)strtol(str, endptr, base);
 }
 
-DLL_PUBLIC
-int errno = 0;
+//DLL_PUBLIC
+//int errno = 0;
 
 DLL_PUBLIC
 int isascii(int c) {
@@ -1846,26 +2068,6 @@ DLL_PUBLIC int iswxdigit(wint_t wc) {
 
 DLL_PUBLIC int iswpunct(wint_t wc) {
     return (wc >= 33 && wc <= 47) || (wc >= 58 && wc <= 64) || (wc >= 91 && wc <= 96) || (wc >= 123 && wc <= 126);
-}
-
-char* strncpy(char* dest, const char* src, size_t n) {
-    char* d = dest;
-    const char* s = src;
-    size_t i = 0;
-
-    // Copy at most n characters from src to dest
-    while (*s && i < n) {
-        *d++ = *s++;
-        i++;
-    }
-
-    // If n is greater than the length of src, pad dest with null characters
-    while (i < n) {
-        *d++ = '\0';
-        i++;
-    }
-
-    return dest;
 }
 
 DLL_PUBLIC size_t strxfrm(char* dest, const char* src, size_t n) {

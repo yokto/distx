@@ -133,6 +133,15 @@ int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* form
 									success = true;
 								}
 								break;
+							case 'x':
+								{
+									format++;
+									long ptr = va_arg(args, long);
+									size_t res = sprint_number(putc, arg, (int64_t)ptr, 16, 0);
+									count += res;
+									success = true;
+								}
+								break;
 							case 'u':
 								{
 									format++;

@@ -20,11 +20,10 @@ TESTC_EXECS := $(patsubst %.c, $(BUILDDIR)/bin/%, $(TESTC_SOURCES))
 
 all: $(HELLOC) \
 	$(HELLORUST) \
-	#$(HELLOCPP) \
 	$(LIBBASE) \
 	$(CONSTANTS) \
 	$(TESTCPP_EXECS) \
-	$(TESTC_EXECS) \
+	$(TESTC_EXECS)
 
 #nolibc: foobar.so nolibc.c ../lib/* Makefile
 #	gcc -shared -nostdlib '-Wl,--dynamic-linker=/home/silvio/stuff/sources/elf/executables/load_elf.so' -fvisibility=hidden -fPIC -o nolibc -lfoobar -L. nolibc.c

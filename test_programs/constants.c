@@ -1,7 +1,9 @@
 #define _GNU_SOURCE 1
 #include <fcntl.h>
 #include <stdio.h>
+#include <errno.h>
 #include <threads.h>
+#include <sys/stat.h>
 
 #define C(name) printf("#define " #name " \t%d\n", name);
 #define S(name) printf("#define " #name "_SZ \t%d\n", sizeof(name));
@@ -31,6 +33,10 @@ int main() {
 	C(O_NOCTTY)
 	C(O_NOFOLLOW)
 	C(O_NONBLOCK)
+	C(S_IFDIR)
+	C(S_IFREG)
+	C(ENOENT)
+	C(ENOTDIR)
 	C(EOF)
 	C(thrd_success)
 	C(thrd_nomem)
@@ -41,4 +47,15 @@ int main() {
 	S(mtx_t)
 	S(thrd_t)
 	S(tss_t)
+	S(dev_t)
+        S(ino_t)
+        S(mode_t)
+        S(nlink_t)
+        S(uid_t)
+        S(gid_t)
+        S(dev_t)
+        S(off_t)
+        S(blksize_t)
+        S(blkcnt_t)
+        S(struct stat)
 }
