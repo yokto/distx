@@ -1,16 +1,118 @@
-# Elvator
+# Zwolf
 
 ## Motivation
 
-The idea of this project is to have a loader that can run the same binaries on all operating systems.
-Developers developing in compiled languages have a hard life.
+At the moment the web is the only framework that allows app developers to deploy their apps to most platforms with relative ease.
+Native App Developers have it hard to deploy to all platforms.
 They need to build their project for multiple cpu architectures (x86, x64, arm32, arm64, riscv...) and multiple operating systems.
 On Linux they might even have to do it for every distribution.
-Even worse, cross compilation is usually very cumbersome, so they actually need a machine for every configuration in their build infrastructure.
+Even worse, cross compilation is usually very cumbersome.
+They often need a machine for every configuration in their build infrastructure.
+Qt is probably the most popular non-web based Gui Framework.
+Setting up an infrastructure to build a Qt app for every system that might want it is a considerable effort.
 
-There are good reasons (performance/address sizes) to compile binaries for different architectures.
-However what are the reasons for having to compile differently for different operating systems.
-In our opinion there are none.
+The web is an amazing framework.
+It is so extensive and easy to deploy everywhere use that it makes it hard for other frameworks to compete.
+However there are several problems with it in the long run.
+- Since it is standardized it can only ever add features.
+- It's interface is so big that it is hard for a newcommer to implement. Therefore there will be fewer and fewer full implementations.
+- The web is slow to add new functionality (for good reason).
+- Lack of access to very basic native APIs. I.e. File System, TCP ..
+- If the process of standardizing ever goes in the wrong direction, the rest of the world will still be stuck with it.
+
+### Reducing build complexity
+
+There are several options for reducing build complexity.
+
+1. Make the package Architecture independend.
+   This can be done by shipping bytecode / sourcecode instead of binaries.
+   If done correctly the performance of this is probably ok for most purposes.
+   I am not sure why there are no popular cross platform java gui frameworks for example.
+   I can only assume it is because writing a good Gui framework is such a big task.
+   We will not be going in this direction however for two reasons.
+   Firstly, there is some small performance impact.
+   Secondly, the bytecode / source code format will also be a big interface that can not change.
+   If we ship binaries, the binary format is of course an interface that does not change much.
+   However this is anyway given by the hardware.
+   And over the long run new architectures might be added and old ones removed.
+2. Make it easier to find files on all platforms.
+   This is mostly a C/C++ specific problem.
+   But this is actually the easiest to solve.
+   We well try to solve this problem.
+   If files are always to be found in the same place, a previously complex process might become easy enough to solve with a simple Makefile
+3. Make the package Operating System independend.
+   This is the core of what this project tries to acomplish.
+   The idea is that we compile our program in some format (here elf) load it into memory and execute it.
+   When an operating system call comes, we simply call the underlying operating system call.
+   We know this is has reasonable performance as it is exactly the same concept as wine/proton.
+   The binary format (elf) is not a very big interface.
+   At the moment of this writing, we are able to load and run some reasonable part of libc++ on just shy of ~1000 lines of code for the loader code.
+
+So in summary we will try to make a system where you need to build for each architecture (point 1) but not for each operating system (point 3). We will also try to make files available in the same place on all operating systems (point 2).
+
+
+## What is Zwolf
+
+There are four components needed to build this system.
+
+### The loader
+
+The loader is quite simple. It just takes a binary, loads it into ram. Links it with it's dependencies and executes it.
+
+   ./elf/x64/linux_loaders program/bin/x64/program
+
+or
+
+   .\elf\x64\windows_loader.exe program\bin\x64\program
+
+It links only dependencies on other non-OS libraries that were built for Zwolf.
+The program itself can dynamically load system libraries and symbols however.
+
+### The toolchain
+
+This part is relatively straight forward. We just use clang. The main problem here is that clang is somewhat intertwined with the libc++/libunwind which we use as runtime libraries. There are some default compiler options we added. One important part is that we always need an soname that tells us where the library file is. I.e.
+
+    $ find /some/path
+    ./somelib/lib/x64/lib.so
+    ./someexe/bin/x64/exe
+    $ readelf -a somelib/lib/x64/lib.so  | grep SONAME
+    (SONAME) Library soname: [somelib/lib/x64/lib.so]
+    $ readelf -a someexe/bin/x64/exe | grep SONAME
+    (SONAME) Library soname: [someexe/bin/x64/exe]
+
+So you need to build it with
+
+    clang -Wl,-soname,someexe/bin/x64/exe -o someexe/bin/x64/exe exe.c
+
+### Libraries
+
+This is a complicated part of the project.
+We would like to get the smalles possible interface that will make it easy to port to many operating systems.
+The initial idea was to simply write a libc (xlibc) that just calls the underlying operatingsystems libc functions.
+This works mostly.
+However of course this is a monumental task.
+There are also many libc functions that have nothing to do with the operating system.
+Such as all the string, wchar and locale functions.
+Even printf, and scanf are mostly about formating and contain very little actual os specific code.
+On the other hand there is a lot missing from libc such as networking.
+
+#### libc++
+
+We use clangs libc++ as c++ standard library.
+
+#### Gui library
+
+... difficult :(
+might try qt
+
+### Distribution mechanism
+
+Building for all operating systems is all good and right but how does it get to the users.
+We would need some kind of store or probably initially more something like npm.
+
+Nothing has been done on this.
+
+TODO
 
 ## Quickstart?
 
