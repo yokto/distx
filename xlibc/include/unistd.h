@@ -6,6 +6,8 @@ extern "C" {
 
 #include <stddef.h>
 
+extern char ** environ;
+
 
 #ifdef __cplusplus
 }

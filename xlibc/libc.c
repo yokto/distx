@@ -16,6 +16,9 @@
 DLL_PUBLIC
 __thread int errno = 0;
 
+DLL_PUBLIC
+char ** environ = 0;
+
 #define concat2(X, Y) X ## Y
 #define concat(X, Y) concat2(X, Y)
 #define DECLARE(ret, name, ...) \
@@ -299,6 +302,7 @@ __attribute__((constructor)) void init() {
 		thrd_join_wait_ms = dlsym(kernel32, "WaitForSingleObject");
 		thrd_create_ms = dlsym(kernel32, "CreateThread");
 		thrd_detach_ms = dlsym(kernel32, "CloseHandle");
+		environ = *(void**)dlsym(libc, "_environ");
 		stdin = fdopen( 0, "r" );
 		stdout = fdopen( 1, "a" );
 		stderr = fdopen( 2, "a" );
@@ -363,6 +367,7 @@ __attribute__((constructor)) void init() {
 		truncate_sysv = dlsym(libc, "truncate");
 		statvfs_sysv = dlsym(libc, "statvfs");
 		lstat_sysv = dlsym(libc, "lstat");
+		environ = *(void**)dlsym(libc, "__environ");
 		stdin = dlsym(libc, "_IO_2_1_stdin_");
 		stdout = dlsym(libc, "_IO_2_1_stdout_");
 		stderr = dlsym(libc, "_IO_2_1_stderr_");
