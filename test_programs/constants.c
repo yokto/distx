@@ -58,4 +58,13 @@ int main() {
         S(blksize_t)
         S(blkcnt_t)
         S(struct stat)
+
+	C(SEEK_CUR)
+        C(SEEK_SET)
+        C(SEEK_END)
+        C(O_APPEND)
+        C(O_RDONLY)
+        C(O_WRONLY)
+        C(O_RDWR)
+        C(O_CREAT)
 }

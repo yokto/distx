@@ -10,5 +10,6 @@ int __write(char* str) __attribute__ ((weak));
 int __resolve(void* ptr, const char ** libfile, size_t* offset);
 int __debug_printf(char* restrict fmt, ...);
 extern int __errno();
+void* __dlsym(void* handle, char* name) __attribute__ ((weak));
 
 #endif // COMMON_H

@@ -7,7 +7,7 @@ HEADERS = $(addprefix $(INSTALL),$(wildcard include/*.h)) $(addprefix $(INSTALL)
 
 all: $(LIBC) $(HEADERS)
 
-$(LIBC): libc.c printf.c string.c time.c unicode.c Makefile libc.map
+$(LIBC): libc.c printf.c string.c time.c unicode.c fs.c Makefile libc.map
 	mkdir -p $(dir $(LIBC))
 	echo ${CC}
 	${CC} \
@@ -26,7 +26,8 @@ $(LIBC): libc.c printf.c string.c time.c unicode.c Makefile libc.map
 		printf.c \
 		string.c \
 		unicode.c \
-		time.c
+		time.c \
+		fs.c
 
 #               -Werror \
 

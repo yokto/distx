@@ -299,24 +299,3 @@ int vfprintf(FILE* file, const char *restrict format, va_list args) {
 	return ret;
 }
 
-#include <stdio.h>
-#include <string.h>
-
-char* getenv(const char* name) {
-    if (name == NULL || name[0] == '\0') {
-        return NULL; // Invalid input: NULL pointer or empty string
-    }
-
-    size_t name_length = strlen(name);
-
-    for (char** env = environ; *env != NULL; env++) {
-        if (strncmp(*env, name, name_length) == 0 && (*env)[name_length] == '=') {
-            // Found the environment variable with the matching name
-            return *env + name_length + 1;
-        }
-    }
-
-    // Environment variable not found
-    return NULL;
-}
-

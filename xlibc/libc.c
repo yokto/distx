@@ -9,11 +9,13 @@
 #include <threads.h>
 #include <error.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <limits.h>
 #include <wchar.h>
 #include <ctype.h>
 #include <wctype.h>
 #include <common.h>
+#include <fs.h>
 
 DLL_PUBLIC
 __thread int errno = 0;
@@ -116,7 +118,6 @@ DECLARE(void*, aligned_alloc, size_t alignment, size_t size); // strictly speaki
 DECLARE(void*, realloc, void *ptr, size_t size)
 DECLARE(void, free, void* ptr)
 DECLARE(void, aligned_free, void *ptr);
-DECLARE(char *, getenv, const char *name)
 DECLARE(int, fflush, FILE* file)
 DECLARE(size_t, fwrite, const void * ptr, size_t size, size_t nmemb, FILE * stream)
 static FILE* (*_wfopen_ms)(const uint16_t *filename, const uint16_t *mode) __attribute((ms_abi)); 
@@ -232,6 +233,7 @@ __attribute__((constructor)) void init() {
 		__exit(-1);
 	}
 
+	init_fs(isWin, libc);
 	if (isWin) {
 		vswprintf_ms = dlsym(libc, "vswprintf");
 		malloc_ms = dlsym(libc, "malloc");
@@ -241,7 +243,6 @@ __attribute__((constructor)) void init() {
 		realloc_ms = dlsym(libc, "realloc");
 		free_ms = dlsym(libc, "free");
 		fflush_ms = dlsym(libc, "fflush");
-		getenv_ms = dlsym(libc, "getenv");
 		thrd_yield_ms = dlsym(kernel32, "SwitchToThread");
 		thrd_current_ms = dlsym(kernel32, "GetCurrentThread");
 		thrd_sleep_ms = dlsym(kernel32, "SleepEx");
@@ -306,7 +307,6 @@ __attribute__((constructor)) void init() {
 		realloc_sysv = dlsym(libc, "realloc");
 		free_sysv = dlsym(libc, "free");
 		fflush_sysv = dlsym(libc, "fflush");
-		getenv_sysv = dlsym(libc, "getenv");
 		thrd_yield_sysv = dlsym(libc, "thrd_yield");
 		thrd_current_sysv = dlsym(libc, "thrd_current");
 		thrd_sleep_sysv = dlsym(libc, "thrd_sleep");
@@ -507,13 +507,43 @@ DLL_PUBLIC int remove(const char *pathname) {
 	}
 }
 
+static const char basealias[] = "/__zwolf_basedir__/";
+#define basealias_len (sizeof(basealias) - 1)
+static const char buildalias[] = "/__zwolf_builddir__/";
+#define buildalias_len (sizeof(buildalias) - 1)
+
 DLL_PUBLIC
-FILE *fopen(const char *filename, const char *mode) {
-	__debug_printf("execute os fopen %s (%s)\n", filename, mode);
+FILE *fopen(const char *filenameOrig, const char *mode) {
+	__debug_printf("execute os fopen %s (%s)\n", filenameOrig, mode);
+	int filelen = strlen(filenameOrig);
+
+	const char* filename = filenameOrig;
+	
+	if (strncmp(basealias, filename, basealias_len) == 0) {
+		char* base = getenv("ZWOLF_BASEDIR");
+		if (base) {
+			int baselen = strlen(base);
+
+			filename = __builtin_alloca(baselen + filelen - basealias_len + 1);
+			memcpy(filename, base, baselen);
+			memcpy(filename + baselen, filenameOrig + basealias_len, filelen - basealias_len + 1);
+		}
+	}
+	if (strncmp(buildalias, filename, buildalias_len) == 0) {
+		char* build = getenv("ZWOLF_BUILDDIR");
+		if (build) {
+			int buildlen = strlen(build);
+
+			filename = __builtin_alloca(buildlen + filelen - buildalias_len + 1);
+			memcpy(filename, build, buildlen);
+			memcpy(filename + buildlen, filenameOrig + buildalias_len, filelen - buildalias_len + 1);
+		}
+	}
+
 	if (isWin) {
 		uintptr_t len = 0;
 		int32_t error = base_fs_tonativepathlen(filename, &len);
-		if (error != SUCCESS) {
+		if (error != SUCCESS) { 
 			errno = error;
 			return NULL;
 		}
@@ -523,7 +553,10 @@ FILE *fopen(const char *filename, const char *mode) {
 			errno = error;
 			return NULL;
 		}
-		uint16_t mode_ms[2] = { 'r', 0 };
+		uint16_t mode_ms[4] = { 0, 0, 0, 0 };
+		for (int i = 0 ; mode != '\0' && i < 3 ; i++) {
+			mode_ms[i] = mode[i];
+		}
 		return _wfopen_ms(nativepath, mode_ms);
 	} else {
 		return fopen_sysv(filename, mode);
@@ -553,8 +586,6 @@ DLL_PUBLIC int fputc(int c, FILE *stream) {
 	if (written == 1) { return c; }
 	return EOF;
 }
-
-DLL_PUBLIC char *getenv(const char *name) IMPLEMENT(getenv, name)
 
 DLL_PUBLIC
 void thrd_yield(void) {
@@ -2041,41 +2072,22 @@ void print_backtrace()
 }
 
 
-int32_t base_fs_tonativepath(const char *pathname, void* nativepath) {
-	if (isWin) {
-		int32_t error;
-		uint16_t* native = nativepath;
-		if (pathname[0] == '/' && pathname[1] != '\0' && pathname[2] == ':') { // "/C:..." -> "C:..."
-			pathname++;
-		}
-		error = utf8to16(pathname, native);
-		for (uint16_t* it = native; *it != 0; it++) {
-			if (*native == '/') { *native = '\\'; }
-		}
-		return error;
-	} else {
-		strcpy(nativepath, pathname);
-		return SUCCESS;
-	}
-}
-int32_t base_fs_tonativepathlen(const char *pathname, uintptr_t* length) {
-	if (isWin) {
-		if (pathname[0] == '/' && pathname[1] != '\0' && pathname[2] == ':') { // "/C:..." -> "C:..."
-			pathname++;
-		}
-		return utf8to16len(pathname, length);
-	} else {
-		*length = strlen(pathname + 1);
-		return SUCCESS;
-	}
+
+char* getenv(const char* name) {
+    if (name == NULL || name[0] == '\0') {
+        return NULL; // Invalid input: NULL pointer or empty string
+    }
+
+    size_t name_length = strlen(name);
+
+    for (char** env = environ; *env != NULL; env++) {
+        if (strncmp(*env, name, name_length) == 0 && (*env)[name_length] == '=') {
+            // Found the environment variable with the matching name
+            return *env + name_length + 1;
+        }
+    }
+
+    // Environment variable not found
+    return NULL;
 }
 
-//int32_t base_fs_fromnativepath(const void* nativepath, const char* nativepath);
-//int32_t base_fs_fromnativepathlen(const void* nativepath, uintptr_t* length);
-//extern intptr_t base_fs_stdout;
-//extern intptr_t base_fs_stderr;
-//extern intptr_t base_fs_stdin;
-//int32_t base_fs_open(const void *nativepath, uintptr_t* fd, uint32_t flags);
-//int32_t base_fs_read(uintptr_t* fd, void *buf, uintptr_t count, uintptr_t* read);
-//int32_t base_fs_write(uintptr_t fd, const void *buf, uintptr_t count, uintptr_t* written);
-//int32_t base_fs_close(uintptr_t fd);

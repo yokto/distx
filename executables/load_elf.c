@@ -242,6 +242,14 @@ void toUnix(char* path) {
 	}
 }
 
+void fromUnix(char* path) {
+	for (size_t i = 0; i < strlen(path); i++) {
+		if (path[i] == '/') {
+			path[i] = '\\';
+		}
+	}
+}
+
 void set_basedir(loaded_libs * libs, char * path, char * soname) {
 	if (libs->basedir) {
 		ERR("only call when basedir is not set")
@@ -260,9 +268,25 @@ void set_basedir(loaded_libs * libs, char * path, char * soname) {
 		ERR("soname (%s) should be a substring of realpath (%s)", soname, realp)
 		free(realp);
 	}
+#ifdef WIN32
+	libs->basedir = malloc(base_len + 2);
+	libs->basedir[0] = '/';
+	libs->basedir[base_len + 1] = '\0';
+	memcpy(libs->basedir + 1, realp, base_len);
+
+	// set env
+	const char * var = "ZWOLF_BASEDIR=";
+	int varlen = strlen(var);
+	char * env = calloc(base_len + 1 + varlen + 1, 1);
+	strcat(env, var);
+	strcat(env, libs->basedir);
+	_putenv(env);
+#else
 	libs->basedir = malloc(base_len + 1);
 	libs->basedir[base_len] = '\0';
 	memcpy(libs->basedir, realp, base_len);
+	setenv("ZWOLF_BASEDIR", libs->basedir, true);
+#endif
 	DEBUG("basedir %s\n", libs->basedir);
 	free(realp);
 }
@@ -290,8 +314,14 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 		int base_len = strlen(libs->basedir);
 		int path_len = strlen(lib_path);
 		char* real_path = malloc(base_len + path_len + 1);
+#ifdef WIN32
+		memcpy(real_path, libs->basedir + 1, base_len - 1);
+		memcpy(real_path + base_len - 1, lib_path, path_len + 1);
+		fromUnix(real_path);
+#else
 		memcpy(real_path, libs->basedir, base_len);
 		memcpy(real_path + base_len, lib_path, path_len + 1);
+#endif
 		DEBUG("\topening %s\n", real_path);
 		fd = fopen(real_path, "rb");
 		free(real_path);

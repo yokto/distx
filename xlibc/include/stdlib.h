@@ -86,6 +86,10 @@ void abort() __attribute__ ((__noreturn__));
 
 #define MB_CUR_MAX 1
 
+//static inline long llabs(long long l) { return (l >= 0) ? l : -l; }
+
+char* getenv(const char* name);
+
 #ifdef __cplusplus
 }
 #endif
