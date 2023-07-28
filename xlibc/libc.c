@@ -1,8 +1,11 @@
 #include <stdarg.h>
+#include <base/fs.h>
 #include <locale.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <unicode.h>
 #include <stddef.h>
+#include <string.h>
 #include <threads.h>
 #include <error.h>
 #include <stdio.h>
@@ -10,7 +13,6 @@
 #include <wchar.h>
 #include <ctype.h>
 #include <wctype.h>
-#include <libc_printf.h>
 #include <common.h>
 
 DLL_PUBLIC
@@ -102,12 +104,11 @@ void* __dlsym(void* handle, char* name) __attribute__ ((weak));
 void* __dlsym(void* handle __attribute__((unused)), char* name __attribute__((unused))) { return 0; }
 int __printf(char* restrict fmt, ...) __attribute__ ((weak));
 int __printf(char* restrict fmt __attribute__((unused)), ...) { return 0; }
-int __write(char* str __attribute__((unused)), size_t num __attribute__((unused))) { return 0; }
+int __write(char* str __attribute__((unused))) { return 0; }
 void __exit(int ret __attribute__((unused))) { return; }
 
 static bool isWin = false;
 
-DECLARE(int, vfprintf, FILE* file, const char *restrict fmt, va_list p)
 DECLARE(int, vswprintf, wchar_t * ws, size_t len, const wchar_t * format, va_list arg);
 DECLARE(void*, malloc, size_t new_size)
 DECLARE(void*, calloc, size_t nmemb, size_t size)
@@ -115,20 +116,16 @@ DECLARE(void*, aligned_alloc, size_t alignment, size_t size); // strictly speaki
 DECLARE(void*, realloc, void *ptr, size_t size)
 DECLARE(void, free, void* ptr)
 DECLARE(void, aligned_free, void *ptr);
-DECLARE(void *, memset, void *ptr, int value, size_t num);
-DECLARE(void *, memcpy, void *restrict dest, const void *restrict src, size_t n);
-DECLARE(char, getc, FILE* file)
-DECLARE(int, ungetc, int c, FILE *stream)
-DECLARE(int, fflush, FILE* file)
 DECLARE(char *, getenv, const char *name)
+DECLARE(int, fflush, FILE* file)
 DECLARE(size_t, fwrite, const void * ptr, size_t size, size_t nmemb, FILE * stream)
-DECLARE(FILE*, fopen, const char *filename, const char *mode)
+static FILE* (*_wfopen_ms)(const uint16_t *filename, const uint16_t *mode) __attribute((ms_abi)); 
+static FILE* (*fopen_sysv)(const char *filename, const char *mode);
 DECLARE(FILE*, fdopen, int fd, const char *mode)
 DECLARE(int, fclose, FILE* stream)
 DECLARE(long, ftell, FILE* stream)
 DECLARE(int, fseek, FILE *stream, long int offset, int whence)
 DECLARE(size_t, fread, void * ptr, size_t size, size_t nmemb, FILE * stream)
-DECLARE(int, fputc, int c, FILE *stream)
 DECLARE(int, remove, const char *pathname)
 int (*_rmdir_ms)(const char *pathname) __attribute((ms_abi));
 DECLARE(int, cnd_init, cnd_t* cond)
@@ -236,7 +233,6 @@ __attribute__((constructor)) void init() {
 	}
 
 	if (isWin) {
-		vfprintf_ms = dlsym(libc, "vfprintf");
 		vswprintf_ms = dlsym(libc, "vswprintf");
 		malloc_ms = dlsym(libc, "malloc");
 		calloc_ms = dlsym(libc, "calloc");
@@ -245,8 +241,6 @@ __attribute__((constructor)) void init() {
 		realloc_ms = dlsym(libc, "realloc");
 		free_ms = dlsym(libc, "free");
 		fflush_ms = dlsym(libc, "fflush");
-		memset_ms = dlsym(libc, "memset");
-		memcpy_ms = dlsym(libc, "memcpy");
 		getenv_ms = dlsym(libc, "getenv");
 		thrd_yield_ms = dlsym(kernel32, "SwitchToThread");
 		thrd_current_ms = dlsym(kernel32, "GetCurrentThread");
@@ -256,17 +250,14 @@ __attribute__((constructor)) void init() {
 		tss_get_ms = dlsym(kernel32, "TlsGetValue");
 		tss_set_ms = dlsym(kernel32, "TlsSetValue");
 		fwrite_ms = dlsym(libc, "fwrite");
-		fopen_ms = dlsym(libc, "fopen");
+		_wfopen_ms = dlsym(libc, "_wfopen");
 		fdopen_ms = dlsym(libc, "_fdopen");
 		fclose_ms = dlsym(libc, "fclose");
 		ftell_ms = dlsym(libc, "ftell");
 		fseek_ms = dlsym(libc, "fseek");
 		fread_ms = dlsym(libc, "fread");
-		fputc_ms = dlsym(libc, "fputc");
 		remove_ms = dlsym(libc, "remove");
 		_rmdir_ms = dlsym(libc, "_rmdir");
-		getc_ms = dlsym(libc, "getc");
-		ungetc_ms = dlsym(libc, "ungetc");
 		cnd_init_ms = dlsym(kernel32, "InitializeConditionVariable");
 		cnd_broadcast_ms = dlsym(kernel32, "WakeAllConditionVariable");
 		SleepConditionVariableCS = dlsym(kernel32, "SleepConditionVariableCS");
@@ -307,7 +298,6 @@ __attribute__((constructor)) void init() {
 		stdout = fdopen( 1, "a" );
 		stderr = fdopen( 2, "a" );
 	} else {
-		vfprintf_sysv = dlsym(libc, "vfprintf");
 		vswprintf_sysv = dlsym(libc, "vswprintf");
 		malloc_sysv = dlsym(libc, "malloc");
 		calloc_sysv = dlsym(libc, "calloc");
@@ -316,8 +306,6 @@ __attribute__((constructor)) void init() {
 		realloc_sysv = dlsym(libc, "realloc");
 		free_sysv = dlsym(libc, "free");
 		fflush_sysv = dlsym(libc, "fflush");
-		memset_sysv = dlsym(libc, "memset");
-		memcpy_sysv = dlsym(libc, "memcpy");
 		getenv_sysv = dlsym(libc, "getenv");
 		thrd_yield_sysv = dlsym(libc, "thrd_yield");
 		thrd_current_sysv = dlsym(libc, "thrd_current");
@@ -328,15 +316,12 @@ __attribute__((constructor)) void init() {
 		tss_set_sysv = dlsym(libc, "tss_set");
 		fwrite_sysv = dlsym(libc, "fwrite");
 		fopen_sysv = dlsym(libc, "fopen");
-		fdopen_ms = dlsym(libc, "fdopen");
+		fdopen_sysv = dlsym(libc, "fdopen");
 		fclose_sysv = dlsym(libc, "fclose");
 		ftell_sysv = dlsym(libc, "ftell");
 		fseek_sysv = dlsym(libc, "fseek");
 		fread_sysv = dlsym(libc, "fread");
-		fputc_sysv = dlsym(libc, "fputc");
 		remove_sysv = dlsym(libc, "remove");
-		getc_sysv = dlsym(libc, "getc");
-		ungetc_sysv = dlsym(libc, "ungetc");
 		cnd_init_ms = dlsym(libc, "cnd_init");
 		cnd_broadcast_sysv = dlsym(libc, "cnd_broadcast");
 		cnd_signal_sysv = dlsym(libc, "cnd_signal");
@@ -377,51 +362,27 @@ __attribute__((constructor)) void init() {
 }
 
 DLL_PUBLIC
-char getc(FILE* file) IMPLEMENT(getc, file)
+char getc(FILE* file) {
+	char ret;
+	int read = fread(&ret, 1, 1, file);
+	if (read == 1) { return ret; }
+	return EOF;
+}
 
 DLL_PUBLIC
-int ungetc(int c, FILE *stream) IMPLEMENT(ungetc, c, stream)
+int ungetc(int c, FILE *stream) {
+    UNUSED(c);
+    UNUSED(stream);
+    fprintf(stderr, "vsscanf not implemented");
+    fflush(stderr);
+    abort();
+    return 0;
+}
 
 DLL_PUBLIC
 char getchar() {
 	return getc(stdin);
 }
-
-DLL_PUBLIC
-size_t strlen(const char* str) {
-    const char* s;
-    for (s = str; *s; ++s) {}
-    return (s - str);
-}
-
-char* strncpy(char* dest, const char* src, size_t n) {
-    char* d = dest;
-    const char* s = src;
-    size_t i = 0;
-
-    // Copy at most n characters from src to dest
-    while (*s && i < n) {
-        *d++ = *s++;
-        i++;
-    }
-
-    // If n is greater than the length of src, pad dest with null characters
-    while (i < n) {
-        *d++ = '\0';
-        i++;
-    }
-
-    return dest;
-}
-
-//DLL_PUBLIC
-//int vfprintf(FILE* stream, const char *restrict format, va_list argp) {
-//	if (isWin) {
-//		return vfprintf_ms(stream, format, argp);
-//	} else {
-//		return vfprintf_sysv(stream, format, argp);
-//	}
-//}
 
 
 DLL_PUBLIC
@@ -547,7 +508,27 @@ DLL_PUBLIC int remove(const char *pathname) {
 }
 
 DLL_PUBLIC
-FILE *fopen(const char *filename, const char *mode) IMPLEMENT(fopen, filename, mode)
+FILE *fopen(const char *filename, const char *mode) {
+	__debug_printf("execute os fopen %s (%s)\n", filename, mode);
+	if (isWin) {
+		uintptr_t len = 0;
+		int32_t error = base_fs_tonativepathlen(filename, &len);
+		if (error != SUCCESS) {
+			errno = error;
+			return NULL;
+		}
+		uint16_t* nativepath = __builtin_alloca(len * 2);
+		error = base_fs_tonativepath(filename, nativepath);
+		if (error != SUCCESS) {
+			errno = error;
+			return NULL;
+		}
+		uint16_t mode_ms[2] = { 'r', 0 };
+		return _wfopen_ms(nativepath, mode_ms);
+	} else {
+		return fopen_sysv(filename, mode);
+	}
+}
 
 DLL_PUBLIC
 FILE *fdopen(int fd, const char *mode) IMPLEMENT(fdopen, fd, mode)
@@ -567,9 +548,12 @@ size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE *restrict strea
 DLL_PUBLIC
 size_t fwrite(const void * ptr, size_t size, size_t nmemb, FILE *restrict stream) IMPLEMENT(fwrite, ptr, size, nmemb, stream)
 
-DLL_PUBLIC int fputc(int c, FILE *stream) IMPLEMENT(fputc, c, stream)
-DLL_PUBLIC void *memset(void *ptr, int value, size_t num) IMPLEMENT(memset, ptr, value, num)
-DLL_PUBLIC void *memcpy(void *restrict dest, const void *restrict src, size_t n) IMPLEMENT(memcpy, dest, src, n)
+DLL_PUBLIC int fputc(int c, FILE *stream) {
+	const int written = fwrite(&c, 1, 1, stream);
+	if (written == 1) { return c; }
+	return EOF;
+}
+
 DLL_PUBLIC char *getenv(const char *name) IMPLEMENT(getenv, name)
 
 DLL_PUBLIC
@@ -994,16 +978,6 @@ DLL_PUBLIC int mtx_unlock(mtx_t* mutex) {
 }
 
 DLL_PUBLIC
-int strncmp(const char* str1, const char* str2, size_t n) {
-    for (size_t i = 0; i < n; i++) {
-        if (str1[i] == '\0' || str1[i] != str2[i]) {
-            return (unsigned char)str1[i] - (unsigned char)str2[i];
-        }
-    }
-    return 0;
-}
-
-DLL_PUBLIC
 wchar_t* wcschr(const wchar_t* str, wchar_t wc) {
     while (*str) {
         if (*str == wc) {
@@ -1084,48 +1058,6 @@ wchar_t* wmemchr(const wchar_t* ptr, wchar_t wc, size_t num) {
 }
 
 DLL_PUBLIC
-void *memmove(void *dest, const void *src, size_t n) {
-    char *dst_ptr = (char*) dest;
-    const char *src_ptr = (const char*) src;
-
-    // If source and destination regions overlap, use a temporary buffer
-    if (src_ptr < dst_ptr && dst_ptr < src_ptr + n) {
-        char *tmp = (char*) malloc(n);
-        if (tmp == NULL) {
-            return NULL; // Out of memory
-        }
-
-        // Copy source to tmp buffer
-        for (size_t i = 0; i < n; i++) {
-            *(tmp + i) = *(src_ptr + i);
-        }
-
-        // Copy tmp buffer to destination
-        for (size_t i = 0; i < n; i++) {
-            *(dst_ptr + i) = *(tmp + i);
-        }
-
-        free(tmp);
-    } else {
-        // No overlap, copy directly from source to destination
-        for (size_t i = 0; i < n; i++) {
-            *(dst_ptr + i) = *(src_ptr + i);
-        }
-    }
-
-    return dest;
-}
-
-DLL_PUBLIC
-int strcmp(const char *s1, const char *s2) {
-    while (*s1 && (*s1 == *s2)) {
-        s1++;
-        s2++;
-    }
-    return *(const unsigned char*)s1 - *(const unsigned char*)s2;
-}
-
-DLL_PUBLIC
 int dl_iterate_phdr() {
 	return 0;
 }
@@ -1148,18 +1080,6 @@ int isxdigit(int c) {
     } else {
         return 0;
     }
-}
-
-DLL_PUBLIC
-int memcmp(const void* ptr1, const void* ptr2, size_t size) {
-    const unsigned char* p1 = (const unsigned char*) ptr1;
-    const unsigned char* p2 = (const unsigned char*) ptr2;
-    for (size_t i = 0; i < size; i++) {
-        if (p1[i] != p2[i]) {
-            return p1[i] < p2[i] ? -1 : 1;
-        }
-    }
-    return 0;
 }
 
 DLL_PUBLIC
@@ -1191,17 +1111,6 @@ int fputs(const char *s, FILE *stream) {
 DLL_PUBLIC
 int puts(const char *s) {
 	return fputs(s, stdout);
-}
-
-DLL_PUBLIC
-void *memchr(const void *s, int c, size_t n) {
-    const unsigned char *p = s;
-    for (size_t i = 0; i < n; i++) {
-        if (p[i] == (unsigned char)c) {
-            return (void *)(p + i);
-        }
-    }
-    return NULL;
 }
 
 DLL_PUBLIC
@@ -1952,26 +1861,6 @@ size_t mbsrtowcs(wchar_t *dest, const char **src, size_t len, mbstate_t *ps) {
     return count;
 }
 
-DLL_PUBLIC
-int strcoll(const char *s1, const char *s2) {
-    while (*s1 && *s2) {
-        if (*s1 != *s2) {
-            // Convert characters to unsigned char to handle locale-specific behavior
-            unsigned char c1 = (unsigned char)*s1;
-            unsigned char c2 = (unsigned char)*s2;
-
-            if (tolower(c1) != tolower(c2)) {
-                // Characters are not equal, return their comparison result
-                return tolower(c1) - tolower(c2);
-            }
-        }
-        ++s1;
-        ++s2;
-    }
-
-    // One or both strings have ended, compare their lengths
-    return strlen(s1) - strlen(s2);
-}
 
 DLL_PUBLIC size_t wcslen(const wchar_t *s) {
     size_t length = 0;
@@ -2075,212 +1964,6 @@ DLL_PUBLIC int iswpunct(wint_t wc) {
     return (wc >= 33 && wc <= 47) || (wc >= 58 && wc <= 64) || (wc >= 91 && wc <= 96) || (wc >= 123 && wc <= 126);
 }
 
-DLL_PUBLIC size_t strxfrm(char* dest, const char* src, size_t n) {
-    strncpy(dest, src, n);
-    return strlen(src);
-}
-
-DLL_PUBLIC
-size_t strftime(char* s, size_t maxsize, const char* format, const struct tm* timeptr) {
-    const char* formatPos = format;
-    char* strPos = s;
-    size_t remainingSize = maxsize;
-    
-    while (*formatPos != '\0' && remainingSize > 1) {
-        if (*formatPos == '%') {
-            formatPos++;  // Move past the '%'
-
-            if (*formatPos == '\0')
-                break;  // Reached the end of format string
-
-            switch (*formatPos) {
-                case 'a':  // Abbreviated weekday name
-                    if (timeptr->tm_wday >= 0 && timeptr->tm_wday <= 6) {
-                        const char* weekdayAbbreviations[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-                        const char* abbreviation = weekdayAbbreviations[timeptr->tm_wday];
-                        size_t copyLength = remainingSize < 4 ? remainingSize - 1 : 3;
-                        strncpy(strPos, abbreviation, copyLength);
-                        strPos += copyLength;
-                        remainingSize -= copyLength;
-                    }
-                    break;
-
-                case 'A':  // Full weekday name
-                    if (timeptr->tm_wday >= 0 && timeptr->tm_wday <= 6) {
-                        const char* weekdayNames[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-                        const char* name = weekdayNames[timeptr->tm_wday];
-                        size_t copyLength = remainingSize < 10 ? remainingSize - 1 : 9;
-                        strncpy(strPos, name, copyLength);
-                        strPos += copyLength;
-                        remainingSize -= copyLength;
-                    }
-                    break;
-
-                case 'b':  // Abbreviated month name
-                    if (timeptr->tm_mon >= 0 && timeptr->tm_mon <= 11) {
-                        const char* monthAbbreviations[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-                        const char* abbreviation = monthAbbreviations[timeptr->tm_mon];
-                        size_t copyLength = remainingSize < 4 ? remainingSize - 1 : 3;
-                        strncpy(strPos, abbreviation, copyLength);
-                        strPos += copyLength;
-                        remainingSize -= copyLength;
-                    }
-                    break;
-
-                case 'B':  // Full month name
-                    if (timeptr->tm_mon >= 0 && timeptr->tm_mon <= 11) {
-                        const char* monthNames[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
-                        const char* name = monthNames[timeptr->tm_mon];
-                        size_t copyLength = remainingSize < 10 ? remainingSize - 1 : 9;
-                        strncpy(strPos, name, copyLength);
-                        strPos += copyLength;
-                        remainingSize -= copyLength;
-                    }
-                    break;
-
-                case 'c':  // Date and time representation
-                    if (strftime(strPos, remainingSize, "%a %b %e %H:%M:%S %Y", timeptr) > 0) {
-                        size_t copiedLength = strlen(strPos);
-                        strPos += copiedLength;
-                        remainingSize -= copiedLength;
-                    }
-                    break;
-
-                case 'd':  // Day of the month (01-31)
-                    snprintf(strPos, remainingSize, "%02d", timeptr->tm_mday);
-                    strPos += 2;
-                    remainingSize -= 2;
-                    break;
-
-                case 'H':  // Hour in 24-hour format (00-23)
-                    snprintf(strPos, remainingSize, "%02d", timeptr->tm_hour);
-                    strPos += 2;
-                    remainingSize -= 2;
-                    break;
-
-                case 'I': // Hour in 12-hour format (01-12)
-		    {
-                    	int hour12 = timeptr->tm_hour % 12;
-                    	if (hour12 == 0)
-                    	    hour12 = 12;
-                    	snprintf(strPos, remainingSize, "%02d", hour12);
-                    	strPos += 2;
-                    	remainingSize -= 2;
-		    }
-                    break;
-
-                case 'j':  // Day of the year (001-366)
-                    snprintf(strPos, remainingSize, "%03d", timeptr->tm_yday + 1);
-                    strPos += 3;
-                    remainingSize -= 3;
-                    break;
-
-                case 'm':  // Month (01-12)
-                    snprintf(strPos, remainingSize, "%02d", timeptr->tm_mon + 1);
-                    strPos += 2;
-                    remainingSize -= 2;
-                    break;
-
-                case 'M':  // Minute (00-59)
-                    snprintf(strPos, remainingSize, "%02d", timeptr->tm_min);
-                    strPos += 2;
-                    remainingSize -= 2;
-                    break;
-
-                case 'p':  // AM/PM designation
-                    if (timeptr->tm_hour >= 0 && timeptr->tm_hour <= 11) {
-                        strncpy(strPos, "AM", 2);
-                        strPos += 2;
-                        remainingSize -= 2;
-                    } else {
-                        strncpy(strPos, "PM", 2);
-                        strPos += 2;
-                        remainingSize -= 2;
-                    }
-                    break;
-
-                case 'S':  // Second (00-59)
-                    snprintf(strPos, remainingSize, "%02d", timeptr->tm_sec);
-                    strPos += 2;
-                    remainingSize -= 2;
-                    break;
-
-                case 'U':  // Week number of the year (Sunday as the first day) (00-53)
-                    {
-                        int weekNumber = (timeptr->tm_yday - timeptr->tm_wday + 7) / 7;
-                        snprintf(strPos, remainingSize, "%02d", weekNumber);
-                        strPos += 2;
-                        remainingSize -= 2;
-                    }
-                    break;
-
-                case 'w':  // Weekday as a decimal number (0-6, Sunday is 0)
-                    snprintf(strPos, remainingSize, "%d", timeptr->tm_wday);
-                    strPos += 1;
-                    remainingSize -= 1;
-                    break;
-
-                case 'W':  // Week number of the year (Monday as the first day) (00-53)
-                    {
-                        int weekNumber = (timeptr->tm_yday - (timeptr->tm_wday ? (timeptr->tm_wday - 1) : 6) + 7) / 7;
-                        snprintf(strPos, remainingSize, "%02d", weekNumber);
-                        strPos += 2;
-                        remainingSize -= 2;
-                    }
-                    break;
-
-                case 'x':  // Date representation
-                    if (strftime(strPos, remainingSize, "%m/%d/%y", timeptr) > 0) {
-                        size_t copiedLength = strlen(strPos);
-                        strPos += copiedLength;
-                        remainingSize -= copiedLength;
-                    }
-                    break;
-
-                case 'X':  // Time representation
-                    if (strftime(strPos, remainingSize, "%H:%M:%S", timeptr) > 0) {
-                        size_t copiedLength = strlen(strPos);
-                        strPos += copiedLength;
-                        remainingSize -= copiedLength;
-                    }
-                    break;
-
-                case 'y':  // Year without century (00-99)
-                    snprintf(strPos, remainingSize, "%02d", timeptr->tm_year % 100);
-                    strPos += 2;
-                    remainingSize -= 2;
-                    break;
-
-                case 'Y':  // Year with century
-                    snprintf(strPos, remainingSize, "%04d", timeptr->tm_year + 1900);
-                    strPos += 4;
-                    remainingSize -= 4;
-                    break;
-
-                case 'Z':  // Timezone name or abbreviation
-                    // Not supported in this simplified implementation
-                    break;
-
-                case '%':  // Literal '%'
-                    *strPos++ = '%';
-                    remainingSize--;
-                    break;
-
-                default:
-                    // Invalid format specifier, skip it
-                    break;
-            }
-        } else {
-            *strPos++ = *formatPos;
-            remainingSize--;
-        }
-
-        formatPos++;
-    }
-
-    *strPos = '\0';  // Null-terminate the resulting string
-    return (size_t)(strPos - s);  // Return the length of the resulting string
-}
 
 locale_t uselocale(locale_t locale) {
     UNUSED(locale);
@@ -2326,6 +2009,12 @@ DLL_PUBLIC int mtime(const char *pathname, struct timespec * time) {
     return 0;
 }
 
+DLL_PUBLIC
+void exit(int status)
+{
+	__exit(status);
+}
+
 void print_addr(void * ptr) {
 	const char * lib = 0;
 	size_t offset = 0;
@@ -2350,3 +2039,43 @@ void print_backtrace()
         print_addr(__builtin_return_address(6));
         print_addr(__builtin_return_address(7));
 }
+
+
+int32_t base_fs_tonativepath(const char *pathname, void* nativepath) {
+	if (isWin) {
+		int32_t error;
+		uint16_t* native = nativepath;
+		if (pathname[0] == '/' && pathname[1] != '\0' && pathname[2] == ':') { // "/C:..." -> "C:..."
+			pathname++;
+		}
+		error = utf8to16(pathname, native);
+		for (uint16_t* it = native; *it != 0; it++) {
+			if (*native == '/') { *native = '\\'; }
+		}
+		return error;
+	} else {
+		strcpy(nativepath, pathname);
+		return SUCCESS;
+	}
+}
+int32_t base_fs_tonativepathlen(const char *pathname, uintptr_t* length) {
+	if (isWin) {
+		if (pathname[0] == '/' && pathname[1] != '\0' && pathname[2] == ':') { // "/C:..." -> "C:..."
+			pathname++;
+		}
+		return utf8to16len(pathname, length);
+	} else {
+		*length = strlen(pathname + 1);
+		return SUCCESS;
+	}
+}
+
+//int32_t base_fs_fromnativepath(const void* nativepath, const char* nativepath);
+//int32_t base_fs_fromnativepathlen(const void* nativepath, uintptr_t* length);
+//extern intptr_t base_fs_stdout;
+//extern intptr_t base_fs_stderr;
+//extern intptr_t base_fs_stdin;
+//int32_t base_fs_open(const void *nativepath, uintptr_t* fd, uint32_t flags);
+//int32_t base_fs_read(uintptr_t* fd, void *buf, uintptr_t count, uintptr_t* read);
+//int32_t base_fs_write(uintptr_t fd, const void *buf, uintptr_t count, uintptr_t* written);
+//int32_t base_fs_close(uintptr_t fd);

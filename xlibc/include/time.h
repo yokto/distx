@@ -4,6 +4,7 @@
 extern "C" {
 #endif
 
+#include <stdint.h>
 #include <stddef.h>
 
 #define CLOCKS_PER_SEC 1

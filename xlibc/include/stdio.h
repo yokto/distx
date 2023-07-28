@@ -1,7 +1,7 @@
 #ifndef STDIO_H
 #define STDIO_H
 
-#include <systypes.h>
+#include <base/types.h>
 #include <stdarg.h>
 #include <time.h>
 
@@ -9,6 +9,8 @@
 extern "C" {
 #endif
 
+typedef __SIZE_TYPE__ size_t;
+typedef signed long ssize_t;
 
 typedef void* FILE;
 typedef uint64_t fpos_t;
@@ -112,8 +114,8 @@ int chdir(const char *path);
 ssize_t readlink(const char * pathname, char * buf, size_t bufsiz);
 int rename(const char *oldpath, const char *newpath);
 int truncate(const char *path, off_t length);
-typedef unsigned long fsblkcnt_t;
-typedef unsigned long fsfilcnt_t;
+typedef uint64_t fsblkcnt_t;
+typedef uint64_t fsfilcnt_t;
 struct statvfs {
                unsigned long  f_bsize;    /* Filesystem block size */
                unsigned long  f_frsize;   /* Fragment size */

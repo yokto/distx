@@ -9,14 +9,14 @@ extern "C" {
     ((size_t)&(((st *)0)->m))
 
 typedef __SIZE_TYPE__ size_t;
-#ifdef __SSIZE_TYPE__
-typedef __SSIZE_TYPE__ ssize_t;
-#else
 typedef signed long ssize_t;
-#endif
+//#ifdef __SSIZE_TYPE__
+//typedef __SSIZE_TYPE__ ssize_t;
+//#else
+//#endif
 
 typedef long ptrdiff_t;
-//typedef __WCHAR_TYPE__ wchar_t;
+typedef __WCHAR_TYPE__ wchar_t;
 
 #ifdef __cplusplus
 }

@@ -5,6 +5,7 @@ extern "C" {
 #endif
 
 extern __thread int errno;
+#define SUCCESS 0
 #define ERANGE 1
 #define ENOENT  2
 #define ENOMEM 12

@@ -1,14 +1,12 @@
 #ifndef STDLIB_H
 #define STDLIB_H
 
-#include <systypes.h>
+#include <base/types.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-//typedef __WCHAR_TYPE__ wchar_t;
-typedef __SIZE_TYPE__ size_t;
 typedef struct {
 	int quot;
 	int rem;
@@ -62,8 +60,6 @@ void *calloc(size_t nmemb, size_t size);
 void* aligned_alloc(size_t alignment, size_t new_size);
 void aligned_free(void* ptr);
 void *realloc(void *ptr, size_t size);
-void *memset(void *ptr, int value, size_t num);
-void *memcpy(void * dest, const void * src, size_t n);
 char *getenv(const char *name);
 long int strtol(const char* str, char** endptr, int base);
 int mbtowc(wchar_t *pwc, const char *s, size_t n);
@@ -85,6 +81,7 @@ long double strtold (const char* nptr, char** endptr);
 typedef void* FILE; // not really supposed to be here
 extern FILE* stderr; // not really supposed to be here
 int fprintf(FILE* stream, const char * format, ...); // not really supposed to be here
+void exit(int status);
 void abort() __attribute__ ((__noreturn__));
 
 #define MB_CUR_MAX 1

@@ -1,5 +1,4 @@
 #include <stdarg.h>
-#include <libc_printf.h>
 #include <common.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -212,19 +211,21 @@ int __debug_puts(void* arg, int c) {
 	state->buf[state->to_write] = c;
 	state->to_write ++;
 	if (state->to_write >= state->buf_size) {
-		__write(state->buf, state->buf_size);
+		__write(state->buf);
 		state->to_write = 0;
 	}
 	return 1;
 }
 int __debug_printf(char* format, ...) {
 	va_list args;
-	char buf[__debug_puts_buf];
+	char buf[__debug_puts_buf + 1];
+	buf[__debug_puts_buf] = '\0';
 	struct print_state state = { buf, __debug_puts_buf, 0, 0 };
 	va_start(args, format);
 
 	const int ret = internal_printf(__debug_puts, &state, format, args); 
-	__write(state.buf, state.to_write);
+	state.buf[state.to_write] = '\0';
+	__write(state.buf);
 	if (ret < 0) { __exit(-1); }
 
 	va_end(args);
@@ -244,8 +245,7 @@ int snprintf_puts(void* arg, int c) {
 DLL_PUBLIC
 int vsnprintf(char * s, size_t n, const char * format, va_list args) {
 	struct print_state state = { s, n, 0, 0 };
-	const int ret = internal_printf(__debug_puts, &state, format, args); 
-	__write(state.buf, state.to_write);
+	const int ret = internal_printf(snprintf_puts, &state, format, args); 
 	if (ret < 0) { __exit(-1); }
 	return ret;
 }
@@ -292,9 +292,31 @@ int vfprintf(FILE* file, const char *restrict format, va_list args) {
 	char buf[vfprintf_bufsz];
 	struct print_state state = { buf, vfprintf_bufsz, 0, file };
 
-	const int ret = internal_printf(__debug_puts, &state, format, args); 
-	__write(state.buf, state.to_write);
+	const int ret = internal_printf(vfprintf_puts, &state, format, args); 
+	fwrite(state.buf, 1, state.to_write, state.file);
 	if (ret < 0) { __exit(-1); }
 
 	return ret;
 }
+
+#include <stdio.h>
+#include <string.h>
+
+char* getenv(const char* name) {
+    if (name == NULL || name[0] == '\0') {
+        return NULL; // Invalid input: NULL pointer or empty string
+    }
+
+    size_t name_length = strlen(name);
+
+    for (char** env = environ; *env != NULL; env++) {
+        if (strncmp(*env, name, name_length) == 0 && (*env)[name_length] == '=') {
+            // Found the environment variable with the matching name
+            return *env + name_length + 1;
+        }
+    }
+
+    // Environment variable not found
+    return NULL;
+}
+

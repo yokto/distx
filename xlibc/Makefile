@@ -3,11 +3,11 @@ INSTALL := $(dir ${PWD})
 LIBC := $(INSTALL)lib/libc.so
 LIBM := $(INSTALL)lib/libm.so
 
-HEADERS = $(addprefix $(INSTALL),$(wildcard include/*.h))
+HEADERS = $(addprefix $(INSTALL),$(wildcard include/*.h)) $(addprefix $(INSTALL),$(wildcard include/*/*.h))
 
 all: $(LIBC) $(HEADERS)
 
-$(LIBC): libc.c libc_printf.c Makefile libc.map
+$(LIBC): libc.c printf.c string.c time.c unicode.c Makefile libc.map
 	mkdir -p $(dir $(LIBC))
 	echo ${CC}
 	${CC} \
@@ -23,7 +23,10 @@ $(LIBC): libc.c libc_printf.c Makefile libc.map
 		-Iinclude \
 		-o $(LIBC) \
 		libc.c \
-		libc_printf.c
+		printf.c \
+		string.c \
+		unicode.c \
+		time.c
 
 #               -Werror \
 
@@ -49,5 +52,6 @@ $(LIBM): libm.c Makefile libm.map
 
 # copy headers
 $(INSTALL)include/%.h: include/%.h
-	mkdir -p $(INSTALL)include
+	mkdir -p $(INSTALL)include/sys
+	mkdir -p $(INSTALL)include/base
 	cp $< $@

@@ -2,7 +2,8 @@
 #define WCHAR_H
 
 #include <stdarg.h>
-#include <systypes.h>
+#include <base/types.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {

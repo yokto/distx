@@ -289,7 +289,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	if (libs->basedir) {
 		int base_len = strlen(libs->basedir);
 		int path_len = strlen(lib_path);
-		const real_path = malloc(base_len + path_len + 1);
+		char* real_path = malloc(base_len + path_len + 1);
 		memcpy(real_path, libs->basedir, base_len);
 		memcpy(real_path + base_len, lib_path, path_len + 1);
 		DEBUG("\topening %s\n", real_path);
@@ -382,7 +382,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 #endif
 			// if p_filesz smaller than p_memsz we need to set the rest to zero. I.e. bss. section
 			if (ph->p_filesz < ph->p_memsz) {
-				DEBUG("setting %p for %x to zero\n", ph->p_vaddr + ph->p_filesz, ph->p_memsz - ph->p_filesz)
+				DEBUG("setting %p for %llx to zero\n", (void*)(ph->p_vaddr + ph->p_filesz), ph->p_memsz - ph->p_filesz)
 				memset(memory + ph->p_vaddr + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz);
 			}
 		}	
@@ -551,7 +551,7 @@ char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 		if (v->vn_next == 0) { break; }
 		v = (void*)v + v->vn_next;
 	}
-	STRICT_ERR("could not find version for symbol %d in library %s\n", lib->strtab + lib->symtab[sym_idx].st_name, lib->name);
+	STRICT_ERR("could not find version for symbol %s in library %s\n", lib->strtab + lib->symtab[sym_idx].st_name, lib->name);
 	return 0;
 }
 
@@ -597,8 +597,31 @@ int printf2(const char *restrict format, ...) {
 }
 
 __attribute__((sysv_abi))
-int write2(const char *s, size_t num) {
-	return fwrite(s, 1, num, stderr);
+int write2(const char *s) {
+#ifdef WIN32
+	// Calculate the length of the UTF-8 string (excluding the null-terminator)
+	int utf8_length = strlen(s);
+	const char* utf8_str = s;
+
+	// Get the required buffer size for UTF-16
+	int utf16_length = MultiByteToWideChar(CP_UTF8, 0, utf8_str, utf8_length, NULL, 0);
+
+	// Allocate memory for the UTF-16 string
+	wchar_t* utf16_str = (wchar_t*)alloca((utf16_length + 1) * sizeof(wchar_t)); // +1 for null-terminator
+
+	// Perform the conversion from UTF-8 to UTF-16
+	MultiByteToWideChar(CP_UTF8, 0, utf8_str, utf8_length, utf16_str, utf16_length);
+
+	// Null-terminate the UTF-16 string
+	utf16_str[utf16_length] = L'\0';
+	int ret = fputws(utf16_str, stderr);
+	fflush(stderr);
+	return ret;
+#else
+	int ret = fputs(s, stderr);
+	fflush(stderr);
+	return ret;
+#endif
 }
 
 __attribute__((sysv_abi))
@@ -606,19 +629,19 @@ int errno2() {
 	return errno;
 }
 
-__attribute__((sysv_abi))
-int resolve_addr(void* ptr, const char ** libfile, size_t* offset) {
-	for (size_t i = 0; i < zwolf_global_libs.libs_count; i++) {
-		loaded_lib* l = &zwolf_global_libs.libs[i];
-		if (l->base <= ptr && l->base + l->size > ptr) {
-			*libfile = l->path;
-			*offset = ptr - l->base;
-			return;
-		}
-	}
-	*libfile = 0;
-	*offset = 0;
-}
+//__attribute__((sysv_abi))
+//int resolve_addr(void* ptr, const char ** libfile, size_t* offset) {
+//	for (size_t i = 0; i < zwolf_global_libs.libs_count; i++) {
+//		loaded_lib* l = &zwolf_global_libs.libs[i];
+//		if (l->base <= ptr && l->base + l->size > ptr) {
+//			*libfile = l->path;
+//			*offset = ptr - l->base;
+//			return;
+//		}
+//	}
+//	*libfile = 0;
+//	*offset = 0;
+//}
 
 __attribute__((sysv_abi))
 void* dlopen2(char* name) {
@@ -671,7 +694,7 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 	int sym = ELF64_R_SYM(rela->r_info);
 	int type = ELF64_R_TYPE(rela->r_info);
 
-	DEBUG("rela info %lx, offset %lx, addend %lx, sym %lx, type %lx\n", rela->r_info, rela->r_offset, rela->r_addend, sym, type)
+	DEBUG("rela info %llx, offset %llx, addend %llx, sym %x, type %x\n", rela->r_info, rela->r_offset, rela->r_addend, sym, type)
 	if (type == R_X86_64_RELATIVE && sym == 0 && rela->r_addend != 0) {
 		return lib->base + rela->r_addend;
 	}
@@ -702,8 +725,8 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 			ret = &write2;
 		} else if (strcmp(sym_name, "__errno") == 0) {
 			ret = &errno2;
-		} else if (strcmp(sym_name, "__resolve") == 0) {
-			ret = &resolve_addr;
+//		} else if (strcmp(sym_name, "__resolve") == 0) {
+//			ret = &resolve_addr;
 		} else if (strcmp(sym_name, "__dlsym") == 0) {
 			ret = &dlsym2;
 		} else if (strcmp(sym_name, "__dlopen") == 0) {
@@ -718,7 +741,7 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 				file = verdefstr(sym, lib);
 			}
 			if (!file) {
-				STRICT_ERR("could not link symbol\n", sym_name);
+				STRICT_ERR("could not link symbol %s\n", sym_name);
 				return 0;
 			} else {
 				for (size_t i = 0; i < libs->libs_count; i++) {
@@ -733,7 +756,7 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 				}
 			}
 		}
-		DEBUG("\t\t\tsetting symbol %s to %p with offset\n", sym_name, ret, rela->r_addend)
+		DEBUG("\t\t\tsetting symbol %s to %p with offset addend %llx\n", sym_name, ret, rela->r_addend)
 		return ret + rela->r_addend;
 	} else {
 		ERR("unknown relocation %d", type);
@@ -744,17 +767,17 @@ void setSymbol(Elf64_Rela * rela, void* sym, loaded_lib* lib) {
 	int type = ELF64_R_TYPE(rela->r_info);
 	if (type == R_X86_64_32) {
 		uint32_t* offsetTableLoc = (uint32_t*)(lib->base + rela->r_offset);
-		*offsetTableLoc = sym;
+		*offsetTableLoc = (uint32_t)(uint64_t)sym;
 	} else {
 		uint64_t* offsetTableLoc = (uint64_t*)(lib->base + rela->r_offset);
-		*offsetTableLoc = sym;
+		*offsetTableLoc = (uint64_t)sym;
 	}
 }
 
 void link(loaded_lib* lib, loaded_libs* libs) {
 	DEBUG("\tlinking library %s\n", lib->path)
-	DEBUG("\trela count %d\n", lib->rela_count)
-	DEBUG("\trela plt count %d\n", lib->rela_plt_count)
+	DEBUG("\trela count %lld\n", lib->rela_count)
+	DEBUG("\trela plt count %lld\n", lib->rela_plt_count)
 	for (int i = 0 ; i < lib->rela_count ; i++) {
 		Elf64_Rela * rela = lib->rela + i;
 		void * sym = findSymbol(rela, lib, libs);
@@ -796,7 +819,7 @@ void init_lib(loaded_lib* lib, loaded_libs* libs) {
 		for (int j = 0; j * sizeof(void*) < lib->init_arraysz ; j++) {
 			// this is already absolute because of relocation
 			size_t rel_f = lib->init_array[j];
-			DEBUG("\t\tinit %d from library %s with pointer %p\n", j, lib->name, (void*)rel_f - lib->base)
+			DEBUG("\t\tinit %d from library %s with pointer %p\n", j, lib->name, (void*)((void*)rel_f - lib->base))
 			//DEBUG("exec init at %llx for lib %s\n", rel_f, lib->name)
 			((void (*)())(rel_f))();
 		}
@@ -825,7 +848,40 @@ void fini_libs(loaded_libs* libs) {
 	}
 }
 
+#ifdef WIN32
+char ** init_win_argv(int count) {
+	char ** argv =  calloc(count + 1, sizeof(char*));
+	int argc;
+	wchar_t ** winargs = CommandLineToArgvW(GetCommandLineW(), &argc);
+	for (int i = 0 ; i < count ; i++) {
+		wchar_t * utf16_str = winargs[i];
+
+		int utf16_length = wcslen(utf16_str);
+
+		// Get the required buffer size for UTF-8
+		int utf8_length = WideCharToMultiByte(CP_UTF8, 0, utf16_str, utf16_length, NULL, 0, NULL, NULL);
+
+		// Allocate memory for the UTF-8 string
+		char* utf8_str = (char*)malloc(utf8_length + 1); // +1 for null-terminator
+
+		// Perform the conversion from UTF-16 to UTF-8
+		WideCharToMultiByte(CP_UTF8, 0, utf16_str, utf16_length, utf8_str, utf8_length, NULL, NULL);
+
+		// Null-terminate the UTF-8 string
+		utf8_str[utf8_length] = '\0';
+		argv[i] = utf8_str;
+	}
+	LocalFree(winargs);
+	return argv;
+}
+#endif
+
 int main(int argc, char ** argv) {
+#ifdef WIN32
+	char** argv2 = init_win_argv(argc);
+#else
+	char** argv2 = argv;
+#endif
 //#ifdef WIN32
 //        DEBUG("kernel: %p\n", GetModuleHandle("KERNEL32.DLL"))
 //        DEBUG("kernel: switch %p\n", GetProcAddress(GetModuleHandle("KERNEL32.DLL"), "SwitchToThread"))
@@ -836,8 +892,8 @@ int main(int argc, char ** argv) {
 //#endif
 	//DEBUG("printf %s\n", &printf)
 	DEBUG("stdin %p, stdout %p, stderr %p\n", stdin, stdout, stderr)
-	if (argc != 2) {
-		ERR("./loadelf file\n");
+	if (argc < 2) {
+		ERR("./loadelf file <args>\n");
 	}
 
 	loaded_libs* libs = &zwolf_global_libs;
@@ -861,11 +917,11 @@ int main(int argc, char ** argv) {
 	DEBUG("end init libs\n")
 
 	Elf64_Half main_idx = lookup("main", lib);
-	int (*main_f)(void) __attribute__((sysv_abi));
+	int (*main_f)(int argc, char** argv) __attribute__((sysv_abi));
 	void * main_addr = lib->base + lib->symtab[main_idx].st_value;
 	main_f = main_addr;
 	DEBUG("main at %d %p\n", main_idx , (void*)(main_addr - lib->base))
-	int ret = main_f();
+	int ret = main_f(argc - 1, argv2 + 1);
 	DEBUG("main returned %d\n", ret)
 	DEBUG("fini\n")
 	fflush(stdout);
