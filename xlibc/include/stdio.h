@@ -91,7 +91,7 @@ typedef uint64_t mode_t;
 #define S_ISSOCK(mode) (mode == 7)
 
 int open(const char *pathname, int flags, mode_t mode);
-int close(int fd);
+//int close(int fd);
 
 struct stat {
 	mode_t    st_mode;        /* File type and mode */

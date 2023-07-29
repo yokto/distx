@@ -78,6 +78,15 @@ $(HELLORUST): hellorust.rs Makefile
 #libbase:
 #	$(MAKE) -C libbase/src
 
+$(BUILDDIR)/bin/testc_zlib: testc_zlib.c
+	mkdir -p $(dir $(BUILDDIR)/bin)
+	clang -femulated-tls -g \
+		"-lz" \
+		"-L/__zwolf_builddir__/zlib/lib" \
+		"-I/__zwolf_builddir__/zlib/include" \
+		"-Wl,-soname,test_programs/bin/testc_zlib" \
+		-o "$@" "$<"
+
 $(BUILDDIR)/bin/testc_%: testc_%.c
 	mkdir -p $(dir $(BUILDDIR)/bin)
 	clang -femulated-tls -g \
