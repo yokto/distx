@@ -1,6 +1,8 @@
 #include <base/types.h>
 #include <errno.h>
 
+#define SUCCESS 0
+
 int32_t utf8decode(const char* ptr, uintptr_t length, uint8_t* codelength, uint32_t* codepoint) {
     if (length == 0 || ptr == 0) {
         return EINVAL;

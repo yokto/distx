@@ -18,8 +18,7 @@ TESTC_EXECS := $(patsubst %.c, $(BUILDDIR)/bin/%, $(TESTC_SOURCES))
 
 #.PHONY: libbase
 
-all: $(HELLOC) \
-	$(HELLORUST) \
+all: $(HELLORUST) \
 	$(LIBBASE) \
 	$(CONSTANTS) \
 	$(TESTCPP_EXECS) \

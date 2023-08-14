@@ -7,9 +7,13 @@
 #include <stdbool.h>
 #include <stdarg.h>
 
+bool zwolf_debug = false;
+
 #define DEBUG(...) { \
-	fprintf(stderr, __VA_ARGS__); \
-	fflush(stderr); \
+	if (zwolf_debug) { \
+		fprintf(stderr, __VA_ARGS__); \
+		fflush(stderr); \
+	} \
 }
 #define WARN(...) { \
 	fprintf(stderr, __VA_ARGS__); \
@@ -75,7 +79,6 @@ typedef struct loaded_lib {
 	size_t gotsz;
 	Elf64_Word* hash;
 	size_t symtab_count;
-	char* name;
 	char* path;
 	size_t init_arraysz;
 	size_t* init_array;
@@ -275,7 +278,7 @@ void set_basedir(loaded_libs * libs, char * path, char * soname) {
 	memcpy(libs->basedir + 1, realp, base_len);
 
 	// set env
-	const char * var = "ZWOLF_BASEDIR=";
+	const char * var = "ZWOLF_RUNDIR=";
 	int varlen = strlen(var);
 	char * env = calloc(base_len + 1 + varlen + 1, 1);
 	strcat(env, var);
@@ -285,7 +288,7 @@ void set_basedir(loaded_libs * libs, char * path, char * soname) {
 	libs->basedir = malloc(base_len + 1);
 	libs->basedir[base_len] = '\0';
 	memcpy(libs->basedir, realp, base_len);
-	setenv("ZWOLF_BASEDIR", libs->basedir, true);
+	setenv("ZWOLF_RUNDIR", libs->basedir, true);
 #endif
 	DEBUG("basedir %s\n", libs->basedir);
 	free(realp);
@@ -428,18 +431,10 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 			for (dynamic = lib->dynamic; dynamic->d_tag != DT_NULL; dynamic++) {
 				if (dynamic->d_tag == DT_SONAME) {
 					char * soname = lib->strtab + dynamic->d_un.d_ptr;
-					char * last_slash = strrchr(soname, '/');
-					char * lib_name = last_slash && strncmp(last_slash, "/lib", 4) == 0 ? last_slash + 4 : 0; // drop the "lib" in "libxyz.so"
-					char * dot = lib_name ? strchr(lib_name, '.') : 0;
-					size_t lib_name_len = dot ? dot - lib_name : 0;
-					lib->name = malloc(lib_name_len + 1);
-					strncpy(lib->name, lib_name, lib_name_len);
-					lib->name[lib_name_len] = '\0';
-					DEBUG("libname %s\n", lib->name)
-					if (lib_name_len <= 0){ 
-						WARN("Could not figure out libname of %s\n", soname);
-					}
 					if (!libs->basedir) { // for main program
+						free(lib->path);
+						lib->path = malloc(strlen(soname) + 1);
+						strcpy(lib->path, soname);
 						set_basedir(libs, lib_path, soname);
 					}
 				}
@@ -504,7 +499,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 		}
 	}
 
-	if (!lib->name) {
+	if (!lib->path) {
 		ERR("library %s has no soname", lib_path);
 	}
 
@@ -512,12 +507,13 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 #ifndef WIN32
 	struct link_map* new_map = malloc(sizeof(struct link_map));
 	memset(new_map, 0, sizeof(struct link_map));
-	const char * pwd = "/home/silvio/stuff/sources/elfx86/";
+	const char * pwd = libs->basedir;
 	const int pwd_len = strlen(pwd);
-	const int lib_len = strlen(lib_path);
+	const int lib_len = strlen(lib->path);
+	WARN("lib-path %s\n", lib->path);
 	char * full_path = malloc(pwd_len + lib_len + 1);
 	memcpy(full_path, pwd, pwd_len);
-	memcpy(full_path + pwd_len, lib_path, lib_len);
+	memcpy(full_path + pwd_len, lib->path, lib_len);
 	full_path[lib_len + pwd_len] = '\0';
 	new_map->l_name = full_path;
 	new_map->l_addr = lib->base;
@@ -562,7 +558,7 @@ char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 	Elf64_Verneed * v = lib->verneed;
 	if (!lib->verneed) {
 		STRICT_ERR("could not find version for symbol %s in library %s\n",
-			lib->strtab + lib->symtab[sym_idx].st_name, lib->name);
+			lib->strtab + lib->symtab[sym_idx].st_name, lib->path);
 		return 0;
 	}
 	DEBUG("\t\t\tneeded index %zd residex %d \n", sym_idx, lib->versym[sym_idx])
@@ -581,13 +577,13 @@ char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 		if (v->vn_next == 0) { break; }
 		v = (void*)v + v->vn_next;
 	}
-	STRICT_ERR("could not find version for symbol %s in library %s\n", lib->strtab + lib->symtab[sym_idx].st_name, lib->name);
+	STRICT_ERR("could not find version for symbol %s in library %s\n", lib->strtab + lib->symtab[sym_idx].st_name, lib->path);
 	return 0;
 }
 
 Elf64_Half lookup(char* name, loaded_lib* lib) {
 	if (!lib->hash) {
-		ERR("no hash table in %s\n", lib->name);
+		ERR("no hash table in %s\n", lib->path);
 	}
 	const uint32_t nbucket = ((uint32_t*)lib->hash)[0];
 	const uint32_t nchain = ((uint32_t*)lib->hash)[1];
@@ -595,7 +591,7 @@ Elf64_Half lookup(char* name, loaded_lib* lib) {
 	const unsigned long hash = elf_Hash(name);
 
 	Elf64_Half idx = lib->hash[2 + (hash % nbucket)];
-	DEBUG("\t\t\tlooking for %s in library %s\n",name, lib->name)
+	DEBUG("\t\t\tlooking for %s in library %s\n",name, lib->path)
 	while (idx != 0) {
 		DEBUG("\t\t\tname %s, foundname %s\n", name, lib->strtab + lib->symtab[idx].st_name)
 		if (strcmp(name, lib->strtab + lib->symtab[idx].st_name) == 0) {
@@ -628,6 +624,7 @@ int printf2(const char *restrict format, ...) {
 
 __attribute__((sysv_abi))
 int write2(const char *s) {
+	if (!zwolf_debug) { return strlen(s); }
 #ifdef WIN32
 	// Calculate the length of the UTF-8 string (excluding the null-terminator)
 	int utf8_length = strlen(s);
@@ -780,7 +777,7 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 						Elf64_Half f = lookup(sym_name, l);
 						void * f_addr = l->base + l->symtab[f].st_value;
 						//DEBUG("setting name %s, at %x from base %x to %x\n", sym_name, rela->r_offset, lib->base, f_addr)
-						DEBUG("\t\t\tfound symbol in %s\n", l->name)
+						DEBUG("\t\t\tfound symbol in %s\n", l->path)
 						ret = f_addr;
 					}
 				}
@@ -844,13 +841,13 @@ void init_lib(loaded_lib* lib, loaded_libs* libs) {
 	}
 
 	// init self
-	DEBUG("\t\tinit %s\n", lib->name)
+	DEBUG("\t\tinit %s\n", lib->path)
 	if (lib->init_array) {
 		for (int j = 0; j * sizeof(void*) < lib->init_arraysz ; j++) {
 			// this is already absolute because of relocation
 			size_t rel_f = lib->init_array[j];
-			DEBUG("\t\tinit %d from library %s with pointer %p\n", j, lib->name, (void*)((void*)rel_f - lib->base))
-			//DEBUG("exec init at %llx for lib %s\n", rel_f, lib->name)
+			DEBUG("\t\tinit %d from library %s with pointer %p\n", j, lib->path, (void*)((void*)rel_f - lib->base))
+			//DEBUG("exec init at %llx for lib %s\n", rel_f, lib->path)
 			((void (*)())(rel_f))();
 		}
 	}
@@ -859,9 +856,9 @@ void init_lib(loaded_lib* lib, loaded_libs* libs) {
 void init_libs(loaded_libs* libs) {
 	for (int i = 0; i < libs->libs_count; i++) {
 		loaded_lib* lib = &libs->libs[i];
-		DEBUG("\tstart init %s\n", lib->name)
+		DEBUG("\tstart init %s\n", lib->path)
 		init_lib(lib, libs);
-		DEBUG("\tend init %s\n", lib->name)
+		DEBUG("\tend init %s\n", lib->path)
 	}
 }
 
@@ -907,6 +904,9 @@ char ** init_win_argv(int count) {
 #endif
 
 int main(int argc, char ** argv) {
+	if (getenv("ZWOLF_DEBUG")) {
+		zwolf_debug = true;
+	}
 #ifdef WIN32
 	char** argv2 = init_win_argv(argc);
 #else
@@ -955,6 +955,4 @@ int main(int argc, char ** argv) {
 	DEBUG("main returned %d\n", ret)
 	DEBUG("fini\n")
 	fflush(stdout);
-	fini_libs(libs);
-	DEBUG("done\n")
 }

@@ -61,7 +61,7 @@ void cnd_destroy( cnd_t* cond );
 // thread local
 typedef size_t tss_t;
 typedef void(*tss_dtor_t)(void*);
-#define thread_local _Thread_local
+//#define thread_local _Thread_local
 #define TSS_DTOR_ITERATIONS 42
 int tss_create( tss_t* tss_key, tss_dtor_t destructor );
 void *tss_get( tss_t tss_key );

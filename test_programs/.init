@@ -1,4 +1,12 @@
-export PATH=/home/silvio/stuff/sources/elfx86/llvm/bin:/run/wrappers/bin:/home/silvio/.nix-profile/bin:/etc/profiles/per-user/silvio/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin:/home/silvio/global_npm/bin
+pathadd() {
+    if [ -d "$1" ] && [[ ":$PATH:" != *":$1:"* ]]; then
+        export PATH="$1:$PATH"
+    fi
+}
+pathadd "/home/silvio/stuff/sources/elfx86/llvm/bin"
 gdb () {
 	(cd ..; command gdb /home/silvio/stuff/sources/elf/build/load_elf)
+}
+ph () {
+	echo "#include <$1>" | gcc -x c -E -  -o -
 }

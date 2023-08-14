@@ -9,6 +9,8 @@
 #include "string.h"
 #include "unicode.h"
 
+#define SUCCESS 0
+
 static bool isWin = 0;
 static int32_t tonativepath(const char* filenameOrig, const char** output);
 
@@ -68,9 +70,10 @@ int32_t base_fs_open(const char *path, uintptr_t* fd, uint32_t flags) {
 			}
 			if (flags & BASE_FS_OPEN_APPEND) { flag |= LINUX_O_APPEND; }
 			if (flags & BASE_FS_OPEN_CREATE) { flag |= LINUX_O_CREAT; }
-			__debug_printf("open ret %s\n", nativepath);
+			__debug_printf("open path %s\n", nativepath);
 			int ret = linux_open(nativepath, flag, 0666);
-			__debug_printf("open ret %d\n", __errno());
+			__debug_printf("open errno %d\n", __errno());
+			__debug_printf("open fd %d\n", ret);
 			if (ret >= 0) {
 				*fd = ret;
 			} else {
@@ -226,7 +229,7 @@ int32_t base_fs_tonativepathlen(const char *pathname, uintptr_t* length) {
 	}
 }
 
-static const char basealias[] = "/__zwolf_basedir__/";
+static const char basealias[] = "/__zwolf_rundir__/";
 #define basealias_len (sizeof(basealias) - 1)
 static const char buildalias[] = "/__zwolf_builddir__/";
 #define buildalias_len (sizeof(buildalias) - 1)
@@ -237,7 +240,7 @@ static int32_t tonativepath(const char* filenameOrig, const char** output) {
 	const char* filename = filenameOrig;
 	
 	if (strncmp(basealias, filename, basealias_len) == 0) {
-		char* base = getenv("ZWOLF_BASEDIR");
+		char* base = getenv("ZWOLF_RUNDIR");
 		if (base) {
 			int baselen = strlen(base);
 

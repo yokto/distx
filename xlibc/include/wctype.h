@@ -4,6 +4,8 @@
 extern "C" {
 #endif
 
+#include <wchar.h>
+
 int iswspace(wint_t wc);
 #define iswspace_l(wc, l) iswspace(wc)
 int iswdigit(wint_t wc);

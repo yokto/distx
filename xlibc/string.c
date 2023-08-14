@@ -2,12 +2,24 @@
 #include <string.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 DLL_PUBLIC
 size_t strlen(const char* str) {
     const char* s;
     for (s = str; *s; ++s) {}
     return (s - str);
+}
+
+DLL_PUBLIC
+size_t strnlen(const char *str, size_t maxlen) {
+    size_t length = 0;
+
+    while (length < maxlen && str[length] != '\0') {
+        length++;
+    }
+
+    return length;
 }
 
 DLL_PUBLIC
@@ -159,3 +171,240 @@ size_t strxfrm(char* dest, const char* src, size_t n) {
     return strlen(src);
 }
 
+DLL_PUBLIC
+char* strdup(const char* str) {
+    // Check if the input string is NULL
+    if (str == NULL) {
+        return NULL;
+    }
+
+    // Get the length of the input string
+    size_t len = strlen(str);
+
+    // Allocate memory for the new string (plus one for the null terminator)
+    char* new_str = (char*)malloc(len + 1);
+
+    // Check if memory allocation was successful
+    if (new_str == NULL) {
+        return NULL; // Memory allocation failed
+    }
+
+    // Copy the input string into the newly allocated memory
+    strcpy(new_str, str);
+
+    return new_str;
+}
+
+DLL_PUBLIC
+char *strtok_r(char *restrict str, const char *restrict delim, char **restrict saveptr) {
+    char *start, *end;
+
+    // If str is NULL, use the saved pointer from the previous call (if available).
+    if (str == NULL) {
+        str = *saveptr;
+    }
+
+    // Skip leading delimiters.
+    str += strspn(str, delim);
+
+    // If the string is empty or contains only delimiters, return NULL.
+    if (*str == '\0') {
+        *saveptr = str;
+        return NULL;
+    }
+
+    // Find the end of the token.
+    end = str + strcspn(str, delim);
+
+    // Save the end of the current token in saveptr for the next call.
+    if (*end != '\0') {
+        *end = '\0';
+        *saveptr = end + 1;
+    } else {
+        *saveptr = end;
+    }
+
+    // Set start to the beginning of the current token.
+    start = str;
+
+    return start;
+}
+
+DLL_PUBLIC
+size_t strspn(const char *str, const char *charset) {
+    size_t count = 0;
+    bool found = false;
+
+    while (*str) {
+        const char *c = charset;
+        found = false;
+
+        // Check if the current character is present in the charset.
+        while (*c) {
+            if (*c == *str) {
+                found = true;
+                break;
+            }
+            c++;
+        }
+
+        // If the character is found, increment the count and move to the next character.
+        if (found) {
+            count++;
+            str++;
+        } else {
+            // If the character is not found, break out of the loop.
+            break;
+        }
+    }
+
+    return count;
+}
+
+DLL_PUBLIC
+size_t strcspn(const char *str, const char *charset) {
+    size_t count = 0;
+    bool found = false;
+
+    while (*str) {
+        const char *c = charset;
+        found = false;
+
+        // Check if the current character is present in the charset.
+        while (*c) {
+            if (*c == *str) {
+                found = true;
+                break;
+            }
+            c++;
+        }
+
+        // If the character is found, break out of the loop.
+        if (found) {
+            break;
+        } else {
+            // If the character is not found, increment the count and move to the next character.
+            count++;
+            str++;
+        }
+    }
+
+    return count;
+}
+
+DLL_PUBLIC char *strchr(const char *str, int ch) {
+    while (*str != '\0') {
+        if (*str == ch) {
+            return (char *)str;
+        }
+        str++;
+    }
+
+    // If the character was not found, return NULL
+    return NULL;
+}
+
+DLL_PUBLIC
+int atoi(const char *str) {
+    int result = 0;
+    int sign = 1;
+    int i = 0;
+
+    // Skip leading white spaces
+    while (str[i] == ' ') {
+        i++;
+    }
+
+    // Check for sign
+    if (str[i] == '+' || str[i] == '-') {
+        sign = (str[i++] == '-') ? -1 : 1;
+    }
+
+    // Convert digits to integer
+    while (str[i] >= '0' && str[i] <= '9') {
+        result = result * 10 + (str[i++] - '0');
+    }
+
+    return result * sign;
+}
+
+char* strrchr(const char* str, int ch) {
+    const char* last_occurrence = NULL;
+
+    while (*str != '\0') {
+        if (*str == ch) {
+            last_occurrence = str;
+        }
+        str++;
+    }
+
+    // Handle the case when ch is the null terminator.
+    if (ch == '\0') {
+        last_occurrence = str;
+    }
+
+    return (char*)last_occurrence;
+}
+
+DLL_PUBLIC
+char* strpbrk(const char* str, const char* charset) {
+    while (*str != '\0') {
+        const char* ch = charset;
+        while (*ch != '\0') {
+            if (*str == *ch) {
+                return (char*)str;
+            }
+            ch++;
+        }
+        str++;
+    }
+
+    return NULL;
+}
+
+
+DLL_PUBLIC
+char* strtok(char* str, const char* delim) {
+    static char* buffer = NULL;
+    if (str != NULL) {
+        buffer = str;
+    }
+
+    if (buffer == NULL || *buffer == '\0') {
+        return NULL;
+    }
+
+    char* token = buffer;
+    char* delimiter = strchr(buffer, *delim);
+
+    if (delimiter != NULL) {
+        *delimiter = '\0';
+        buffer = delimiter + 1;
+    } else {
+        buffer = NULL;
+    }
+
+    return token;
+}
+
+DLL_PUBLIC
+char* strcat(char* dest, const char* src) {
+    char* original_dest = dest;
+
+    // Move the dest pointer to the end of the destination string
+    while (*dest) {
+        dest++;
+    }
+
+    // Copy characters from the source to the destination
+    while (*src) {
+        *dest = *src;
+        dest++;
+        src++;
+    }
+
+    // Null-terminate the destination string
+    *dest = '\0';
+
+    return original_dest;
+}

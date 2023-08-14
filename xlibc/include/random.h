@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#include <sys/types.h>
+
 int getentropy(void *buffer, size_t length);
 
 #ifdef __cplusplus

@@ -5,9 +5,9 @@ LIBM := $(INSTALL)lib/libm.so
 
 HEADERS = $(addprefix $(INSTALL),$(wildcard include/*.h)) $(addprefix $(INSTALL),$(wildcard include/*/*.h))
 
-all: $(LIBC) $(HEADERS)
+all: $(LIBC) $(LIBM) $(HEADERS)
 
-$(LIBC): libc.c printf.c string.c time.c unicode.c fs.c Makefile libc.map
+$(LIBC): libc.c printf.c string.c time.c unicode.c fs.c qsort.c math.c proc.c Makefile
 	mkdir -p $(dir $(LIBC))
 	echo ${CC}
 	${CC} \
@@ -15,6 +15,7 @@ $(LIBC): libc.c printf.c string.c time.c unicode.c fs.c Makefile libc.map
 		-Wall -Wextra \
 		-Wl,-soname,xlibc/lib/libc.so \
 		-Wl,--export-dynamic-symbol=__* \
+		-Wno-unused-parameter \
 		-nolibc -shared \
 		-femulated-tls \
 		-Ilibc \
@@ -25,9 +26,12 @@ $(LIBC): libc.c printf.c string.c time.c unicode.c fs.c Makefile libc.map
 		libc.c \
 		printf.c \
 		string.c \
+		math.c \
+		proc.c \
 		unicode.c \
 		time.c \
-		fs.c
+		fs.c \
+		qsort.c
 
 #               -Werror \
 
@@ -37,17 +41,13 @@ $(LIBM): libm.c Makefile libm.map
 		-g \
 		-Wall -Wextra -Werror \
 		-Wl,-soname,xlibc/lib/libm.so \
-		-Wl,--version-script=libc.map \
-		-Wl,--hash-style=sysv \
-		-Wl,--export-dynamic-symbol=__* \
-		-Wl,-Bsymbolic \
 		-nostdlib -shared \
 		-fno-stack-protector \
 		-fPIC \
 		-fno-builtin \
 		-Ilibc \
 		-Iinclude \
-		-o $(LIBC) \
+		-o $(LIBM) \
 		libm.c \
 		-lc -L$(dir $(LIBC)) 
 
@@ -55,4 +55,5 @@ $(LIBM): libm.c Makefile libm.map
 $(INSTALL)include/%.h: include/%.h
 	mkdir -p $(INSTALL)include/sys
 	mkdir -p $(INSTALL)include/base
+	@echo '#include "$*.h"' | ${CC} -x c --analyze -Iinclude -nostdinc -
 	cp $< $@

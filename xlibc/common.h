@@ -12,4 +12,9 @@ int __debug_printf(char* restrict fmt, ...);
 extern int __errno();
 void* __dlsym(void* handle, char* name) __attribute__ ((weak));
 
+#define concatH(X, Y) X ## Y
+#define concat(X, Y) concatH(X, Y)
+#define concatH3(X, Y, Z) X ## Y ## Z
+#define concat3(X, Y, Z) concatH3(X, Y, Z)
+
 #endif // COMMON_H

@@ -260,6 +260,15 @@ int snprintf(char * s, size_t n, const char * format, ...) {
 }
 
 DLL_PUBLIC
+int sprintf(char * s, const char * format, ...) {
+	va_list args;
+	va_start(args, format);
+	const int ret = vsnprintf(s, SIZE_MAX, format, args);
+	va_end(args);
+	return ret;
+}
+
+DLL_PUBLIC
 int vasprintf(char ** strp, const char * format, va_list args) {
 	const int ret = internal_printf(0, 0, format, args); 
 	char* p = (char*)malloc(ret);
@@ -299,3 +308,8 @@ int vfprintf(FILE* file, const char *restrict format, va_list args) {
 	return ret;
 }
 
+DLL_PUBLIC
+int putchar(int c) {
+	char out = c;
+	fwrite(&c, 1, 1, stdout);
+}

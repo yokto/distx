@@ -24,6 +24,7 @@ int toupper(int c);
 #define toupper_l(c, l) toupper(c)
 int tolower(int c);
 #define tolower_l(c, l) tolower(c)
+inline static int isblank(int ch) { return (ch == ' ' || ch == '\t'); }
 
 #ifdef __cplusplus
 }

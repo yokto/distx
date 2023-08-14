@@ -1,8 +1,12 @@
 #include <stdarg.h>
 #include <base/fs.h>
+#include <proc.h>
 #include <locale.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <signal.h>
+#include <dlfcn.h>
+#include <sys/wait.h>
 #include <unicode.h>
 #include <stddef.h>
 #include <string.h>
@@ -15,7 +19,10 @@
 #include <ctype.h>
 #include <wctype.h>
 #include <common.h>
+#include <sys/stat.h>
 #include <fs.h>
+
+#define SUCCESS 0
 
 DLL_PUBLIC
 __thread int errno = 0;
@@ -58,10 +65,12 @@ typedef uint64_t linux_blkcnt_t;
 struct linux_stat {
                linux_dev_t     st_dev;         /* ID of device containing file */
                linux_ino_t     st_ino;         /* Inode number */
-               linux_mode_t    st_mode;        /* File type and mode */
                linux_nlink_t   st_nlink;       /* Number of hard links */
+               linux_mode_t    st_mode;        /* File type and mode */
                linux_uid_t     st_uid;         /* User ID of owner */
                linux_gid_t     st_gid;         /* Group ID of owner */
+	       int pad0;
+
                linux_dev_t     st_rdev;        /* Device ID (if special file) */
                linux_off_t     st_size;        /* Total size, in bytes */
                linux_blksize_t st_blksize;     /* Block size for filesystem I/O */
@@ -90,9 +99,9 @@ struct windows_stat {
     short st_gid;          // Group ID of the file's owner
     windows_dev_t st_rdev;        // Device ID (if file is a special file)
     windows_off_t st_size;        // File size in bytes
-    windowstime_t st_atime;       // Last access time
-    windowstime_t st_mtime;       // Last modification time
-    windowstime_t st_ctime;       // Last status change time
+    windowstime_t wst_atime;       // Last access time
+    windowstime_t wst_mtime;       // Last modification time
+    windowstime_t wst_ctime;       // Last status change time
     char padding[48];
 };
 
@@ -234,6 +243,7 @@ __attribute__((constructor)) void init() {
 	}
 
 	init_fs(isWin, libc);
+	init_proc(isWin, libc);
 	if (isWin) {
 		vswprintf_ms = dlsym(libc, "vswprintf");
 		malloc_ms = dlsym(libc, "malloc");
@@ -443,7 +453,14 @@ void free(void* ptr) {
 }
 
 
-DLL_PUBLIC void* malloc(size_t new_size) IMPLEMENT(malloc, new_size)
+DLL_PUBLIC void* malloc(size_t new_size) {
+	__debug_printf("execute os malloc %ld\n", new_size);
+	if (isWin) {
+		return malloc_ms(new_size);
+	} else {
+		return malloc_sysv(new_size);
+	}
+}
 
 DLL_PUBLIC void *calloc(size_t nmemb, size_t size) IMPLEMENT(calloc, nmemb, size)
 
@@ -507,7 +524,7 @@ DLL_PUBLIC int remove(const char *pathname) {
 	}
 }
 
-static const char basealias[] = "/__zwolf_basedir__/";
+static const char basealias[] = "/__zwolf_rundir__/";
 #define basealias_len (sizeof(basealias) - 1)
 static const char buildalias[] = "/__zwolf_builddir__/";
 #define buildalias_len (sizeof(buildalias) - 1)
@@ -520,7 +537,7 @@ FILE *fopen(const char *filenameOrig, const char *mode) {
 	const char* filename = filenameOrig;
 	
 	if (strncmp(basealias, filename, basealias_len) == 0) {
-		char* base = getenv("ZWOLF_BASEDIR");
+		char* base = getenv("ZWOLF_RUNDIR");
 		if (base) {
 			int baselen = strlen(base);
 
@@ -804,8 +821,8 @@ DLL_PUBLIC int stat(const char * pathname, struct stat * statbuf) {
 		statbuf->st_ino = ls.st_ino;
 		statbuf->st_nlink = ls.st_nlink;
 		statbuf->st_size = ls.st_size;
-		statbuf->st_mtim.tv_sec = ls.st_mtime / 1000;
-		statbuf->st_mtim.tv_nsec = (ls.st_mtime % 1000) * 1000000;
+		statbuf->st_mtim.tv_sec = ls.wst_mtime / 1000;
+		statbuf->st_mtim.tv_nsec = (ls.wst_mtime % 1000) * 1000000;
 		__debug_printf("stat returned %d %p mode %lx\n", ret, statbuf, ls.st_mode);
 		return ret;
 	} else {
@@ -913,8 +930,8 @@ DLL_PUBLIC int lstat(const char * pathname, struct stat * statbuf) {
 		statbuf->st_ino = ls.st_ino;
 		statbuf->st_nlink = ls.st_nlink;
 		statbuf->st_size = ls.st_size;
-		statbuf->st_mtim.tv_sec = ls.st_mtime / 1000;
-		statbuf->st_mtim.tv_nsec = (ls.st_mtime % 1000) * 1000000;
+		statbuf->st_mtim.tv_sec = ls.wst_mtime / 1000;
+		statbuf->st_mtim.tv_nsec = (ls.wst_mtime % 1000) * 1000000;
 		__debug_printf("stat returned %d %p mode %lx\n", ret, statbuf, ls.st_mode);
 		return ret;
 	} else {
@@ -930,6 +947,13 @@ DLL_PUBLIC int lstat(const char * pathname, struct stat * statbuf) {
 		__debug_printf("stat returned %d %p mode %lx\n", ret, statbuf, ls.st_mode);
 		return ret;
 	}
+}
+
+int ftruncate(int fd, uint64_t length) {
+	int ret = base_fs_truncate(fd, length);
+	if (ret == SUCCESS) { return 0; }
+	errno = ret;
+	return -1;
 }
 
 DLL_PUBLIC void mtx_destroy(mtx_t *mutex ) {
@@ -2091,3 +2115,125 @@ char* getenv(const char* name) {
     return NULL;
 }
 
+#define NO_IMPL(name) \
+{ \
+	__debug_printf("not implemented %s\n", #name); \
+	abort(); \
+}
+
+DLL_PUBLIC int access(const char *pathname, int mode) {
+	__debug_printf("access not implemented properly\n");
+	return 0;
+}
+DLL_PUBLIC int getpwuid_r(uid_t uid, struct passwd * pwd, char * buf, size_t buflen, struct passwd ** result) NO_IMPL(getpwuid_r)
+DLL_PUBLIC uid_t getuid(void) NO_IMPL(getuid)
+DLL_PUBLIC int dup2(int oldfd, int newfd) NO_IMPL(dup2)
+DLL_PUBLIC pid_t fork(void) NO_IMPL(fork)
+DLL_PUBLIC int sigemptyset(sigset_t *set) {
+	__debug_printf("sigemptyset not implemented properly\n");
+	return 0;
+}
+
+DLL_PUBLIC void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) NO_IMPL(mmap)
+DLL_PUBLIC int munmap(void *addr, size_t length) NO_IMPL(munmap)
+DLL_PUBLIC int chmod(const char *pathname, mode_t mode) NO_IMPL(chmod)
+DLL_PUBLIC int fchmod(int fd, mode_t mode) NO_IMPL(fchmod)
+DLL_PUBLIC int sigfillset(sigset_t *set) {
+	__debug_printf("sigfillset not implemented properly\n");
+	return 0;
+}
+DLL_PUBLIC int raise(int sig) NO_IMPL(raise)
+DLL_PUBLIC pid_t getpid(void) NO_IMPL(getpid)
+
+DLL_PUBLIC int rand_r(unsigned int *seedp) NO_IMPL(rand_r)
+static unsigned long next = 1;
+#define RAND_MAX 32767
+
+int rand() {
+    next = 1103515245 * next + 12345;
+    return next;
+}
+
+void srand(unsigned int seed) {
+    next = seed;
+}
+
+
+DLL_PUBLIC int sigaddset(sigset_t *set, int signum) NO_IMPL(sigaddset)
+DLL_PUBLIC int sigprocmask(int how, const sigset_t * set, sigset_t * oldset) {
+	__debug_printf("sigfprocmask not implemented properly\n");
+	return 0;
+}
+DLL_PUBLIC int fstat(int fd, struct stat *statbuf) {
+	if (true || fd<=2) {
+		statbuf->st_mode = 0;
+		statbuf->st_dev = 20;
+		statbuf->st_ino = 9;
+		statbuf->st_nlink = 1;
+		statbuf->st_size = 0;
+		statbuf->st_mtim.tv_sec = 0;
+		statbuf->st_mtim.tv_nsec = 0;
+		statbuf->st_atim.tv_sec = 0;
+		statbuf->st_atim.tv_nsec = 0;
+		statbuf->st_ctim.tv_sec = 0;
+		statbuf->st_ctim.tv_nsec = 0;
+		statbuf->st_uid = 0;         /* User ID of owner */
+		statbuf->st_gid = 0;
+		return 0;
+	}
+	__debug_printf("not implemented fstat\n"); \
+	abort(); \
+}
+
+DLL_PUBLIC pid_t wait(int *wstatus) NO_IMPL(wait)
+DLL_PUBLIC pid_t wait4(pid_t pid, int *wstatus, int options, struct rusage *rusage) NO_IMPL(wait4)
+DLL_PUBLIC pid_t waitpid(pid_t pid, int *wstatus, int options) NO_IMPL(waitpid)
+DLL_PUBLIC int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options) NO_IMPL(waitid)
+DLL_PUBLIC int kill(pid_t pid, int sig) NO_IMPL(kill)
+DLL_PUBLIC int execve(const char *pathname, char *const argv[], char *const envp[]) NO_IMPL(execve)
+DLL_PUBLIC int execv(const char *pathname, char *const argv[]) NO_IMPL(execv)
+
+
+DLL_PUBLIC int symlink(const char *target, const char *linkpath) NO_IMPL(symlink)
+DLL_PUBLIC int link(const char *oldpath, const char *newpath) NO_IMPL(link)
+
+DLL_PUBLIC int statfs(const char *path, struct statfs *buf) NO_IMPL(statfs)
+DLL_PUBLIC mode_t umask(mode_t mask) NO_IMPL(umask)
+
+DLL_PUBLIC uint64_t getsid(pid_t pid) NO_IMPL(getsid)	
+DLL_PUBLIC time_t time(time_t *timer) NO_IMPL(time)	
+DLL_PUBLIC int fchown(int fd, uid_t owner, gid_t group) NO_IMPL(fchown)	
+DLL_PUBLIC int fcntl(int fd, int cmd, ... /* arg */ ) NO_IMPL(fcntl)
+DLL_PUBLIC int madvise(void *addr, size_t length, int advice) NO_IMPL(madvise)	
+DLL_PUBLIC int getpwnam_r(const char * name, struct passwd * pwd, char * buf, size_t buflen, struct passwd ** result) NO_IMPL(getpwnam_r)
+DLL_PUBLIC int fstatfs(int fd, struct statfs *buf) NO_IMPL(fstatfs)
+DLL_PUBLIC void _exit(int status) NO_IMPL(_exit)
+DLL_PUBLIC struct tm *localtime_r(const time_t *timer, struct tm* result) NO_IMPL(localtime_r)
+DLL_PUBLIC int usleep(useconds_t usec) NO_IMPL(usleep)
+DLL_PUBLIC int sigaction(int signum, const struct sigaction * act, struct sigaction * oldact) {
+	__debug_printf("not implemented sigaction\n");
+	return 0;
+}
+DLL_PUBLIC unsigned int alarm(unsigned int seconds) NO_IMPL(alarm)
+DLL_PUBLIC struct tm *gmtime(const time_t *timer) NO_IMPL(gmtime)
+DLL_PUBLIC char *asctime(const struct tm *timeptr) NO_IMPL(asctime)
+DLL_PUBLIC struct tm *localtime(const time_t *timep) NO_IMPL(localtime)
+DLL_PUBLIC int dladdr(const void *addr, Dl_info *info) NO_IMPL(dladdr)
+
+//DLL_PUBLIC  NO_IMPL()
+
+DLL_PUBLIC void perror(const char *s) {
+	fprintf(stderr, "%s: errno %s", s, strerror(errno));
+}
+
+DLL_PUBLIC
+int open(const char *pathname, int flags, ...) {
+	uintptr_t fd;
+	uint32_t ret = base_fs_open(pathname, &fd, flags);
+	if (ret == 0) {
+		return fd;
+	} else {
+		errno = ret;
+		return -1;
+	}
+}

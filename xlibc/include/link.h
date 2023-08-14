@@ -22,6 +22,7 @@ extern "C" {
    License along with the GNU C Library; if not, see
    <https://www.gnu.org/licenses/>.  */
 
+#include <sys/types.h>
 
 #if __SIZEOF_POINTER__ == 32
 #define __ELF_NATIVE_CLASS 32
@@ -259,13 +260,13 @@ struct dl_phdr_info
 int dl_iterate_phdr (int (*callback) (struct dl_phdr_info *info,
                                     size_t size, void *data), void *data);
 
-typedef struct
-{
-  const char *dli_fname;        /* File name of defining object.  */
-  void *dli_fbase;              /* Load address of that object.  */  
-  const char *dli_sname;        /* Name of nearest symbol.  */
-  void *dli_saddr;              /* Exact value of nearest symbol.  */  
-} Dl_info;
+//typedef struct
+//{
+//  const char *dli_fname;        /* File name of defining object.  */
+//  void *dli_fbase;              /* Load address of that object.  */  
+//  const char *dli_sname;        /* Name of nearest symbol.  */
+//  void *dli_saddr;              /* Exact value of nearest symbol.  */  
+//} Dl_info;
 
 #ifdef __cplusplus
 }

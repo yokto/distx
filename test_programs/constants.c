@@ -3,9 +3,12 @@
 #include <stdio.h>
 #include <errno.h>
 #include <threads.h>
+#include <signal.h>
 #include <sys/stat.h>
+#include <inttypes.h>
 
 #define C(name) printf("#define " #name " \t%d\n", name);
+#define CS(name) printf("#define " #name " \t%s\n", name);
 #define S(name) printf("#define " #name "_SZ \t%d\n", sizeof(name));
 
 int main() {
@@ -45,6 +48,7 @@ int main() {
 	C(thrd_error)
 	S(FILE)
 	S(mtx_t)
+	S(pid_t)
 	S(thrd_t)
 	S(tss_t)
 	S(dev_t)
@@ -67,4 +71,20 @@ int main() {
         C(O_WRONLY)
         C(O_RDWR)
         C(O_CREAT)
+	C(SIG_UNBLOCK)
+
+CS(PRIu8)
+CS(PRIu16)
+CS(PRIu32)
+CS(PRIu64)
+CS(PRIX8)
+CS(PRIX16)
+CS(PRIX32)
+CS(PRIX64)
+CS(PRIx8)
+CS(PRIx16)
+CS(PRIx32)
+CS(PRIx64)
+CS(PRIxPTR)
+
 }

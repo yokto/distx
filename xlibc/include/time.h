@@ -41,10 +41,16 @@ char *ctime(const time_t *timer);
 double difftime(time_t time1, time_t time2);
 struct tm *gmtime(const time_t *timer);
 struct tm *localtime(const time_t *timer);
+struct tm *localtime_r(const time_t *timer, struct tm* result);
 time_t mktime(struct tm *timeptr);
 size_t strftime(char *str, size_t maxsize, const char *format, const struct tm *timeptr);
 #define strftime_l(s, m, f, t, l) strftime(s, m ,f ,t)
 time_t time(time_t *timer);
+
+struct timeval {
+                  time_t      tv_sec;  /* Seconds */
+                  uint32_t tv_usec; /* Microseconds */
+              };
 
 
 

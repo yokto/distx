@@ -8,12 +8,11 @@
 extern "C" {
 #endif
 
-#define assert(x) { \
-	if (!(x)) { \
-		fprintf(stderr, "assert failed in file " __FILE__ " on line %d\n", __LINE__); \
-		*(int*)(NULL); \
-	} \
-}
+#ifndef NDEBUG
+#define assert(x) ((x) ? (void)0 : __builtin_trap())
+#else
+#define assert(x) ((void)0)
+#endif
 
 #ifdef __cplusplus
 }

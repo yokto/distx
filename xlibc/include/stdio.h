@@ -37,18 +37,22 @@ extern FILE* stdin;
 
 char getc(FILE* file);
 char getchar();
+char *fgets(char * s, int size, FILE * stream);
 int vfprintf(FILE* stream, const char * format, va_list argp);
 int printf(const char * format, ...);
 int fprintf(FILE* stream, const char * format, ...);
 int snprintf(char * s, size_t n, const char * format, ...);
+int sprintf(char * s, const char * format, ...);
 int vsnprintf(char * s, size_t n, const char * format, va_list arg);
 int vasprintf(char ** strp, const char * format, va_list arg );
+int feof(FILE *stream);
 //int __printf_chk(int flag, const char * format, ...);
 int puts(const char* str);
 int fputs(const char* str, FILE* f);
 int fputc(int c, FILE *stream);
 int vsscanf(const char *s, const char *format, va_list arg);
 int sscanf(const char *s, const char *format, ...);
+int scanf(const char *format, ...);
 FILE *fopen(const char *filename, const char *mode);
 size_t fread(void * ptr, size_t size, size_t nmemb, FILE * stream);
 size_t fwrite(const void * ptr, size_t size, size_t nmemb, FILE * stream);
@@ -82,30 +86,19 @@ int closedir(DIR* dir);
 
 
 typedef uint64_t mode_t;
-#define S_ISLNK(mode) (mode == 1)
-#define S_ISREG(mode) (mode == 2)
-#define S_ISDIR(mode) (mode == 3)
-#define S_ISBLK(mode) (mode == 4)
-#define S_ISCHR(mode) (mode == 5)
-#define S_ISFIFO(mode) (mode == 6)
-#define S_ISSOCK(mode) (mode == 7)
+#define S_ISLNK(mode) (false)
+#define S_ISREG(mode) (mode & 0x8000)
+#define S_ISDIR(mode) (mode & 0x4000)
+#define S_ISBLK(mode) (false)
+#define S_ISCHR(mode) (false)
+#define S_ISFIFO(mode) (false)
+#define S_ISSOCK(mode) (false)
 
-int open(const char *pathname, int flags, mode_t mode);
+//int open(const char *pathname, int flags, mode_t mode);
 //int close(int fd);
 
-struct stat {
-	mode_t    st_mode;        /* File type and mode */
-	int st_dev;
-	int st_ino;
-	int st_nlink;
-	int st_size;
-	timespec st_mtim;
-};
 typedef int64_t off_t;
 
-int stat(const char * pathname, struct stat * statbuf);
-int lstat(const char * pathname, struct stat * statbuf);
-int fstat(int fd, struct stat *statbuf);
 int mkdir(const char *pathname, mode_t mode);
 char *realpath(const char * path,
                char * resolved_path);
@@ -135,14 +128,13 @@ int statvfs(const char * path, struct statvfs * buf);
 
 
 #define O_CLOEXEC 524288
-#define O_RDONLY 0
+//#define O_RDONLY 0
 #define O_DIRECTORY 65536
 #define O_NOFOLLOW 131072
 
 #define PATH_MAX 4096
 
-
-
+void perror(const char *s);
 
 
 #ifdef __cplusplus

@@ -4,6 +4,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef uint64_t blkcnt_t;
 typedef uint64_t blksize_t;
 typedef uint64_t clock_t;
@@ -18,7 +22,7 @@ typedef uint64_t key_t;
 typedef uint64_t mode_t;
 typedef uint64_t nlink_t;
 typedef int64_t off_t;
-typedef uint64_t pid_t;
+typedef uint32_t pid_t;
 typedef uint64_t pthread_attr_t;
 typedef uint64_t pthread_barrier_t;
 typedef uint64_t pthread_barrierattr_t;
@@ -42,4 +46,15 @@ typedef uint64_t trace_id_t;
 typedef uint64_t uid_t;
 typedef uint64_t useconds_t;
 
+typedef uint64_t fsid_t;
+
+struct passwd {
+	char * pw_dir;
+};
+
+typedef size_t socklen_t;
+
+#ifdef __cplusplus
+}
+#endif
 #endif // SYS_TYPES_H
