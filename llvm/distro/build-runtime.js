@@ -1,0 +1,26 @@
+[
+	[".", "mkdir", "-p", "build-runtime"],
+	["build-runtime",
+		"env",
+		"CC=clang",
+		"CXX=clang++",
+		"cmake",
+		"../runtimes",
+		"-DLLVM_ENABLE_RUNTIMES=compiler-rt;libcxx;libcxxabi;libunwind",
+		"-DCMAKE_BUILD_TYPE=Release",
+		"-DCMAKE_C_COMPILER=clang",
+		"-DDEFAULT_SYSROOT=/home/silvio/stuff/sources/elfx86/llvm/src/__zwolf_rundir__/xlibc/",
+		"-DCMAKE_INSTALL_PREFIX=/home/silvio/stuff/sources/elfx86/llvm",
+		"-DCMAKE_C_COMPILER_TARGET=x86_64-unknown-linux-zwolf",
+		"-DLLVM_TARGETS_TO_BUILD=X86",
+		"-DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON",
+		"-DLIBCXX_USE_COMPILER_RT=ON",
+		"-DLIBCXXABI_USE_COMPILER_RT=ON",
+		"-DCOMPILER_RT_DEFAULT_TARGET_ARCH=amd64",
+		"-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON",
+		"-DLIBCXX_ENABLE_DEBUG_MODE=ON",
+		"-G", "Ninja"
+	],
+	["build-runtime", "ninja", "compiler-rt", "cxx", "cxxabi", "unwind"],
+	["build-runtime", "ninja", "install"]
+]
