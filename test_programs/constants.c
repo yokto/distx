@@ -1,6 +1,7 @@
 #define _GNU_SOURCE 1
 #include <fcntl.h>
 #include <stdio.h>
+#include <sys/mman.h>
 #include <errno.h>
 #include <threads.h>
 #include <signal.h>
@@ -94,4 +95,8 @@ C(SYS_futex)
 C(FUTEX_WAIT_PRIVATE)
 C(FUTEX_WAKE_PRIVATE)
 C(ETIMEDOUT)
+C(PROT_READ)
+C(PROT_WRITE)
+C(MAP_PRIVATE)
+C(MAP_ANONYMOUS)
 }

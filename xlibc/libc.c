@@ -24,6 +24,8 @@
 #include <thread_impl.h>
 #include <unistd.h>
 
+//#define FENCE 1
+
 #define SUCCESS 0
 
 DLL_PUBLIC
@@ -133,6 +135,8 @@ DECLARE(int, fflush, FILE* file)
 DECLARE(size_t, fwrite, const void * ptr, size_t size, size_t nmemb, FILE * stream)
 static FILE* (*_wfopen_ms)(const uint16_t *filename, const uint16_t *mode) __attribute((ms_abi)); 
 static FILE* (*fopen_sysv)(const char *filename, const char *mode);
+void *(*mmap_sysv)(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
+int (*munmap_sysv)(void *addr, size_t length);
 DECLARE(FILE*, fdopen, int fd, const char *mode)
 DECLARE(int, fclose, FILE* stream)
 DECLARE(long, ftell, FILE* stream)
@@ -368,6 +372,8 @@ __attribute__((constructor)) void init() {
 		truncate_sysv = dlsym(libc, "truncate");
 		statvfs_sysv = dlsym(libc, "statvfs");
 		lstat_sysv = dlsym(libc, "lstat");
+		mmap_sysv = dlsym(libc, "mmap");
+		munmap_sysv = dlsym(libc, "munmap");
 		environ = *(void**)dlsym(libc, "__environ");
 		stdin = dlsym(libc, "_IO_2_1_stdin_");
 		stdout = dlsym(libc, "_IO_2_1_stdout_");
@@ -450,39 +456,77 @@ int sscanf(const char *str, const char *format, ...) {
 //
 DLL_PUBLIC
 void free(void* ptr) {
-	__debug_printf("execute os free\n");
+	__debug_printf("execute os free %p\n", ptr);
 	if (isWin) {
 		return free_ms(ptr);
 	} else {
+#ifdef FENCE
+		if (ptr == 0) { return; }
+		uint64_t oldsize = *(uint64_t*)(ptr-8);
+		munmap_sysv(ptr-8, oldsize + 8);
+		return;
+#else
 		return free_sysv(ptr);
+#endif
 	}
 }
 
+#define PROT_READ       1
+#define PROT_WRITE      2
+#define MAP_PRIVATE     2
+#define MAP_ANONYMOUS   32
 
 DLL_PUBLIC void* malloc(size_t new_size) {
-	__debug_printf("execute os malloc %ld\n", new_size);
+	__debug_printf("execute os malloc %ld ", new_size);
+	void* result = 0;
 	if (isWin) {
-		return malloc_ms(new_size);
+		result = malloc_ms(new_size);
 	} else {
-		return malloc_sysv(new_size);
+#ifdef FENCE
+		result = mmap_sysv(0, new_size + 8, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+		*(uint64_t*) result = new_size;
+		result += 8;
+#else
+		result = malloc_sysv(new_size);
+#endif
 	}
+	__debug_printf("= %p\n", result);
+	return result;
 }
 
-DLL_PUBLIC void *calloc(size_t nmemb, size_t size) IMPLEMENT(calloc, nmemb, size)
+DLL_PUBLIC void *calloc(size_t nmemb, size_t size) {
+	__debug_printf("execute os calloc %ld x %ld ", nmemb, size);
+	void* result = 0;
+	if (isWin) {
+		result = calloc_ms(nmemb, size);
+	} else {
+#ifdef FENCE
+		result = malloc(nmemb * size);
+		memset(result, 0, nmemb * size);
+#else
+		result = calloc_sysv(nmemb, size);
+#endif
+	}
+	__debug_printf("= %p\n", result);
+	return result;
+}
 
 DLL_PUBLIC
 void* aligned_alloc(size_t alignment, size_t new_size) {
-	__debug_printf("execute os aligned_alloc\n");
+	__debug_printf("execute os aligned_alloc alignment %d size %d", alignment, new_size);
+	void* ret=0;
 	if (isWin) {
-		return aligned_alloc_ms(new_size, alignment);
+		ret = aligned_alloc_ms(new_size, alignment);
 	} else {
-		return aligned_alloc_sysv(alignment, new_size);
+		ret = aligned_alloc_sysv(alignment, new_size);
 	}
+	__debug_printf("= %p\n", ret);
+	return ret;
 }
 
 DLL_PUBLIC
 void aligned_free(void* ptr) {
-	__debug_printf("execute os aligned_free\n");
+	__debug_printf("execute os aligned_free %p\n", ptr);
 	if (isWin) {
 		return aligned_free_ms(ptr);
 	} else {
@@ -492,11 +536,19 @@ void aligned_free(void* ptr) {
 
 DLL_PUBLIC
 void *realloc(void *ptr, size_t size) {
-	__debug_printf("execute os realloc\n");
+	__debug_printf("execute os realloc %p %p\n", ptr, size);
 	if (isWin) {
 		return realloc_ms(ptr, size);
 	} else {
+#ifdef FENCE
+		if (ptr == 0) { return malloc(size); }
+		uint64_t oldsize = *(uint64_t*)(ptr-8);
+		void* res = malloc(size);
+		memcpy(res, ptr, oldsize > size ? size : oldsize);
+		return res;
+#else
 		return realloc_sysv(ptr, size);
+#endif
 	}
 }
 

@@ -7,6 +7,7 @@
 #include "common.h"
 #include <errno.h>
 #include "threads.h"
+#include <stdlib.h>
 
 static bool (*WaitOnAddress)(volatile void *Address, void* CompareAddress, size_t AddressSize, uint32_t dwMilliseconds);
 static void (*WakeByAddressSingle)(void* Address);
@@ -25,7 +26,6 @@ void init_threads(bool iswin, void* lib) {
 	isWin = iswin;
 	if (isWin) {
 		void* sync = __dlopen("api-ms-win-core-synch-l1-2-0.dll");
-		__debug_printf("sync %p\n\n\n", sync);
 		WaitOnAddress = __dlsym(sync, "WaitOnAddress");
 		WakeByAddressAll = __dlsym(sync, "WakeByAddressAll");
 		WakeByAddressSingle = __dlsym(sync, "WakeByAddressSingle");
@@ -37,20 +37,20 @@ void init_threads(bool iswin, void* lib) {
 DLL_PUBLIC
 int32_t futex_wait(_Atomic uint32_t *addr, uint32_t val, const struct timespec *to)
 {
-	__debug_printf("futex_wait\n\n\n");
+	__debug_printf("futex_wait\n");
 	if (isWin) {
 		if (to == NULL)
 		{
 			WaitOnAddress((volatile void *)addr, &val, sizeof (val),
 					-1);
-			__debug_printf("futex_wait done\n\n\n");
+			__debug_printf("futex_wait done\n");
 			return 0;
 		}
 
 		if (to->tv_nsec >= 1000000000)
 		{
 			errno = EINVAL;
-			__debug_printf("futex_wait done\n\n\n");
+			__debug_printf("futex_wait done\n");
 			return -1;
 		}
 
@@ -58,7 +58,7 @@ int32_t futex_wait(_Atomic uint32_t *addr, uint32_t val, const struct timespec *
 		{
 			WaitOnAddress((volatile void *)addr, &val, sizeof (val),
 					2147000000);
-			__debug_printf("futex_wait done\n\n\n");
+			__debug_printf("futex_wait done\n");
 			return 0; /* time-out out of range, claim spurious wake-up */
 		}
 
@@ -69,13 +69,13 @@ int32_t futex_wait(_Atomic uint32_t *addr, uint32_t val, const struct timespec *
 					sizeof (val), ms))
 		{
 			errno = ETIMEDOUT;
-			__debug_printf("futex_wait done\n\n\n");
+			__debug_printf("futex_wait done\n");
 			return -1;
 		}
 		return 0;
 	} else {
             int32_t ret = syscall(SYS_futex, addr, FUTEX_WAIT_PRIVATE, val, to, NULL, 0);
-	    __debug_printf("futex_wait done\n\n\n");
+	    __debug_printf("futex_wait done\n");
 	    return ret;
 	}
 }
@@ -83,11 +83,11 @@ int32_t futex_wait(_Atomic uint32_t *addr, uint32_t val, const struct timespec *
 DLL_PUBLIC
 int futex_signal(_Atomic uint32_t *addr)
 {
-	__debug_printf("futex_signal\n\n\n");
+	__debug_printf("futex_signal\n");
 	if (isWin) {
-	__debug_printf("futex_signal %p %p \n\n\n", WakeByAddressSingle, addr);
+	__debug_printf("futex_signal %p %p \n", WakeByAddressSingle, addr);
 		WakeByAddressSingle(addr);
-	__debug_printf("futex_signal done\n\n\n");
+	__debug_printf("futex_signal done\n");
 		return 0;
 	} else {
 		return (syscall(SYS_futex, addr, FUTEX_WAKE_PRIVATE, 1, NULL, NULL, 0) >= 1) ? 0 : 1;
@@ -97,7 +97,7 @@ int futex_signal(_Atomic uint32_t *addr)
 DLL_PUBLIC
 int futex_broadcast(_Atomic uint32_t *addr)
 {
-	__debug_printf("futex_broadcast\n\n\n");
+	__debug_printf("futex_broadcast\n");
 	if (isWin) {
 		WakeByAddressAll(addr);
 		return 0;
@@ -111,6 +111,7 @@ int futex_broadcast(_Atomic uint32_t *addr)
 DLL_PUBLIC
 int mtx_init(mtx_t *m, int type)
 {
+	__debug_printf("mtx_init\n");
 	*m = 0;
 	return 0;
 }
@@ -118,6 +119,7 @@ int mtx_init(mtx_t *m, int type)
 DLL_PUBLIC
 void mtx_destroy(mtx_t *m)
 {
+	__debug_printf("mtx_destroy\n");
 	/* Do nothing */
 	(void) m;
 }
@@ -125,14 +127,15 @@ void mtx_destroy(mtx_t *m)
 DLL_PUBLIC
 int mtx_lock(mtx_t *m)
 {
+	//__debug_printf("mtx_lock\n");
 	int i;
 	uint32_t c;
 	
 	/* Spin and try to take lock */
 	for (i = 0; i < 100; i++)
 	{
-		c = 1;
-		__atomic_compare_exchange_n(m, &c, 0, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+		c = 0;
+		__atomic_compare_exchange_n(m, &c, 1, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 		if (!c) return 0;
 		
 		//cpu_relax();
@@ -154,6 +157,7 @@ int mtx_lock(mtx_t *m)
 DLL_PUBLIC
 int mtx_unlock(mtx_t *m)
 {
+	//__debug_printf("mtx_unlock %d\n" , *m);
 	int i;
 	
 	/* Unlock, and if not contended then exit. */
@@ -161,7 +165,9 @@ int mtx_unlock(mtx_t *m)
 	{
 		*m = 0;
 	}
-	else if (__atomic_exchange_n(m, 0, __ATOMIC_SEQ_CST) == 1) return 0;
+	else if (__atomic_exchange_n(m, 0, __ATOMIC_SEQ_CST) == 1) {
+		return 0;
+	}
 
 	/* Spin and hope someone takes the lock */
 	for (i = 0; i < 200; i++)
@@ -169,8 +175,8 @@ int mtx_unlock(mtx_t *m)
 		if (*m)
 		{
 			/* Need to set to state 2 because there may be waiters */
-			uint32_t expected = 2;
-			__atomic_compare_exchange_n(m, &expected, 1, true,  __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+			uint32_t expected = 1;
+			__atomic_compare_exchange_n(m, &expected, 2, true,  __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 			if (expected) return 0;
 		}
 		//cpu_relax();
@@ -185,9 +191,10 @@ int mtx_unlock(mtx_t *m)
 DLL_PUBLIC
 int mtx_trylock(mtx_t *m)
 {
+	__debug_printf("mtx_trylock\n");
 	/* Try to take the lock, if is currently unlocked */
-	uint32_t c = 1;
-	__atomic_compare_exchange_n(m, &c, 0, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+	uint32_t c = 0;
+	__atomic_compare_exchange_n(m, &c, 1, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 	if (!c) return 0;
 	return EBUSY;
 }
@@ -198,6 +205,7 @@ int mtx_trylock(mtx_t *m)
 DLL_PUBLIC
 int cnd_init(cnd_t *c)
 {
+	__debug_printf("cnd_init\n");
 	c->m = NULL;
 
 	/* Sequence variable doesn't actually matter, but keep valgrind happy */
@@ -209,6 +217,7 @@ int cnd_init(cnd_t *c)
 DLL_PUBLIC
 void cnd_destroy(cnd_t *c)
 {
+	__debug_printf("cnd_destroy\n");
 	/* No need to do anything */
 	(void) c;
 }
@@ -216,6 +225,7 @@ void cnd_destroy(cnd_t *c)
 DLL_PUBLIC
 int cnd_signal(cnd_t *c)
 {
+	__debug_printf("cnd_signal\n");
 	/* We are waking someone up */
 	__atomic_add_fetch(&c->seq, 1, __ATOMIC_SEQ_CST);
 	
@@ -228,6 +238,7 @@ int cnd_signal(cnd_t *c)
 DLL_PUBLIC
 int cnd_broadcast(cnd_t *c)
 {
+	__debug_printf("cnd_broadcast\n");
 	mtx_t *m = c->m;
 	
 	/* No mutex means that there are no waiters */
@@ -245,11 +256,12 @@ int cnd_broadcast(cnd_t *c)
 DLL_PUBLIC
 int cnd_wait(cnd_t *c, mtx_t *m)
 {
+	__debug_printf("cnd_wait\n");
 	int seq = c->seq;
 
 	if (c->m != m)
 	{
-		/* Atomically set mutex inside cv */
+		/* Atomically set mutex inside cnd_t */
 		void *expected = NULL;
 		__atomic_compare_exchange_n(&c->m, &expected, m, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 		if (c->m != m) return EINVAL;
@@ -270,6 +282,7 @@ int cnd_wait(cnd_t *c, mtx_t *m)
 DLL_PUBLIC
 int cnd_timedwait(cnd_t* c, mtx_t* m, const struct timespec* time_point )
 {
+	__debug_printf("cnd_timedwait\n");
 	int seq = c->seq;
 
 	if (c->m != m)

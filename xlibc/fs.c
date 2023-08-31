@@ -225,7 +225,7 @@ int32_t base_fs_tonativepathlen(const char *pathname, uintptr_t* length) {
 		*length *= 2;
 		return ret;
 	} else {
-		*length = strlen(pathname + 1);
+		*length = strlen(pathname) + 1;
 		return SUCCESS;
 	}
 }

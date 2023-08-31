@@ -1,40 +1,51 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <threads.h>
 
-int main() {
-    mtx_t mtx;
-    int result;
+#define NUM_THREADS 8
+#define ITERATIONS 1000000
 
-    // Testing mtx_init
-    if ((result = mtx_init(&mtx, mtx_plain)) != thrd_success) {
-        printf("Mutex initialization failed with error code: %d\n", result);
-        return -1;
+mtx_t mutex;
+int shared_counter = 0;
+
+int worker(void *arg) {
+    for (int i = 0; i < ITERATIONS; ++i) {
+        mtx_lock(&mutex);
+        ++shared_counter;
+        mtx_unlock(&mutex);
     }
-    printf("Mutex initialized successfully.\n");
-
-    // Testing mtx_lock and mtx_unlock
-    if ((result = mtx_lock(&mtx)) != thrd_success) {
-        printf("Mutex lock failed with error code: %d\n", result);
-        mtx_destroy(&mtx);
-        return -1;
-    }
-    printf("Mutex locked.\n");
-
-    if ((result = mtx_unlock(&mtx)) != thrd_success) {
-        printf("Mutex unlock failed with error code: %d\n", result);
-        mtx_destroy(&mtx);
-        return -1;
-    }
-
-    // Testing mtx_trylock
-    if ((result = mtx_trylock(&mtx)) == thrd_success) {
-        printf("Mutex locked with trylock.\n");
-        mtx_unlock(&mtx);
-    } else {
-        printf("trylock failed. Mutex is already locked. res %d\n", result);
-    }
-
-    mtx_destroy(&mtx);
     return 0;
 }
+
+int main() {
+    if (mtx_init(&mutex, mtx_plain) != thrd_success) {
+        perror("Mutex initialization failed");
+        return -1;
+    }
+
+    thrd_t threads[NUM_THREADS];
+    for (int i = 0; i < NUM_THREADS; ++i) {
+        if (thrd_create(&threads[i], worker, NULL) != thrd_success) {
+            perror("Thread creation failed");
+            return -1;
+        }
+    }
+
+    for (int i = 0; i < NUM_THREADS; ++i) {
+        if (thrd_join(threads[i], NULL) != thrd_success) {
+            perror("Thread join failed");
+            return -1;
+        }
+    }
+
+    mtx_destroy(&mutex);
+
+    // Check if the shared counter matches the expected value
+    if (shared_counter == NUM_THREADS * ITERATIONS) {
+        printf("Test passed\n");
+        return 0;
+    } else {
+        printf("Test failed\n");
+        return -1;
+    }
+}
+
