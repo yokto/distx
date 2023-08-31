@@ -2,7 +2,9 @@
 #include <string.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdbool.h>
+#include <math.h>
 
 DLL_PUBLIC
 size_t strlen(const char* str) {
@@ -327,6 +329,36 @@ int atoi(const char *str) {
 
     return result * sign;
 }
+
+DLL_PUBLIC
+double atof(const char *arr)
+{
+	double value = 0;
+	int afterdot=0;
+	double scale=1;
+	int negative = 0; 
+
+	if (*arr == '-') {
+		arr++;
+		negative = 1;
+	}
+	while (*arr) {
+		if (afterdot) {
+			scale = scale/10;
+			value = value + (*arr-'0')*scale;
+		} else {
+			if (*arr == '.') {
+				afterdot++;
+			}
+			else
+				value = value * 10.0 + (*arr - '0');
+		}
+		arr++;
+	}
+	if(negative) return -value;
+	else    return  value;
+}
+
 
 char* strrchr(const char* str, int ch) {
     const char* last_occurrence = NULL;

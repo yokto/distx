@@ -680,7 +680,8 @@ void* dlopen2(char* name) {
 	}
 
 	DEBUG("\t\tgetting lib %s\n", name)
-	return LoadLibrary("msvcrt.dll");
+	//return LoadLibrary("msvcrt.dll");
+	return LoadLibrary(name);
 #else
 	remove_local_libs();
 	void* res = dlopen(name, RTLD_NOW);
@@ -694,10 +695,15 @@ void* dlsym2(void* lib, char* name) {
 	DEBUG("dlsyming %s\n", name)
 #if defined(WIN32)
 	DEBUG("\t\tgetting sym %s from lib %p\n", name, lib)
-	return GetProcAddress(lib, name);
+	void* sym = GetProcAddress(lib, name);
 #else
-	return dlsym(lib, name);
+	void* sym = dlsym(lib, name);
 #endif
+	if (sym == 0) {
+		WARN("\t\t sym %s is zero\n", name)
+	}
+	DEBUG("\t\tgot sym %s = %p\n", name, sym);
+	return sym;
 }
 
 void dlclose2(void* lib) {
@@ -904,6 +910,18 @@ char ** init_win_argv(int count) {
 #endif
 
 int main(int argc, char ** argv) {
+	const char * exec_env = "ZWOLF_EXECUTABLE";
+#ifdef WIN32
+	const char * path = _fullpath(0, argv[0], 0);
+	char* path2 = calloc(strlen(path) + strlen(exec_env) + 1, 1);
+	strcat(path2, exec_env);
+	strcat(path2, path);
+	free(path);
+	_putenv(path2);
+#else
+	const char * path = realpath(argv[0], 0);
+	setenv(exec_env, path, true);
+#endif
 	if (getenv("ZWOLF_DEBUG")) {
 		zwolf_debug = true;
 	}

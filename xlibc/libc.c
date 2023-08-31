@@ -21,6 +21,8 @@
 #include <common.h>
 #include <sys/stat.h>
 #include <fs.h>
+#include <thread_impl.h>
+#include <unistd.h>
 
 #define SUCCESS 0
 
@@ -156,6 +158,7 @@ DECLARE(char*, realpath, const char * path, char * resolved_path);
 DECLARE(int, mkdir, const char *pathname, mode_t mode);
 int (*_mkdir_ms)(const char *pathname) __attribute((ms_abi));
 DECLARE(int, stat, const char * pathname, struct stat * statbuf);
+DECLARE(int, fstat, int fd, struct stat * statbuf);
 DECLARE(char*, getcwd, char *buf, size_t size);
 DECLARE(struct dirent*, readdir, DIR * dir);
 DECLARE(int, closedir, DIR* dir);
@@ -243,6 +246,7 @@ __attribute__((constructor)) void init() {
 	}
 
 	init_fs(isWin, libc);
+	init_threads(isWin, libc);
 	init_proc(isWin, libc);
 	if (isWin) {
 		vswprintf_ms = dlsym(libc, "vswprintf");
@@ -276,11 +280,11 @@ __attribute__((constructor)) void init() {
 		cnd_signal_ms = dlsym(kernel32, "WakeConditionVariable");
 		cnd_destroy_ms = 0; // not needed
 		cnd_timedwait_ms = 0;
-		mtx_init_ms = dlsym(kernel32, "InitializeCriticalSection");
-		mtx_lock_ms = dlsym(kernel32, "EnterCriticalSection");
-		mtx_unlock_ms = dlsym(kernel32, "LeaveCriticalSection");
-		mtx_trylock_ms = dlsym(kernel32, "TryEnterCriticalSection");
-		mtx_destroy_ms = dlsym(kernel32, "DeleteCriticalSection");
+//		mtx_init_ms = dlsym(kernel32, "InitializeCriticalSection");
+//		mtx_lock_ms = dlsym(kernel32, "EnterCriticalSection");
+//		mtx_unlock_ms = dlsym(kernel32, "LeaveCriticalSection");
+//		mtx_trylock_ms = dlsym(kernel32, "TryEnterCriticalSection");
+//		mtx_destroy_ms = dlsym(kernel32, "DeleteCriticalSection");
 		thrd_equal_ms = 0;
 		GetThreadId_ms = dlsym(kernel32, "GetThreadId");
 		clock_gettime_ms = 0; //dlsym(libc, "clock_gettime");
@@ -288,6 +292,7 @@ __attribute__((constructor)) void init() {
 		realpath_ms = 0; //dlsym(libc, "realpath");
 		_mkdir_ms = dlsym(libc, "_mkdir");
 		stat_ms = dlsym(libc, "_stat");
+		fstat_ms = dlsym(libc, "_fstat");
 		getcwd_ms = 0; //dlsym(libc, "getcwd");
 		readdir_ms = 0; //dlsym(libc, "readdir");
 		closedir_ms = 0; //dlsym(libc, "closedir");
@@ -338,17 +343,18 @@ __attribute__((constructor)) void init() {
 		cnd_wait_sysv = dlsym(libc, "cnd_wait");
 		cnd_destroy_sysv = dlsym(libc, "cnd_destroy");
 		cnd_timedwait_sysv = dlsym(libc, "cnd_timedwait");
-		mtx_init_sysv = dlsym(libc, "mtx_init");
-		mtx_lock_sysv = dlsym(libc, "mtx_lock");
-		mtx_unlock_sysv = dlsym(libc, "mtx_unlock");
-		mtx_trylock_sysv = dlsym(libc, "mtx_trylock");
-		mtx_destroy_sysv = dlsym(libc, "mtx_destroy");
+//		mtx_init_sysv = dlsym(libc, "mtx_init");
+//		mtx_lock_sysv = dlsym(libc, "mtx_lock");
+//		mtx_unlock_sysv = dlsym(libc, "mtx_unlock");
+//		mtx_trylock_sysv = dlsym(libc, "mtx_trylock");
+//		mtx_destroy_sysv = dlsym(libc, "mtx_destroy");
 		thrd_equal_sysv = dlsym(libc, "thrd_equal");
 		clock_gettime_sysv = dlsym(libc, "clock_gettime");
 		getentropy_sysv = dlsym(libc, "getentropy");
 		realpath_sysv = dlsym(libc, "realpath");
 		mkdir_sysv = dlsym(libc, "mkdir");
 		stat_sysv = dlsym(libc, "stat");
+		fstat_sysv = dlsym(libc, "fstat");
 		getcwd_sysv = dlsym(libc, "getcwd");
 		readdir_sysv = dlsym(libc, "readdir");
 		closedir_sysv = dlsym(libc, "closedir");
@@ -383,7 +389,7 @@ DLL_PUBLIC
 int ungetc(int c, FILE *stream) {
     UNUSED(c);
     UNUSED(stream);
-    fprintf(stderr, "vsscanf not implemented");
+    fprintf(stderr, "vsscanf not implemented\n");
     fflush(stderr);
     abort();
     return 0;
@@ -414,7 +420,7 @@ int vsscanf(const char *s, const char *format, va_list arg) {
     UNUSED(s);
     UNUSED(format);
     UNUSED(arg);
-    fprintf(stderr, "vsscanf not implemented");
+    fprintf(stderr, "vsscanf not implemented\n");
     fflush(stderr);
     abort();
     return 0;
@@ -526,8 +532,6 @@ DLL_PUBLIC int remove(const char *pathname) {
 
 static const char basealias[] = "/__zwolf_rundir__/";
 #define basealias_len (sizeof(basealias) - 1)
-static const char buildalias[] = "/__zwolf_builddir__/";
-#define buildalias_len (sizeof(buildalias) - 1)
 
 DLL_PUBLIC
 FILE *fopen(const char *filenameOrig, const char *mode) {
@@ -544,16 +548,6 @@ FILE *fopen(const char *filenameOrig, const char *mode) {
 			filename = __builtin_alloca(baselen + filelen - basealias_len + 1);
 			memcpy(filename, base, baselen);
 			memcpy(filename + baselen, filenameOrig + basealias_len, filelen - basealias_len + 1);
-		}
-	}
-	if (strncmp(buildalias, filename, buildalias_len) == 0) {
-		char* build = getenv("ZWOLF_BUILDDIR");
-		if (build) {
-			int buildlen = strlen(build);
-
-			filename = __builtin_alloca(buildlen + filelen - buildalias_len + 1);
-			memcpy(filename, build, buildlen);
-			memcpy(filename + buildlen, filenameOrig + buildalias_len, filelen - buildalias_len + 1);
 		}
 	}
 
@@ -753,68 +747,65 @@ DLL_PUBLIC int tss_set(tss_t tss_id, void *val) {
 }
 
 
-DLL_PUBLIC int cnd_init(cnd_t* cond) {
-	__debug_printf("execute os cnd_init\n");
-	if (isWin) {
-		cnd_init_ms(cond);
-		return thrd_success;
-	} else {
-		return cnd_init_sysv(cond);
-	}
-}
-DLL_PUBLIC int cnd_broadcast( cnd_t *cond ) {
-	__debug_printf("execute os cnd_broadcast\n");
-	if (isWin) {
-		cnd_broadcast_ms(cond);
-		return thrd_success;
-	} else {
-		return cnd_broadcast_sysv(cond);
-	}
-}
-DLL_PUBLIC int cnd_wait( cnd_t* cond, mtx_t* mutex ) {
-	__debug_printf("execute os cnd_wait\n");
-	if (isWin) {
-		SleepConditionVariableCS(cond, (mtx_t*)*mutex, -1);
-		return thrd_success;
-	} else {
-		return cnd_wait_sysv(cond, (mtx_t*)*mutex);
-	}
-}
-DLL_PUBLIC int cnd_signal(cnd_t *cond ) {
-	__debug_printf("execute os cnd_signal\n");
-	if (isWin) {
-		cnd_signal_ms(cond);
-		return thrd_success;
-	} else {
-		return cnd_signal_sysv(cond);
-	}
-}
-DLL_PUBLIC void cnd_destroy(cnd_t* cond ) {
-	__debug_printf("execute os cnd_destroy\n");
-	if (isWin) {
-		// nothing to do
-	} else {
-		return cnd_destroy_sysv(cond);
-	}
-}
-DLL_PUBLIC int cnd_timedwait( cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point ) {
-	__debug_printf("execute os cnd_wait\n");
-	if (isWin) {
-		uint32_t milliseconds = (uint32_t)(time_point->tv_sec * 1000) + (uint32_t)(time_point->tv_nsec / 1000000);
-		return SleepConditionVariableCS(cond, (mtx_t*)*mutex, milliseconds) == 0 ? thrd_timedout : thrd_success;
-	} else {
-		return cnd_timedwait_sysv(cond, (mtx_t*)*mutex, time_point);
-	}
-}
+//DLL_PUBLIC int cnd_init(cnd_t* cond) {
+//	__debug_printf("execute os cnd_init\n");
+//	if (isWin) {
+//		cnd_init_ms(cond);
+//		return thrd_success;
+//	} else {
+//		return cnd_init_sysv(cond);
+//	}
+//}
+//DLL_PUBLIC int cnd_broadcast( cnd_t *cond ) {
+//	__debug_printf("execute os cnd_broadcast\n");
+//	if (isWin) {
+//		cnd_broadcast_ms(cond);
+//		return thrd_success;
+//	} else {
+//		return cnd_broadcast_sysv(cond);
+//	}
+//}
+//DLL_PUBLIC int cnd_wait( cnd_t* cond, mtx_t* mutex ) {
+//	__debug_printf("execute os cnd_wait\n");
+//	if (isWin) {
+//		SleepConditionVariableCS(cond, (mtx_t*)*mutex, -1);
+//		return thrd_success;
+//	} else {
+//		return cnd_wait_sysv(cond, (mtx_t*)*mutex);
+//	}
+//}
+//DLL_PUBLIC int cnd_signal(cnd_t *cond ) {
+//	__debug_printf("execute os cnd_signal\n");
+//	if (isWin) {
+//		cnd_signal_ms(cond);
+//		return thrd_success;
+//	} else {
+//		return cnd_signal_sysv(cond);
+//	}
+//}
+//DLL_PUBLIC void cnd_destroy(cnd_t* cond ) {
+//	__debug_printf("execute os cnd_destroy\n");
+//	if (isWin) {
+//		// nothing to do
+//	} else {
+//		return cnd_destroy_sysv(cond);
+//	}
+//}
+//DLL_PUBLIC int cnd_timedwait( cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point ) {
+//	__debug_printf("execute os cnd_wait\n");
+//	if (isWin) {
+//		uint32_t milliseconds = (uint32_t)(time_point->tv_sec * 1000) + (uint32_t)(time_point->tv_nsec / 1000000);
+//		return SleepConditionVariableCS(cond, (mtx_t*)*mutex, milliseconds) == 0 ? thrd_timedout : thrd_success;
+//	} else {
+//		return cnd_timedwait_sysv(cond, (mtx_t*)*mutex, time_point);
+//	}
+//}
 
 DLL_PUBLIC int stat(const char * pathname, struct stat * statbuf) {
-		printf("bar\n\n\n");
 	__debug_printf("execute os stat on path %s buf %p\n", pathname, statbuf);
 	if (isWin) {
 		struct windows_stat ls;
-		printf("bar\n\n\n");
 		const int ret = stat_ms(pathname, (struct stat*)&ls);
-		printf("bar\n\n\n");
 		if (ret == -1) { errno = __errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
@@ -828,6 +819,35 @@ DLL_PUBLIC int stat(const char * pathname, struct stat * statbuf) {
 	} else {
 		struct linux_stat ls;
 		const int ret = stat_sysv(pathname, (struct stat*)&ls);
+		if (ret == -1) { errno = __errno(); }
+		statbuf->st_mode = ls.st_mode;        /* File type and mode */
+		statbuf->st_dev = ls.st_dev;
+		statbuf->st_ino = ls.st_ino;
+		statbuf->st_nlink = ls.st_nlink;
+		statbuf->st_size = ls.st_size;
+		statbuf->st_mtim = ls.st_mtim;
+		__debug_printf("stat returned %d %p mode foo %ld\n", ret, statbuf, ls.st_mode);
+		return ret;
+	}
+}
+DLL_PUBLIC int fstat(int fd, struct stat * statbuf) {
+	__debug_printf("execute os fstat on fd %d buf %p\n", fd, statbuf);
+	if (isWin) {
+		struct windows_stat ls;
+		const int ret = fstat_ms(fd, (struct stat*)&ls);
+		if (ret == -1) { errno = __errno(); }
+		statbuf->st_mode = ls.st_mode;        /* File type and mode */
+		statbuf->st_dev = ls.st_dev;
+		statbuf->st_ino = ls.st_ino;
+		statbuf->st_nlink = ls.st_nlink;
+		statbuf->st_size = ls.st_size;
+		statbuf->st_mtim.tv_sec = ls.wst_mtime / 1000;
+		statbuf->st_mtim.tv_nsec = (ls.wst_mtime % 1000) * 1000000;
+		__debug_printf("stat returned %d %p mode %lx\n", ret, statbuf, ls.st_mode);
+		return ret;
+	} else {
+		struct linux_stat ls;
+		const int ret = fstat_sysv(fd, (struct stat*)&ls);
 		if (ret == -1) { errno = __errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
@@ -956,16 +976,16 @@ int ftruncate(int fd, uint64_t length) {
 	return -1;
 }
 
-DLL_PUBLIC void mtx_destroy(mtx_t *mutex ) {
-	__debug_printf("execute os mtx_destroy\n");
-	if (mutex == NULL) { return; }
-	if (isWin) {
-		mtx_destroy_ms((mtx_t*)*mutex);
-	} else {
-		mtx_destroy_sysv((mtx_t*)*mutex);
-	}
-	free(*mutex);
-}
+//DLL_PUBLIC void mtx_destroy(mtx_t *mutex ) {
+//	__debug_printf("execute os mtx_destroy\n");
+//	if (mutex == NULL) { return; }
+//	if (isWin) {
+//		mtx_destroy_ms((mtx_t*)*mutex);
+//	} else {
+//		mtx_destroy_sysv((mtx_t*)*mutex);
+//	}
+//	free(*mutex);
+//}
 
 int mtx_init_if_needed(mtx_t* mutex) {
 	__debug_printf("execute os mtx_init_if_needed %p at %p\n", *mutex, mutex);
@@ -980,57 +1000,57 @@ int mtx_init_if_needed(mtx_t* mutex) {
 	}
 	return thrd_success;
 }
-DLL_PUBLIC int mtx_init(mtx_t* mutex, int type) {
-	__debug_printf("execute os mtx_init %p at %p\n", *mutex, mutex);
-	mtx_t mtx = malloc(80);
-	__debug_printf("malloced %p\n", mtx);
-	if (!mtx) { return thrd_error; }
-	int ret;
-	if (isWin) {
-		ret = mtx_init_ms((mtx_t*)mtx, type);
-	} else {
-		ret = mtx_init_sysv((mtx_t*)mtx, type);
-	}
-	if (ret != thrd_success) {
-		__debug_printf("failed to init\n\n\n");
-		free(mtx);
-	}
-	*mutex = mtx;
-	return ret;
-}
+//DLL_PUBLIC int mtx_init(mtx_t* mutex, int type) {
+//	__debug_printf("execute os mtx_init %p at %p\n", *mutex, mutex);
+//	mtx_t mtx = malloc(80);
+//	__debug_printf("malloced %p\n", mtx);
+//	if (!mtx) { return thrd_error; }
+//	int ret;
+//	if (isWin) {
+//		ret = mtx_init_ms((mtx_t*)mtx, type);
+//	} else {
+//		ret = mtx_init_sysv((mtx_t*)mtx, type);
+//	}
+//	if (ret != thrd_success) {
+//		__debug_printf("failed to init\n\n\n");
+//		free(mtx);
+//	}
+//	*mutex = mtx;
+//	return ret;
+//}
 //{ UNUSED(mutex); UNUSED(type); return 0; }
 
-DLL_PUBLIC int mtx_lock(mtx_t* mutex) {
-	UNUSED(mutex);
-	__debug_printf("execute os mtx_lock %p at %p\n", *mutex, mutex);
-	mtx_init_if_needed(mutex);
-	if (isWin) {
-		mtx_lock_ms((mtx_t*)*mutex);
-		return thrd_success;
-	} else {
-		return mtx_lock_sysv((mtx_t*)*mutex);
-	}
-	return 0;
-}
-DLL_PUBLIC int mtx_trylock(mtx_t *mutex ) {
-	__debug_printf("execute os mtx_trylock %p at %p\n", *mutex, mutex);
-	mtx_init_if_needed(mutex);
-	if (isWin) {
-		return !mtx_trylock_ms((mtx_t*)*mutex);
-	} else {
-		return mtx_trylock_sysv((mtx_t*)*mutex);
-	}
-}
-DLL_PUBLIC int mtx_unlock(mtx_t* mutex) {
-	__debug_printf("execute os mtx_unlock %p at %p\n", *mutex, mutex);
-	if (*mutex == NULL) { return thrd_error; }
-	if (isWin) {
-		mtx_unlock_ms((mtx_t*)*mutex);
-		return thrd_success;
-	} else {
-		return mtx_unlock_sysv((mtx_t*)*mutex);
-	}
-}
+//DLL_PUBLIC int mtx_lock(mtx_t* mutex) {
+//	UNUSED(mutex);
+//	__debug_printf("execute os mtx_lock %p at %p\n", *mutex, mutex);
+//	mtx_init_if_needed(mutex);
+//	if (isWin) {
+//		mtx_lock_ms((mtx_t*)*mutex);
+//		return thrd_success;
+//	} else {
+//		return mtx_lock_sysv((mtx_t*)*mutex);
+//	}
+//	return 0;
+//}
+//DLL_PUBLIC int mtx_trylock(mtx_t *mutex ) {
+//	__debug_printf("execute os mtx_trylock %p at %p\n", *mutex, mutex);
+//	mtx_init_if_needed(mutex);
+//	if (isWin) {
+//		return !mtx_trylock_ms((mtx_t*)*mutex);
+//	} else {
+//		return mtx_trylock_sysv((mtx_t*)*mutex);
+//	}
+//}
+//DLL_PUBLIC int mtx_unlock(mtx_t* mutex) {
+//	__debug_printf("execute os mtx_unlock %p at %p\n", *mutex, mutex);
+//	if (*mutex == NULL) { return thrd_error; }
+//	if (isWin) {
+//		mtx_unlock_ms((mtx_t*)*mutex);
+//		return thrd_success;
+//	} else {
+//		return mtx_unlock_sysv((mtx_t*)*mutex);
+//	}
+//}
 
 DLL_PUBLIC
 wchar_t* wcschr(const wchar_t* str, wchar_t wc) {
@@ -1139,13 +1159,22 @@ int isxdigit(int c) {
 
 DLL_PUBLIC
 void __tls_get_addr() {
-    fprintf(stderr, "__tls_get_addr not implemented");
+    fprintf(stderr, "__tls_get_addr not implemented\n");
     fflush(stderr);
     abort();
 }
 
 DLL_PUBLIC
 int __cxa_atexit(void (*func) (void *), void * arg, void * dso_handle) {
+    UNUSED(dso_handle); // todo
+    UNUSED(func);
+    UNUSED(arg);
+    //fprintf(stderr, "cxa_atexit not implemented properly\n");
+    return 0;
+}
+
+DLL_PUBLIC
+int __cxa_thread_atexit_impl(void (*func) (void *), void * arg, void * dso_handle) {
     UNUSED(dso_handle); // todo
     UNUSED(func);
     UNUSED(arg);
@@ -1547,7 +1576,7 @@ size_t wcstombs(char *dest, const wchar_t *src, size_t len) {
 
 DLL_PUBLIC
 int wcrtomb(char *s, wchar_t wc, mbstate_t *ps) {
-    fprintf(stderr, "wcrtomb not implemented %s %d %p", s, wc, ps);
+    fprintf(stderr, "wcrtomb not implemented %s %d %p\n", s, wc, ps);
     fflush(stderr);
     abort();
     return 0;
@@ -1564,7 +1593,7 @@ int mbrtowc(wchar_t *pwc, const char *s, size_t n, mbstate_t *ps) {
     UNUSED(s);
     UNUSED(n);
     UNUSED(ps);
-    fprintf(stderr, "mbrtowc not implemented");
+    fprintf(stderr, "mbrtowc not implemented\n");
     fflush(stderr);
     abort();
     return 0;
@@ -1577,7 +1606,7 @@ size_t mbsnrtowcs(wchar_t *dst, const char **src, size_t nms, size_t len, mbstat
     UNUSED(nms);
     UNUSED(len);
     UNUSED(ps);
-    fprintf(stderr, "mbsnrtowcs not implemented");
+    fprintf(stderr, "mbsnrtowcs not implemented\n");
     fflush(stderr);
     abort();
     return 0;
@@ -2022,7 +2051,7 @@ DLL_PUBLIC int iswpunct(wint_t wc) {
 
 locale_t uselocale(locale_t locale) {
     UNUSED(locale);
-    fprintf(stderr, "uselocale not implemented");
+    fprintf(stderr, "uselocale not implemented\n");
     fflush(stderr);
     return 1;
 }
@@ -2030,26 +2059,26 @@ locale_t newlocale(int category_mask, const char *locale, locale_t base) {
     UNUSED(category_mask);
     UNUSED(locale);
     UNUSED(base);
-    fprintf(stderr, "newlocale not implemented");
+    fprintf(stderr, "newlocale not implemented\n");
     return 1;
 }
 void freelocale(locale_t locobj) {
     UNUSED(locobj);
-    fprintf(stderr, "freelocale not implemented");
+    fprintf(stderr, "freelocale not implemented\n");
     fflush(stderr);
     abort();
 }
 char *setlocale(int category, const char *locale) {
     UNUSED(category);
     UNUSED(locale);
-    fprintf(stderr, "setlocale not implemented");
+    fprintf(stderr, "setlocale not implemented\n");
     fflush(stderr);
     abort();
     return 0;
 }
 
 struct lconv* localeconv() {
-    fprintf(stderr, "localeconv not implemented");
+    fprintf(stderr, "localeconv not implemented\n");
     fflush(stderr);
     abort();
     return 0;
@@ -2058,7 +2087,7 @@ struct lconv* localeconv() {
 DLL_PUBLIC int mtime(const char *pathname, struct timespec * time) {
     UNUSED(pathname);
     UNUSED(time);
-    fprintf(stderr, "mtime not implemented");
+    fprintf(stderr, "mtime not implemented\n");
     fflush(stderr);
     abort();
     return 0;
@@ -2122,9 +2151,23 @@ char* getenv(const char* name) {
 }
 
 DLL_PUBLIC int access(const char *pathname, int mode) {
-	__debug_printf("access not implemented properly\n");
-	return 0;
+	__debug_printf("access %s\n", pathname);
+	uintptr_t fd = 0;
+	int32_t error = 0;
+	if (mode == F_OK) { mode = R_OK; }
+	error = base_fs_open(pathname, &fd,
+			((mode & R_OK) ? BASE_FS_OPEN_READ : 0) |
+			((mode & W_OK) ? BASE_FS_OPEN_WRITE : 0)); // ignore execute
+	if (error == SUCCESS) {
+		__debug_printf("access granted\n");
+		base_fs_close(fd);
+		return 0;
+	}
+
+	errno = error;
+	return -1;
 }
+
 DLL_PUBLIC int getpwuid_r(uid_t uid, struct passwd * pwd, char * buf, size_t buflen, struct passwd ** result) NO_IMPL(getpwuid_r)
 DLL_PUBLIC uid_t getuid(void) NO_IMPL(getuid)
 DLL_PUBLIC int dup2(int oldfd, int newfd) NO_IMPL(dup2)
@@ -2164,26 +2207,26 @@ DLL_PUBLIC int sigprocmask(int how, const sigset_t * set, sigset_t * oldset) {
 	__debug_printf("sigfprocmask not implemented properly\n");
 	return 0;
 }
-DLL_PUBLIC int fstat(int fd, struct stat *statbuf) {
-	if (true || fd<=2) {
-		statbuf->st_mode = 0;
-		statbuf->st_dev = 20;
-		statbuf->st_ino = 9;
-		statbuf->st_nlink = 1;
-		statbuf->st_size = 0;
-		statbuf->st_mtim.tv_sec = 0;
-		statbuf->st_mtim.tv_nsec = 0;
-		statbuf->st_atim.tv_sec = 0;
-		statbuf->st_atim.tv_nsec = 0;
-		statbuf->st_ctim.tv_sec = 0;
-		statbuf->st_ctim.tv_nsec = 0;
-		statbuf->st_uid = 0;         /* User ID of owner */
-		statbuf->st_gid = 0;
-		return 0;
-	}
-	__debug_printf("not implemented fstat\n"); \
-	abort(); \
-}
+//DLL_PUBLIC int fstat(int fd, struct stat *statbuf) {
+//	if (true || fd<=2) {
+//		statbuf->st_mode = 0;
+//		statbuf->st_dev = 20;
+//		statbuf->st_ino = 9;
+//		statbuf->st_nlink = 1;
+//		statbuf->st_size = 0;
+//		statbuf->st_mtim.tv_sec = 0;
+//		statbuf->st_mtim.tv_nsec = 0;
+//		statbuf->st_atim.tv_sec = 0;
+//		statbuf->st_atim.tv_nsec = 0;
+//		statbuf->st_ctim.tv_sec = 0;
+//		statbuf->st_ctim.tv_nsec = 0;
+//		statbuf->st_uid = 0;         /* User ID of owner */
+//		statbuf->st_gid = 0;
+//		return 0;
+//	}
+//	__debug_printf("not implemented fstat\n"); \
+//	abort(); \
+//}
 
 DLL_PUBLIC pid_t wait(int *wstatus) NO_IMPL(wait)
 DLL_PUBLIC pid_t wait4(pid_t pid, int *wstatus, int options, struct rusage *rusage) NO_IMPL(wait4)
@@ -2207,7 +2250,9 @@ DLL_PUBLIC int fcntl(int fd, int cmd, ... /* arg */ ) NO_IMPL(fcntl)
 DLL_PUBLIC int madvise(void *addr, size_t length, int advice) NO_IMPL(madvise)	
 DLL_PUBLIC int getpwnam_r(const char * name, struct passwd * pwd, char * buf, size_t buflen, struct passwd ** result) NO_IMPL(getpwnam_r)
 DLL_PUBLIC int fstatfs(int fd, struct statfs *buf) NO_IMPL(fstatfs)
-DLL_PUBLIC void _exit(int status) NO_IMPL(_exit)
+DLL_PUBLIC void _exit(int status) {
+	__exit(status);
+}
 DLL_PUBLIC struct tm *localtime_r(const time_t *timer, struct tm* result) NO_IMPL(localtime_r)
 DLL_PUBLIC int usleep(useconds_t usec) NO_IMPL(usleep)
 DLL_PUBLIC int sigaction(int signum, const struct sigaction * act, struct sigaction * oldact) {

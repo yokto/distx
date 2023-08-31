@@ -4,6 +4,7 @@
 #include <string.h>
 
 #define BUFFER_SIZE 1024
+#define SUCCESS 0
 
 int main() {
     const char* filename = "/__zwolf_basedir__/test_programs/example.txt";

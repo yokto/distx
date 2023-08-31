@@ -12,6 +12,7 @@ extern __thread int errno;
 #define	EILSEQ 17
 #define EINVAL 22
 #define ENOTDIR 20
+#define ETIMEDOUT 110
 
 
 #ifdef __cplusplus

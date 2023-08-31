@@ -4,9 +4,6 @@ pathadd() {
     fi
 }
 pathadd "/home/silvio/stuff/sources/elfx86/llvm/bin"
-gdb () {
-	(cd ..; command gdb /home/silvio/stuff/sources/elf/build/load_elf)
-}
 ph () {
 	echo "#include <$1>" | gcc -x c -E -  -o -
 }

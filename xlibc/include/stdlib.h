@@ -95,13 +95,14 @@ void abort() __attribute__ ((__noreturn__));
 char* getenv(const char* name);
 void qsort(void* base, size_t nmemb, size_t size, int (*compar)(const void*, const void*));
 int atoi(const char *nptr);
+double atof(const char *nptr);
 
 int rand(void);
 int rand_r(unsigned int *seedp);
 void srand(unsigned int seed);
 
 int ftruncate(int fd, uint64_t length);
-static inline void _Exit( int exit_code ) { abort(); }
+static inline void _Exit( int exit_code ) { exit(exit_code); }
 
 #ifdef __cplusplus
 }

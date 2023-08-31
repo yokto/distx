@@ -34,7 +34,7 @@ void init_fs(bool iswin, void* lib) {
 }
 
 int32_t base_fs_open(const char *path, uintptr_t* fd, uint32_t flags) {
-	__debug_printf("open %s\n", path);
+	__debug_printf("open %s flags %d\n", path, flags);
 
 	uint32_t error = SUCCESS;
 	char * nativepath = NULL;
@@ -82,6 +82,7 @@ int32_t base_fs_open(const char *path, uintptr_t* fd, uint32_t flags) {
 		}
 	} while (false);
 	if (nativepath) { free(nativepath); }
+	__debug_printf("open failed with %d\n", error);
 	return error;
 }
 
@@ -231,8 +232,6 @@ int32_t base_fs_tonativepathlen(const char *pathname, uintptr_t* length) {
 
 static const char basealias[] = "/__zwolf_rundir__/";
 #define basealias_len (sizeof(basealias) - 1)
-static const char buildalias[] = "/__zwolf_builddir__/";
-#define buildalias_len (sizeof(buildalias) - 1)
 static int32_t tonativepath(const char* filenameOrig, const char** output) {
 	*output = NULL;
 	int filelen = strlen(filenameOrig);
@@ -247,16 +246,6 @@ static int32_t tonativepath(const char* filenameOrig, const char** output) {
 			filename = __builtin_alloca(baselen + filelen - basealias_len + 1);
 			memcpy(filename, base, baselen);
 			memcpy(filename + baselen, filenameOrig + basealias_len, filelen - basealias_len + 1);
-		}
-	}
-	if (strncmp(buildalias, filename, buildalias_len) == 0) {
-		char* build = getenv("ZWOLF_BUILDDIR");
-		if (build) {
-			int buildlen = strlen(build);
-
-			filename = __builtin_alloca(buildlen + filelen - buildalias_len + 1);
-			memcpy(filename, build, buildlen);
-			memcpy(filename + buildlen, filenameOrig + buildalias_len, filelen - buildalias_len + 1);
 		}
 	}
 

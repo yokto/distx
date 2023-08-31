@@ -6,6 +6,9 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <inttypes.h>
+#include <linux/futex.h>
+#include <sys/syscall.h>      /* Definition of SYS_* constants */
+
 
 #define C(name) printf("#define " #name " \t%d\n", name);
 #define CS(name) printf("#define " #name " \t%s\n", name);
@@ -87,4 +90,8 @@ CS(PRIx32)
 CS(PRIx64)
 CS(PRIxPTR)
 
+C(SYS_futex)
+C(FUTEX_WAIT_PRIVATE)
+C(FUTEX_WAKE_PRIVATE)
+C(ETIMEDOUT)
 }

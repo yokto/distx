@@ -1,7 +1,7 @@
-CC := clang
-CXX := clang++
-BUILDDIR := $(realpath $(dir ${PWD}))
-DEPDIR := $(realpath $(dir ${PWD})/..)
+CC := __zwolf_build__/llvm/bin/clang
+CXX := __zwolf_build__/llvm/bin/clang++
+BUILDDIR := __zwolf_run__/test_programs# $(realpath $(dir ${PWD}))
+DEPDIR := __zwolf_run__# $(realpath $(dir ${PWD})/..)
 LIBFOOBAR := $(BUILDDIR)/lib/libfoobar.so
 HELLOC := $(BUILDDIR)/bin/helloc
 LIBC := $(DEPDIR)/xlibc/lib/libc.so
@@ -15,8 +15,6 @@ TESTCPP_SOURCES := $(wildcard testcpp_*.cpp)
 TESTCPP_EXECS := $(patsubst %.cpp, $(BUILDDIR)/bin/%, $(TESTCPP_SOURCES))
 TESTC_SOURCES := $(wildcard testc_*.c)
 TESTC_EXECS := $(patsubst %.c, $(BUILDDIR)/bin/%, $(TESTC_SOURCES))
-
-#.PHONY: libbase
 
 all: $(HELLORUST) \
 	$(LIBBASE) \
@@ -78,8 +76,8 @@ $(HELLORUST): hellorust.rs Makefile
 #	$(MAKE) -C libbase/src
 
 $(BUILDDIR)/bin/testc_zlib: testc_zlib.c
-	mkdir -p $(dir $(BUILDDIR)/bin)
-	clang -femulated-tls -g \
+	mkdir -p "$(BUILDDIR)/bin"
+	${CC} -femulated-tls -g \
 		"-lz" \
 		"-L/__zwolf_builddir__/zlib/lib" \
 		"-I/__zwolf_builddir__/zlib/include" \
@@ -87,16 +85,17 @@ $(BUILDDIR)/bin/testc_zlib: testc_zlib.c
 		-o "$@" "$<"
 
 $(BUILDDIR)/bin/testc_%: testc_%.c
-	mkdir -p $(dir $(BUILDDIR)/bin)
-	clang -femulated-tls -g \
+	mkdir -p "$(BUILDDIR)/bin"
+	${CC} -femulated-tls -g \
 		"-Wl,-soname,test_programs/bin/testc_$*" \
 		-o "$@" "$<"
 
 $(BUILDDIR)/bin/testcpp_%: testcpp_%.cpp
-	mkdir -p $(dir $(BUILDDIR)/bin)
-	clang++ -femulated-tls -g \
+	mkdir -p "$(BUILDDIR)/bin"
+	${CXX} -femulated-tls -g \
 		"-Wl,-soname,test_programs/bin/testcpp_$*" \
 		-o "$@" "$<"
 
 $(CONSTANTS): constants.c
+	mkdir -p "$(BUILDDIR)/bin"
 	gcc -o $(CONSTANTS) constants.c
