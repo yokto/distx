@@ -29,7 +29,7 @@ enum {
 };
 
 // Mutex
-typedef uint32_t mtx_t; // this is a hack because it has this size on linux. we should dynamically allocate it on mtx_init
+typedef _Atomic uint32_t mtx_t; // this is a hack because it has this size on linux. we should dynamically allocate it on mtx_init
 int mtx_init( mtx_t* mutex, int type );
 int mtx_lock( mtx_t* mutex );
 int mtx_timedlock( mtx_t * mutex,
@@ -51,8 +51,8 @@ void call_once( once_flag* flag, void (*func)(void) );
 // conditional variables
 typedef struct cnd_t
 {
-	mtx_t *m;
-	uint32_t seq;
+	_Atomic (mtx_t *) m;
+	_Atomic uint32_t seq;
 	int pad;
 } cnd_t;
 int cnd_init( cnd_t* cond );

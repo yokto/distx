@@ -243,9 +243,10 @@ static int32_t tonativepath(const char* filenameOrig, const char** output) {
 		if (base) {
 			int baselen = strlen(base);
 
-			filename = __builtin_alloca(baselen + filelen - basealias_len + 1);
-			memcpy(filename, base, baselen);
-			memcpy(filename + baselen, filenameOrig + basealias_len, filelen - basealias_len + 1);
+			char* filename_tmp = __builtin_alloca(baselen + filelen - basealias_len + 1);
+			memcpy(filename_tmp, base, baselen);
+			memcpy(filename_tmp + baselen, filenameOrig + basealias_len, filelen - basealias_len + 1);
+			filename = filename_tmp;
 		}
 	}
 

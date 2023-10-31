@@ -22,6 +22,11 @@ all: $(HELLORUST) \
 	$(TESTCPP_EXECS) \
 	$(TESTC_EXECS)
 
+test: test 
+	../build/load_elf __zwolf_run__/test_programs/bin/testc_empty
+	../build/load_elf __zwolf_run__/test_programs/bin/testc_exit
+	../build/load_elf __zwolf_run__/test_programs/bin/testcpp_vector
+
 #nolibc: foobar.so nolibc.c ../lib/* Makefile
 #	gcc -shared -nostdlib '-Wl,--dynamic-linker=/home/silvio/stuff/sources/elf/executables/load_elf.so' -fvisibility=hidden -fPIC -o nolibc -lfoobar -L. nolibc.c
 
@@ -77,12 +82,12 @@ $(HELLORUST): hellorust.rs Makefile
 
 $(BUILDDIR)/bin/testc_zlib: testc_zlib.c
 	mkdir -p "$(BUILDDIR)/bin"
-	${CC} -femulated-tls -g \
-		"-lz" \
-		"-L/__zwolf_builddir__/zlib/lib" \
-		"-I/__zwolf_builddir__/zlib/include" \
-		"-Wl,-soname,test_programs/bin/testc_zlib" \
-		-o "$@" "$<"
+#	${CC} -femulated-tls -g \
+#		"-lz" \
+#		"-L/__zwolf_builddir__/zlib/lib" \
+#		"-I/__zwolf_builddir__/zlib/include" \
+#		"-Wl,-soname,test_programs/bin/testc_zlib" \
+#		-o "$@" "$<"
 
 $(BUILDDIR)/bin/testc_%: testc_%.c
 	mkdir -p "$(BUILDDIR)/bin"

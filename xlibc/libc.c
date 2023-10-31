@@ -34,8 +34,6 @@ __thread int errno = 0;
 DLL_PUBLIC
 char ** environ = 0;
 
-#define concat2(X, Y) X ## Y
-#define concat(X, Y) concat2(X, Y)
 #define DECLARE(ret, name, ...) \
 	ret name(__VA_ARGS__); \
 	static ret (*concat(name, _ms))(__VA_ARGS__) __attribute((ms_abi)); \
@@ -111,7 +109,7 @@ struct windows_stat {
 
 
 
-void print_backtrace();
+//void print_backtrace();
 
 void* __dlopen(char* name) __attribute__ ((weak));
 void* __dlopen(char* name __attribute__((unused))) { return 0; }
@@ -120,7 +118,6 @@ void* __dlsym(void* handle __attribute__((unused)), char* name __attribute__((un
 int __printf(char* restrict fmt, ...) __attribute__ ((weak));
 int __printf(char* restrict fmt __attribute__((unused)), ...) { return 0; }
 int __write(char* str __attribute__((unused))) { return 0; }
-void __exit(int ret __attribute__((unused))) { return; }
 
 static bool isWin = false;
 
@@ -144,18 +141,18 @@ DECLARE(int, fseek, FILE *stream, long int offset, int whence)
 DECLARE(size_t, fread, void * ptr, size_t size, size_t nmemb, FILE * stream)
 DECLARE(int, remove, const char *pathname)
 int (*_rmdir_ms)(const char *pathname) __attribute((ms_abi));
-DECLARE(int, cnd_init, cnd_t* cond)
-DECLARE(int, cnd_broadcast, cnd_t *cond )
-DECLARE(int, cnd_wait, cnd_t* cond, mtx_t* mutex )
-DECLARE(int, cnd_signal, cnd_t *cond );
-DECLARE(void, cnd_destroy, cnd_t* cond );
-DECLARE(int, cnd_timedwait, cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point );
-bool (*SleepConditionVariableCS)(cnd_t* cond, mtx_t*, uint32_t) __attribute((ms_abi));
-DECLARE(int, mtx_init, mtx_t* mutex, int type)
-DECLARE(int, mtx_unlock, mtx_t *mutex)
-DECLARE(int, mtx_lock, mtx_t* mutex)
-DECLARE(int, mtx_trylock, mtx_t *mutex );
-DECLARE(void, mtx_destroy, mtx_t *mutex );
+//DECLARE(int, cnd_init, cnd_t* cond)
+//DECLARE(int, cnd_broadcast, cnd_t *cond )
+//DECLARE(int, cnd_wait, cnd_t* cond, mtx_t* mutex )
+//DECLARE(int, cnd_signal, cnd_t *cond );
+//DECLARE(void, cnd_destroy, cnd_t* cond );
+//DECLARE(int, cnd_timedwait, cnd_t*  cond, mtx_t*  mutex, const struct timespec*  time_point );
+//bool (*SleepConditionVariableCS)(cnd_t* cond, mtx_t*, uint32_t) __attribute((ms_abi));
+//DECLARE(int, mtx_init, mtx_t* mutex, int type)
+//DECLARE(int, mtx_unlock, mtx_t *mutex)
+//DECLARE(int, mtx_lock, mtx_t* mutex)
+//DECLARE(int, mtx_trylock, mtx_t *mutex );
+//DECLARE(void, mtx_destroy, mtx_t *mutex );
 DECLARE(int, clock_gettime, clockid_t clockid, struct timespec *tp);
 DECLARE(int, getentropy, void *buffer, size_t length);
 DECLARE(char*, realpath, const char * path, char * resolved_path);
@@ -277,13 +274,13 @@ __attribute__((constructor)) void init() {
 		fread_ms = dlsym(libc, "fread");
 		remove_ms = dlsym(libc, "remove");
 		_rmdir_ms = dlsym(libc, "_rmdir");
-		cnd_init_ms = dlsym(kernel32, "InitializeConditionVariable");
-		cnd_broadcast_ms = dlsym(kernel32, "WakeAllConditionVariable");
-		SleepConditionVariableCS = dlsym(kernel32, "SleepConditionVariableCS");
-		cnd_wait_ms = 0;
-		cnd_signal_ms = dlsym(kernel32, "WakeConditionVariable");
-		cnd_destroy_ms = 0; // not needed
-		cnd_timedwait_ms = 0;
+		//cnd_init_ms = dlsym(kernel32, "InitializeConditionVariable");
+		//cnd_broadcast_ms = dlsym(kernel32, "WakeAllConditionVariable");
+		//SleepConditionVariableCS = dlsym(kernel32, "SleepConditionVariableCS");
+		//cnd_wait_ms = 0;
+		//cnd_signal_ms = dlsym(kernel32, "WakeConditionVariable");
+		//cnd_destroy_ms = 0; // not needed
+		//cnd_timedwait_ms = 0;
 //		mtx_init_ms = dlsym(kernel32, "InitializeCriticalSection");
 //		mtx_lock_ms = dlsym(kernel32, "EnterCriticalSection");
 //		mtx_unlock_ms = dlsym(kernel32, "LeaveCriticalSection");
@@ -341,12 +338,12 @@ __attribute__((constructor)) void init() {
 		fseek_sysv = dlsym(libc, "fseek");
 		fread_sysv = dlsym(libc, "fread");
 		remove_sysv = dlsym(libc, "remove");
-		cnd_init_ms = dlsym(libc, "cnd_init");
-		cnd_broadcast_sysv = dlsym(libc, "cnd_broadcast");
-		cnd_signal_sysv = dlsym(libc, "cnd_signal");
-		cnd_wait_sysv = dlsym(libc, "cnd_wait");
-		cnd_destroy_sysv = dlsym(libc, "cnd_destroy");
-		cnd_timedwait_sysv = dlsym(libc, "cnd_timedwait");
+		//cnd_init_ms = dlsym(libc, "cnd_init");
+		//cnd_broadcast_sysv = dlsym(libc, "cnd_broadcast");
+		//cnd_signal_sysv = dlsym(libc, "cnd_signal");
+		//cnd_wait_sysv = dlsym(libc, "cnd_wait");
+		//cnd_destroy_sysv = dlsym(libc, "cnd_destroy");
+		//cnd_timedwait_sysv = dlsym(libc, "cnd_timedwait");
 //		mtx_init_sysv = dlsym(libc, "mtx_init");
 //		mtx_lock_sysv = dlsym(libc, "mtx_lock");
 //		mtx_unlock_sysv = dlsym(libc, "mtx_unlock");
@@ -597,9 +594,10 @@ FILE *fopen(const char *filenameOrig, const char *mode) {
 		if (base) {
 			int baselen = strlen(base);
 
-			filename = __builtin_alloca(baselen + filelen - basealias_len + 1);
-			memcpy(filename, base, baselen);
-			memcpy(filename + baselen, filenameOrig + basealias_len, filelen - basealias_len + 1);
+			char * filename_tmp = __builtin_alloca(baselen + filelen - basealias_len + 1);
+			memcpy(filename_tmp, base, baselen);
+			memcpy(filename_tmp + baselen, filenameOrig + basealias_len, filelen - basealias_len + 1);
+			filename = filename_tmp;
 		}
 	}
 
@@ -617,7 +615,7 @@ FILE *fopen(const char *filenameOrig, const char *mode) {
 			return NULL;
 		}
 		uint16_t mode_ms[4] = { 0, 0, 0, 0 };
-		for (int i = 0 ; mode != '\0' && i < 3 ; i++) {
+		for (int i = 0 ; *mode != '\0' && i < 3 ; i++) {
 			mode_ms[i] = mode[i];
 		}
 		return _wfopen_ms(nativepath, mode_ms);
@@ -941,14 +939,14 @@ DLL_PUBLIC struct dirent* readdir(DIR * dir) {
 			if (!hasNext) {
 				return 0;
 			}
-			strncpy(&windir->linux_dirent.d_name, windir->win_dirent.name, 256);
+			strncpy((char*)&windir->linux_dirent.d_name, windir->win_dirent.name, 256);
 			return &windir->linux_dirent;
 		} else {
 			int32_t handle = FindFirstFileA_ms(windir->path, &windir->win_dirent);
 			if (handle == -1) {
 				return 0;
 			}
-			strncpy(&windir->linux_dirent.d_name, windir->win_dirent.name, 256);
+			strncpy((char*)&windir->linux_dirent.d_name, windir->win_dirent.name, 256);
 			windir->handle = handle;
 			windir->initialized = true;
 			return &windir->linux_dirent;
@@ -977,7 +975,7 @@ DLL_PUBLIC DIR* opendir(const char * path) {
 			fflush(stderr);
 			abort();
 		}
-		strncpy(&dir->path, path, MAX_WIN_PATH);
+		strncpy((char*)&dir->path, path, MAX_WIN_PATH);
 		dir->path[len] = '\\';
 		dir->path[len+1] = '*';
 		dir->path[len+2] = '\0';
@@ -1039,19 +1037,19 @@ int ftruncate(int fd, uint64_t length) {
 //	free(*mutex);
 //}
 
-int mtx_init_if_needed(mtx_t* mutex) {
-	__debug_printf("execute os mtx_init_if_needed %p at %p\n", *mutex, mutex);
-	if (*mutex == NULL) {
-		mtx_t m = NULL;
-		void* null = NULL;
-		int ret = mtx_init(&m, 0);
-		if (!__atomic_compare_exchange_n(mutex, &null, m, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
-			mtx_destroy(&m);
-		}
-		return ret;
-	}
-	return thrd_success;
-}
+//int mtx_init_if_needed(mtx_t* mutex) {
+//	__debug_printf("execute os mtx_init_if_needed %p at %p\n", *mutex, mutex);
+//	if (*mutex == NULL) {
+//		mtx_t m = NULL;
+//		void* null = NULL;
+//		int ret = mtx_init(&m, 0);
+//		if (!__atomic_compare_exchange_n(mutex, &null, m, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+//			mtx_destroy(&m);
+//		}
+//		return ret;
+//	}
+//	return thrd_success;
+//}
 //DLL_PUBLIC int mtx_init(mtx_t* mutex, int type) {
 //	__debug_printf("execute os mtx_init %p at %p\n", *mutex, mutex);
 //	mtx_t mtx = malloc(80);
@@ -2151,30 +2149,30 @@ void exit(int status)
 	__exit(status);
 }
 
-void print_addr(void * ptr) {
-	const char * lib = 0;
-	size_t offset = 0;
-	__resolve(ptr, &lib, &offset);
-	if (lib) {
-        	__debug_printf("\t%p %s(%p)\n", ptr, lib, offset);
-	} else {
-        	__debug_printf("\t%p\n", ptr);
-	}
-}
-#define MAX_BACKTRACE_FRAMES 128
-DLL_PUBLIC
-void print_backtrace()
-{
-	__debug_printf("Backtrace:\n");
-        print_addr(__builtin_return_address(0));
-        print_addr(__builtin_return_address(1));
-        print_addr(__builtin_return_address(2));
-        print_addr(__builtin_return_address(3));
-        print_addr(__builtin_return_address(4));
-        print_addr(__builtin_return_address(5));
-        print_addr(__builtin_return_address(6));
-        print_addr(__builtin_return_address(7));
-}
+//void print_addr(void * ptr) {
+//	const char * lib = 0;
+//	size_t offset = 0;
+//	__resolve(ptr, &lib, &offset);
+//	if (lib) {
+//        	__debug_printf("\t%p %s(%p)\n", ptr, lib, offset);
+//	} else {
+//        	__debug_printf("\t%p\n", ptr);
+//	}
+//}
+//#define MAX_BACKTRACE_FRAMES 128
+//DLL_PUBLIC
+//void print_backtrace()
+//{
+//	__debug_printf("Backtrace:\n");
+//        print_addr(__builtin_return_address(0));
+//        print_addr(__builtin_return_address(1));
+//        print_addr(__builtin_return_address(2));
+//        print_addr(__builtin_return_address(3));
+//        print_addr(__builtin_return_address(4));
+//        print_addr(__builtin_return_address(5));
+//        print_addr(__builtin_return_address(6));
+//        print_addr(__builtin_return_address(7));
+//}
 
 
 

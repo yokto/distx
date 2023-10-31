@@ -135,20 +135,20 @@ int mtx_lock(mtx_t *m)
 	for (i = 0; i < 100; i++)
 	{
 		c = 0;
-		__atomic_compare_exchange_n(m, &c, 1, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+		__c11_atomic_compare_exchange_strong(m, &c, 1, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 		if (!c) return 0;
 		
 		//cpu_relax();
 	}
 
 	/* The lock is now contended */
-	if (c == 1) c = __atomic_exchange_n(m, 2, __ATOMIC_SEQ_CST);
+	if (c == 1) c = __c11_atomic_exchange(m, 2, __ATOMIC_SEQ_CST);
 
 	while (c)
 	{
 		/* Wait in the kernel */
 		futex_wait(m, 2, NULL);
-		c = __atomic_exchange_n(m, 2, __ATOMIC_SEQ_CST);
+		c = __c11_atomic_exchange(m, 2, __ATOMIC_SEQ_CST);
 	}
 	
 	return 0;
@@ -165,7 +165,7 @@ int mtx_unlock(mtx_t *m)
 	{
 		*m = 0;
 	}
-	else if (__atomic_exchange_n(m, 0, __ATOMIC_SEQ_CST) == 1) {
+	else if (__c11_atomic_exchange(m, 0, __ATOMIC_SEQ_CST) == 1) {
 		return 0;
 	}
 
@@ -176,7 +176,7 @@ int mtx_unlock(mtx_t *m)
 		{
 			/* Need to set to state 2 because there may be waiters */
 			uint32_t expected = 1;
-			__atomic_compare_exchange_n(m, &expected, 2, true,  __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+			__c11_atomic_compare_exchange_strong(m, &expected, 2,  __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 			if (expected) return 0;
 		}
 		//cpu_relax();
@@ -194,7 +194,7 @@ int mtx_trylock(mtx_t *m)
 	__debug_printf("mtx_trylock\n");
 	/* Try to take the lock, if is currently unlocked */
 	uint32_t c = 0;
-	__atomic_compare_exchange_n(m, &c, 1, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+	__c11_atomic_compare_exchange_strong(m, &c, 1, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 	if (!c) return 0;
 	return EBUSY;
 }
@@ -206,7 +206,7 @@ DLL_PUBLIC
 int cnd_init(cnd_t *c)
 {
 	__debug_printf("cnd_init\n");
-	c->m = NULL;
+	c->m = (void*)NULL;
 
 	/* Sequence variable doesn't actually matter, but keep valgrind happy */
 	c->seq = 0;
@@ -227,7 +227,7 @@ int cnd_signal(cnd_t *c)
 {
 	__debug_printf("cnd_signal\n");
 	/* We are waking someone up */
-	__atomic_add_fetch(&c->seq, 1, __ATOMIC_SEQ_CST);
+	__c11_atomic_fetch_add(&c->seq, 1, __ATOMIC_SEQ_CST);
 	
 	/* Wake up a thread */
 	futex_signal(&c->seq);
@@ -245,7 +245,7 @@ int cnd_broadcast(cnd_t *c)
 	if (!m) return 0;
 	
 	/* We are waking everyone up */
-	__atomic_add_fetch(&c->seq, 1, __ATOMIC_SEQ_CST);
+	__c11_atomic_fetch_add(&c->seq, 1, __ATOMIC_SEQ_CST);
 	
 	/* Wake one thread, and requeue the rest on the mutex */
 	futex_broadcast(&c->seq);
@@ -262,8 +262,8 @@ int cnd_wait(cnd_t *c, mtx_t *m)
 	if (c->m != m)
 	{
 		/* Atomically set mutex inside cnd_t */
-		void *expected = NULL;
-		__atomic_compare_exchange_n(&c->m, &expected, m, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+		mtx_t *expected = NULL;
+		__c11_atomic_compare_exchange_strong(&c->m, &expected, m, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 		if (c->m != m) return EINVAL;
 	}
 	
@@ -271,7 +271,7 @@ int cnd_wait(cnd_t *c, mtx_t *m)
 	
 	futex_wait(&c->seq, seq, NULL);
 	
-	while (__atomic_exchange_n(m, 2, __ATOMIC_SEQ_CST))
+	while (__c11_atomic_exchange(m, 2, __ATOMIC_SEQ_CST))
 	{
 		futex_wait(m, 2, NULL);
 	}
@@ -288,8 +288,8 @@ int cnd_timedwait(cnd_t* c, mtx_t* m, const struct timespec* time_point )
 	if (c->m != m)
 	{
 		/* Atomically set mutex inside cv */
-		void *expected = NULL;
-		__atomic_compare_exchange_n(&c->m, &expected, m, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+		mtx_t *expected = NULL;
+		__c11_atomic_compare_exchange_strong(&c->m, &expected, m, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 		if (c->m != m) return EINVAL;
 	}
 	
@@ -297,7 +297,7 @@ int cnd_timedwait(cnd_t* c, mtx_t* m, const struct timespec* time_point )
 	
 	futex_wait(&c->seq, seq, time_point);
 	
-	if (__atomic_exchange_n(m, 2, __ATOMIC_SEQ_CST)) {
+	if (__c11_atomic_exchange(m, 2, __ATOMIC_SEQ_CST)) {
 		return thrd_timedout;
 	}
 		

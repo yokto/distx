@@ -1,6 +1,6 @@
 CC := __zwolf_build__/llvm/bin/clang
 INSTALL := __zwolf_run__/xlibc/
-LIBC := $(INSTALL)x86_64/lib/libc.so $(INSTALL)arm/lib/libc.so
+LIBC := $(INSTALL)x86_64/lib/libc.so # $(INSTALL)arm/lib/libc.so
 LIBM := $(INSTALL)x86_64/lib/libm.so
 
 HEADERS = $(addprefix $(INSTALL)common/,$(wildcard include/*.h)) $(addprefix $(INSTALL)common/,$(wildcard include/*/*.h))
