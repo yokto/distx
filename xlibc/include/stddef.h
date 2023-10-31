@@ -15,7 +15,7 @@ typedef signed long ssize_t;
 //#else
 //#endif
 
-typedef long ptrdiff_t;
+typedef __PTRDIFF_TYPE__ ptrdiff_t;
 typedef __WCHAR_TYPE__ wchar_t;
 
 #ifdef __cplusplus

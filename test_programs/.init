@@ -3,7 +3,7 @@ pathadd() {
         export PATH="$1:$PATH"
     fi
 }
-pathadd "/home/silvio/stuff/sources/elfx86/llvm/bin"
+pathadd "/home/silvio/stuff/sources/elf_release_linux/llvm/bin"
 ph () {
 	echo "#include <$1>" | gcc -x c -E -  -o -
 }

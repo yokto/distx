@@ -582,7 +582,7 @@ DLL_PUBLIC int remove(const char *pathname) {
 	}
 }
 
-static const char basealias[] = "/__zwolf_rundir__/";
+static const char basealias[] = "/__zwolf_run__/";
 #define basealias_len (sizeof(basealias) - 1)
 
 DLL_PUBLIC

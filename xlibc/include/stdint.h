@@ -41,6 +41,7 @@ typedef int64_t int_fast64_t;
 #define UINT16_MAX  0xffff
 #define UINT32_MAX  0xffffffff
 #define UINT64_MAX  0xffffffffffffffff
+#define UINTPTR_MAX __UINTPTR_MAX__
 #define INT8_MAX   ((int8_t)0x7f)
 #define INT16_MAX  ((int16_t)0x7fff)
 #define INT32_MAX  ((int32_t)0x7fffffff)

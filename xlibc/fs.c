@@ -230,7 +230,7 @@ int32_t base_fs_tonativepathlen(const char *pathname, uintptr_t* length) {
 	}
 }
 
-static const char basealias[] = "/__zwolf_rundir__/";
+static const char basealias[] = "/__zwolf_run__/";
 #define basealias_len (sizeof(basealias) - 1)
 static int32_t tonativepath(const char* filenameOrig, const char** output) {
 	*output = NULL;

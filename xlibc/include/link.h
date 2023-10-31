@@ -212,6 +212,7 @@ typedef struct {
 #define PT_TLS          7               /* Thread-local storage segment */
 #define PT_NUM          8               /* Number of defined types */
 #define PT_GNU_EH_FRAME 0x6474e550
+#define PT_ARM_EXIDX    0x70000001
 
 uint32_t
 elf_Hash(const unsigned char *name)

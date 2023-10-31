@@ -1,28 +1,30 @@
 CC := __zwolf_build__/llvm/bin/clang
 INSTALL := __zwolf_run__/xlibc/
-LIBC := $(INSTALL)lib/libc.so
-LIBM := $(INSTALL)lib/libm.so
+LIBC := $(INSTALL)x86_64/lib/libc.so $(INSTALL)arm/lib/libc.so
+LIBM := $(INSTALL)x86_64/lib/libm.so
 
-HEADERS = $(addprefix $(INSTALL),$(wildcard include/*.h)) $(addprefix $(INSTALL),$(wildcard include/*/*.h))
+HEADERS = $(addprefix $(INSTALL)common/,$(wildcard include/*.h)) $(addprefix $(INSTALL)common/,$(wildcard include/*/*.h))
 
 all: $(LIBC) $(HEADERS) # $(LIBM)
 
-$(LIBC): libc.c printf.c string.c time.c unicode.c fs.c qsort.c proc.c thread_impl.c Makefile
-	mkdir -p $(dir $(LIBC))
+$(INSTALL)%/lib/libc.so: libc.c printf.c string.c time.c unicode.c fs.c qsort.c proc.c thread_impl.c Makefile
+	mkdir -p $(INSTALL)$*/lib
 	echo ${CC}
 	${CC} \
 		-g \
 		-Wall -Wextra \
-		-Wl,-soname,xlibc/lib/libc.so \
+		-Wl,-soname,xlibc/$*/lib/libc.so \
 		-Wl,--export-dynamic-symbol=__* \
+		--target=$*-unknown-linux-zwolf \
 		-Wno-unused-parameter \
 		-nolibc -shared \
 		-femulated-tls \
+		--unwindlib=none \
 		-Ilibc \
 		-I. \
 		-fPIC \
 		-Iinclude \
-		-o $(LIBC) \
+		-o $@ \
 		libc.c \
 		printf.c \
 		string.c \
@@ -51,7 +53,7 @@ $(LIBC): libc.c printf.c string.c time.c unicode.c fs.c qsort.c proc.c thread_im
 #		-lc -L$(dir $(LIBC)) 
 
 # copy headers
-$(INSTALL)include/%.h: include/%.h
-	mkdir -p $(dir $(INSTALL)include/$*h)
+$(INSTALL)common/include/%.h: include/%.h
+	mkdir -p $(dir $(INSTALL)common/include/$*h)
 	@echo '#include "$*.h"' | ${CC} -x c --analyze -Iinclude -nostdinc -
 	cp $< $@

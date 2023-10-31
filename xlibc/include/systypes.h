@@ -7,8 +7,8 @@ extern "C" {
 #include <base/types.h>
 
 
-typedef long intmax_t;
-typedef unsigned long uintmax_t;
+typedef __INTMAX_TYPE__ intmax_t;
+typedef __UINTMAX_TYPE__ uintmax_t;
 
 typedef int8_t int_least8_t;
 typedef int16_t int_least16_t;
@@ -29,13 +29,13 @@ typedef int32_t int_fast32_t;
 typedef int64_t int_fast64_t;
 
 typedef __SIZE_TYPE__ size_t;
-#ifdef __SSIZE_TYPE__
-typedef __SSIZE_TYPE__ ssize_t;
-#else
+//#ifdef __SSIZE_TYPE__
+//typedef __SSIZE_TYPE__ ssize_t;
+//#else
 typedef signed long ssize_t;
-#endif
+//#endif
 
-typedef ssize_t ptrdiff_t;
+typedef __PTRDIFF_TYPE__ ptrdiff_t;
 #ifndef __cplusplus
 typedef __WCHAR_TYPE__ wchar_t;
 #endif
