@@ -21,3 +21,6 @@ int32_t base_fs_fromnativepath(const void* nativepath, const char* pathname);
  * Same as base_fs_tonativepath. Except it only calculates the length.
  */
 int32_t base_fs_fromnativepathlen(const void* nativepath, uintptr_t* length);
+
+
+int32_t tonativepath(const char* filenameOrig, const char** output);

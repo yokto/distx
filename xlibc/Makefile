@@ -7,7 +7,7 @@ HEADERS = $(addprefix $(INSTALL)common/,$(wildcard include/*.h)) $(addprefix $(I
 
 all: $(LIBC) $(HEADERS) # $(LIBM)
 
-$(INSTALL)%/lib/libc.so: libc.c printf.c string.c time.c unicode.c fs.c qsort.c proc.c thread_impl.c Makefile
+$(INSTALL)%/lib/libc.so: libc.c printf.c string.c time.c unicode.c fs.c qsort.c proc.c thread_impl.c emutls.c Makefile
 	mkdir -p $(INSTALL)$*/lib
 	echo ${CC}
 	${CC} \
@@ -25,6 +25,7 @@ $(INSTALL)%/lib/libc.so: libc.c printf.c string.c time.c unicode.c fs.c qsort.c 
 		-fPIC \
 		-Iinclude \
 		-o $@ \
+		emutls.c \
 		libc.c \
 		printf.c \
 		string.c \

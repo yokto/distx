@@ -205,8 +205,8 @@ struct print_state {
 };
 
 #define UNUSED(x) (void)(x)
-#define __debug_puts_buf 64
-int __debug_puts(void* arg, int c) {
+#define debug_puts_buf 64
+int debug_puts(void* arg, int c) {
 	struct print_state * state = (struct print_state*)arg;
 	state->buf[state->to_write] = c;
 	state->to_write ++;
@@ -216,14 +216,14 @@ int __debug_puts(void* arg, int c) {
 	}
 	return 1;
 }
-int __debug_printf(char* format, ...) {
+int debug_printf(char* format, ...) {
 	va_list args;
-	char buf[__debug_puts_buf + 1];
-	buf[__debug_puts_buf] = '\0';
-	struct print_state state = { buf, __debug_puts_buf, 0, 0 };
+	char buf[debug_puts_buf + 1];
+	buf[debug_puts_buf] = '\0';
+	struct print_state state = { buf, debug_puts_buf, 0, 0 };
 	va_start(args, format);
 
-	const int ret = internal_printf(__debug_puts, &state, format, args); 
+	const int ret = internal_printf(debug_puts, &state, format, args); 
 	state.buf[state.to_write] = '\0';
 	__write(state.buf);
 	if (ret < 0) { __exit(-1); }

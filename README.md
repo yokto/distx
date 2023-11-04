@@ -385,10 +385,14 @@ separate debug from exec data as follows
 
 FileSiz can be shorter than MemSiz. This happens for instance for the .bss section of uninitialized variables. The loader needs to set them to 0.
 
+### Register executable on linux
+
+    mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+    echo ":zwolf:M:0:\\x7FELF\\x02\\x01\\x01\\x13::/home/silvio/stuff/sources/elf_src/zwolf/build/load_elf:" > /proc/sys/fs/binfmt_misc/register
+
 # REFERENCES
 
 ### Thread local Storage
 
 https://chao-tic.github.io/blog/2018/12/25/tls
-
 

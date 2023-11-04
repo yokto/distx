@@ -1,6 +1,11 @@
-struct T { T(); };
+#include <iostream>
+#include <stdio.h>
+
+struct Tiiii {
+	Tiiii() {}
+};
 void f() {
-	static T lsobj;
+	static Tiiii lsobj;
 }
 
 

@@ -28,8 +28,8 @@
 	],
 	["build-runtime", "ninja", "cxx", "cxxabi", "unwind"],
 	["build-runtime", "env", "DESTDIR=..", "ninja", "install"],
-	[".", "mkdir", "-p", "build-runtime-arm"],
-	["build-runtime-arm",
+	[".", "echo", "mkdir", "-p", "build-runtime-arm"],
+	["build-runtime-arm", "echo",
 		"env",
 		"CC=clang",
 		"CXX=clang++",
@@ -61,6 +61,6 @@
 		"-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON",
 		"-G", "Ninja"
 	],
-	["build-runtime-arm", "ninja", "cxx", "cxxabi", "unwind"],
-	["build-runtime-arm", "env", "DESTDIR=..", "ninja", "install"]
+	["build-runtime-arm", "echo", "ninja", "cxx", "cxxabi", "unwind"],
+	["build-runtime-arm", "echo", "env", "DESTDIR=..", "ninja", "install"]
 ]

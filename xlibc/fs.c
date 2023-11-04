@@ -12,7 +12,6 @@
 #define SUCCESS 0
 
 static bool isWin = 0;
-static int32_t tonativepath(const char* filenameOrig, const char** output);
 
 void init_fs(bool iswin, void* lib) {
 	isWin = iswin;
@@ -34,7 +33,7 @@ void init_fs(bool iswin, void* lib) {
 }
 
 int32_t base_fs_open(const char *path, uintptr_t* fd, uint32_t flags) {
-	__debug_printf("open %s flags %d\n", path, flags);
+	debug_printf("open %s flags %d\n", path, flags);
 
 	uint32_t error = SUCCESS;
 	char * nativepath = NULL;
@@ -70,10 +69,10 @@ int32_t base_fs_open(const char *path, uintptr_t* fd, uint32_t flags) {
 			}
 			if (flags & BASE_FS_OPEN_APPEND) { flag |= LINUX_O_APPEND; }
 			if (flags & BASE_FS_OPEN_CREATE) { flag |= LINUX_O_CREAT; }
-			__debug_printf("open path %s\n", nativepath);
+			debug_printf("open path %s\n", nativepath);
 			int ret = linux_open(nativepath, flag, 0666);
-			__debug_printf("open errno %d\n", __errno());
-			__debug_printf("open fd %d\n", ret);
+			debug_printf("open errno %d\n", __errno());
+			debug_printf("open fd %d\n", ret);
 			if (ret >= 0) {
 				*fd = ret;
 			} else {
@@ -82,12 +81,12 @@ int32_t base_fs_open(const char *path, uintptr_t* fd, uint32_t flags) {
 		}
 	} while (false);
 	if (nativepath) { free(nativepath); }
-	__debug_printf("open failed with %d\n", error);
+	debug_printf("open failed with %d\n", error);
 	return error;
 }
 
 int32_t base_fs_truncate(uintptr_t fd, int64_t length) {
-	__debug_printf("truncate %d\n", fd);
+	debug_printf("truncate %d\n", fd);
 	if (isWin) {
 		int ret = win_chsize_s(fd, length);
 		if (ret == 0) {
@@ -106,7 +105,7 @@ int32_t base_fs_truncate(uintptr_t fd, int64_t length) {
 }
 
 int32_t base_fs_seek(uintptr_t fd, int64_t offset, uint32_t flags, int64_t* new_offset) {
-	__debug_printf("seek %d\n", fd);
+	debug_printf("seek %d\n", fd);
 	if (isWin) {
 		int flag;
 		if (flags == BASE_FS_SEEK_CUR) { flag = WIN_SEEK_CUR; }
@@ -137,7 +136,7 @@ int32_t base_fs_seek(uintptr_t fd, int64_t offset, uint32_t flags, int64_t* new_
 }
 
 int32_t base_fs_write(uintptr_t fd, const void *buf, uintptr_t count, uintptr_t* written) {
-	__debug_printf("write %d\n", fd);
+	debug_printf("write %d\n", fd);
 	if (isWin) {
 		int ret = win_write(fd, buf, count);
 		if (ret >= 0) {
@@ -158,7 +157,7 @@ int32_t base_fs_write(uintptr_t fd, const void *buf, uintptr_t count, uintptr_t*
 }
 
 int32_t base_fs_read(uintptr_t fd, void *buf, uintptr_t count, uintptr_t* read) {
-	__debug_printf("read %d\n", fd);
+	debug_printf("read %d\n", fd);
 	if (isWin) {
 		int ret = win_read(fd, buf, count);
 		if (ret >= 0) {
@@ -183,7 +182,7 @@ int32_t base_fs_read(uintptr_t fd, void *buf, uintptr_t count, uintptr_t* read) 
 }
 
 int32_t base_fs_close(uintptr_t fd) {
-	__debug_printf("close %d", fd);
+	debug_printf("close %d", fd);
 	if (isWin) {
 		int ret = win_close(fd);
 		if (ret == 0) {
@@ -232,7 +231,7 @@ int32_t base_fs_tonativepathlen(const char *pathname, uintptr_t* length) {
 
 static const char basealias[] = "/__zwolf_run__/";
 #define basealias_len (sizeof(basealias) - 1)
-static int32_t tonativepath(const char* filenameOrig, const char** output) {
+int32_t tonativepath(const char* filenameOrig, const char** output) {
 	*output = NULL;
 	int filelen = strlen(filenameOrig);
 

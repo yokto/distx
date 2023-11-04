@@ -510,7 +510,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	const char * pwd = libs->basedir;
 	const int pwd_len = strlen(pwd);
 	const int lib_len = strlen(lib->path);
-	WARN("lib-path %s\n", lib->path);
+	DEBUG("\tlib-path %s\n", lib->path);
 	char * full_path = malloc(pwd_len + lib_len + 1);
 	memcpy(full_path, pwd, pwd_len);
 	memcpy(full_path + pwd_len, lib->path, lib_len);
@@ -727,7 +727,7 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 	int sym = ELF64_R_SYM(rela->r_info);
 	int type = ELF64_R_TYPE(rela->r_info);
 
-	DEBUG("rela info %llx, offset %llx, addend %llx, sym %x, type %x\n", rela->r_info, rela->r_offset, rela->r_addend, sym, type)
+	DEBUG("\t\trela info %llx, offset %llx, addend %llx, sym %x, type %x\n", rela->r_info, rela->r_offset, rela->r_addend, sym, type)
 	if (type == R_X86_64_RELATIVE && sym == 0 && rela->r_addend != 0) {
 		return lib->base + rela->r_addend;
 	}
@@ -973,4 +973,5 @@ int main(int argc, char ** argv) {
 	DEBUG("main returned %d\n", ret)
 	DEBUG("fini\n")
 	fflush(stdout);
+	return ret;
 }

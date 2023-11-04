@@ -98,6 +98,7 @@ $(BUILDDIR)/bin/testc_%: testc_%.c
 $(BUILDDIR)/bin/testcpp_%: testcpp_%.cpp
 	mkdir -p "$(BUILDDIR)/bin"
 	${CXX} -femulated-tls -g \
+		"-Wl,--no-undefined" \
 		"-Wl,-soname,test_programs/bin/testcpp_$*" \
 		-o "$@" "$<"
 
