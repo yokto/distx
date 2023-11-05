@@ -557,7 +557,7 @@ char * verdefstr(size_t sym_idx, loaded_lib* lib) {
 char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 	Elf64_Verneed * v = lib->verneed;
 	if (!lib->verneed) {
-		STRICT_ERR("could not find version for symbol %s in library %s\n",
+		DEBUG("could not find version for symbol %s in library %s\n",
 			lib->strtab + lib->symtab[sym_idx].st_name, lib->path);
 		return 0;
 	}
@@ -577,7 +577,7 @@ char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 		if (v->vn_next == 0) { break; }
 		v = (void*)v + v->vn_next;
 	}
-	STRICT_ERR("could not find version for symbol %s in library %s\n", lib->strtab + lib->symtab[sym_idx].st_name, lib->path);
+	DEBUG("could not find version for symbol %s in library %s\n", lib->strtab + lib->symtab[sym_idx].st_name, lib->path);
 	return 0;
 }
 
@@ -771,6 +771,8 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 		} else {
 			char * file = verneedstr(sym, lib);
 			if (!file) {
+				// symbol not in dependencies
+				// try finding it in file itself
 				file = verdefstr(sym, lib);
 			}
 			if (!file) {

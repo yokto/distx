@@ -299,6 +299,11 @@ In the programs address space there folloing parts are usually mapped. Note exec
 14 - .. -> 0x402000
 Mappings of a running program can be checked at /proc/<pid>/maps
 
+Other sections:
+
+- .gnu.version (VERSYM in dynamic) 
+- .gnu.version_d (VERDEF in dynamic)
+
 ## Stack Layout
 
 http://articles.manugarg.com/aboutelfauxiliaryvectors.html

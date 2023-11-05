@@ -13,11 +13,12 @@
 		count++; \
 	}
 
-int print_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, uint64_t unumber, int base, int width, bool sign)
+#define MAX_NUM_WIDTH 32
+int print_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, uint64_t unumber, int base, int width, bool leading_zeros, bool sign)
 {
     size_t count = 0;
     // Allocate a buffer for the number representation
-    char buffer[32];  // Assuming a maximum width of 32 characters
+    char buffer[MAX_NUM_WIDTH+2];  // Assuming a maximum width of 32 characters
     
     // Convert the number to a string representation with the specified base
     size_t index = sizeof(buffer) - 1;
@@ -50,7 +51,7 @@ int print_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, uin
         int paddingCount = width - actualWidth;
         
         for (int i = 0; i < paddingCount; i++) {
-            CHECKPUTC('0');
+            CHECKPUTC(leading_zeros ? '0' : ' ');
         }
     }
     
@@ -60,11 +61,11 @@ int print_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, uin
     }
     return count;
 }
-int sprint_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, int base, int width) {
-	return print_number(putc, arg, number, 0, base, width, true);
+int sprint_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, int base, int width, bool leading_zeros) {
+	return print_number(putc, arg, number, 0, base, width, leading_zeros, true);
 }
-int uprint_number(int (*putc)(void* arg, int chr), void* arg, uint64_t unumber, int base, int width) {
-	return print_number(putc, arg, 0, unumber, base, width, false);
+int uprint_number(int (*putc)(void* arg, int chr), void* arg, uint64_t unumber, int base, int width, bool leading_zeros) {
+	return print_number(putc, arg, 0, unumber, base, width, leading_zeros, false);
 }
 
 // returns the number of bytes written or ENOIMPL if something is not implemented
@@ -75,9 +76,19 @@ int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* form
 	while (*format != '\0') {
 		if (*format == '%') {
 			format++;
+			bool zero_padding = false;
+			// https://cplusplus.com/reference/cstdio/printf/
+			if (*format == '0') { // flags
+				zero_padding = true;
+				format++;
+			}
+			int min_width = atoi(format); // width
+			while(*format <= '9' && *format >= '0') {
+				format++;
+			}
 
 			// Handle different specifiers
-			switch (*format) {
+			switch (*format) { // specifier
 				case '%':
 					CHECKPUTC('%')
 					break;
@@ -85,7 +96,15 @@ int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* form
 				case 'p':
 					{
 						void* ptr = va_arg(args, void*);
-						size_t res = uprint_number(putc, arg, (size_t)ptr, 16, 16);
+						size_t res = uprint_number(putc, arg, (size_t)ptr, 16, 16, true);
+						count += res;
+					}
+					break;
+
+				case 'o':
+					{
+						int ptr = va_arg(args, int);
+						size_t res = sprint_number(putc, arg, (int64_t)ptr, 8, min_width, zero_padding);
 						count += res;
 					}
 					break;
@@ -93,7 +112,7 @@ int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* form
 				case 'd':
 					{
 						int ptr = va_arg(args, int);
-						size_t res = sprint_number(putc, arg, (int64_t)ptr, 10, 0);
+						size_t res = sprint_number(putc, arg, (int64_t)ptr, 10, min_width, zero_padding);
 						count += res;
 					}
 					break;
@@ -106,7 +125,7 @@ int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* form
 								{
 									format++;
 									size_t ptr = va_arg(args, size_t);
-									size_t res = uprint_number(putc, arg, (uint64_t)ptr, 10, 0);
+									size_t res = uprint_number(putc, arg, (uint64_t)ptr, 10, min_width, zero_padding);
 									count += res;
 									success = true;
 								}
@@ -127,7 +146,16 @@ int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* form
 								{
 									format++;
 									long ptr = va_arg(args, long);
-									size_t res = sprint_number(putc, arg, (int64_t)ptr, 10, 0);
+									size_t res = sprint_number(putc, arg, (int64_t)ptr, 10, min_width, zero_padding);
+									count += res;
+									success = true;
+								}
+								break;
+							case 'o':
+								{
+									format++;
+									long ptr = va_arg(args, long);
+									size_t res = sprint_number(putc, arg, (int64_t)ptr, 8, min_width, zero_padding);
 									count += res;
 									success = true;
 								}
@@ -136,7 +164,7 @@ int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* form
 								{
 									format++;
 									long ptr = va_arg(args, long);
-									size_t res = sprint_number(putc, arg, (int64_t)ptr, 16, 0);
+									size_t res = sprint_number(putc, arg, (int64_t)ptr, 16, min_width, zero_padding);
 									count += res;
 									success = true;
 								}
@@ -145,7 +173,7 @@ int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* form
 								{
 									format++;
 									unsigned long ptr = va_arg(args, unsigned long);
-									size_t res = uprint_number(putc, arg, (uint64_t)ptr, 10, 0);
+									size_t res = uprint_number(putc, arg, (uint64_t)ptr, 10, min_width, zero_padding);
 									count += res;
 									success = true;
 								}
@@ -171,6 +199,7 @@ int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* form
 
 				default:
 					{
+						debug_printf("not implemented %s", format);
 						const char* str = "\nnot implemented in printf ";
 						while (*str != '\0') {
 							CHECKPUTC(*str)

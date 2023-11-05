@@ -2121,29 +2121,24 @@ DLL_PUBLIC int iswpunct(wint_t wc) {
 
 locale_t uselocale(locale_t locale) {
     UNUSED(locale);
-    fprintf(stderr, "uselocale not implemented\n");
-    fflush(stderr);
+    debug_printf("uselocale not implemented\n");
     return 1;
 }
 locale_t newlocale(int category_mask, const char *locale, locale_t base) {
     UNUSED(category_mask);
     UNUSED(locale);
     UNUSED(base);
-    fprintf(stderr, "newlocale not implemented\n");
+    debug_printf("newlocale not implemented\n");
     return 1;
 }
 void freelocale(locale_t locobj) {
     UNUSED(locobj);
-    fprintf(stderr, "freelocale not implemented\n");
-    fflush(stderr);
-    abort();
+    debug_printf(stderr, "freelocale not implemented\n");
 }
 char *setlocale(int category, const char *locale) {
     UNUSED(category);
     UNUSED(locale);
-    fprintf(stderr, "setlocale not implemented\n");
-    fflush(stderr);
-    abort();
+    debug_printf(stderr, "setlocale not implemented\n");
     return 0;
 }
 
