@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <fs.h>
 
 int (*linux_execve)(const char *pathname, char *const argv[], char *const envp[]);
 uint32_t (*linux_fork)(void);
@@ -24,11 +25,16 @@ void init_proc(bool iswin, void* lib) {
 DLL_PUBLIC
 int32_t base_proc_exec(const char *path, char *const argv[], char *const envp[], uintptr_t* id) {
 	debug_printf("base_proc_exec %s\n", path);
+	int32_t ret = 0;
+	const char * native_path = 0;
+	//ret = tonativepath(path, &native_path);
+	//debug_printf("base_proc_exec %s\n", native_path);
+	if (ret != 0) { return ret; }
 	if (isWin) {
 		debug_printf("exec win \n");
 		__builtin_trap();
 	} else {
-		debug_printf("exec linux %s\n", path);
+		//debug_printf("exec linux %s\n", native_path);
 		uint32_t pid = linux_fork();
 		if (pid == 0) {
 			size_t count = 0;
@@ -38,12 +44,14 @@ int32_t base_proc_exec(const char *path, char *const argv[], char *const envp[],
 			argv2[0] = getenv("ZWOLF_EXECUTABLE");
 			for (size_t c = 0; c < count; c++) { argv2[c+1] = argv[c]; }
 			for (size_t c = 0; c <= count; c++) { debug_printf("arg %s\n", argv2[c]); }
-			return linux_execve(argv2[0], argv2, envp);
+			ret = linux_execve(argv2[0], argv2, envp);
 		} else {
 			*id = pid;
-			return 0;
+			ret = 0;
 		}
 	}
+	//free(native_path);
+	return ret;
 }
 
 DLL_PUBLIC

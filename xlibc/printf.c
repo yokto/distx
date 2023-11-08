@@ -3,20 +3,27 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <error.h>
 
+#define SUCCESS 0
 #define ENOIMPL (-1)
 
 #define CHECKPUTC(c) \
 	if (putc != 0 && 1 != putc(arg, c)) { \
-		return count; \
+		return -1; \
 	} else { \
-		count++; \
+		(*count)++; \
+	}
+
+#define CHECK(f) \
+	error = (f); \
+	if (error != SUCCESS) {\
+		return error;\
 	}
 
 #define MAX_NUM_WIDTH 32
-int print_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, uint64_t unumber, int base, int width, bool leading_zeros, bool sign)
+int32_t print_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, uint64_t unumber, int base, int width, bool leading_zeros, size_t * count, bool capitalization, bool sign)
 {
-    size_t count = 0;
     // Allocate a buffer for the number representation
     char buffer[MAX_NUM_WIDTH+2];  // Assuming a maximum width of 32 characters
     
@@ -24,13 +31,14 @@ int print_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, uin
     size_t index = sizeof(buffer) - 1;
     buffer[index] = '\0';
     
+    const char * const nums = capitalization ? "0123456789abcdef" : "0123456789ABCDEF";
     if (sign) {
 	    const bool negative = number < 0;
 	    if (negative) {
 	    	number = -number;
 	    }
 	    do {
-		    buffer[--index] = "0123456789abcdef"[number % base];
+		    buffer[--index] = nums[number % base];
 		    number /= base;
 	    } while (number != 0);
 	    if (negative) {
@@ -38,7 +46,7 @@ int print_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, uin
 	    }
     } else {
 	    do {
-		    buffer[--index] = "0123456789abcdef"[unumber % base];
+		    buffer[--index] = nums[unumber % base];
 		    unumber /= base;
 	    } while (unumber != 0);
     }
@@ -59,20 +67,20 @@ int print_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, uin
     for (; index < sizeof(buffer) - 1; index++) {
         CHECKPUTC(buffer[index]);
     }
-    return count;
+    return SUCCESS;
 }
-int sprint_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, int base, int width, bool leading_zeros) {
-	return print_number(putc, arg, number, 0, base, width, leading_zeros, true);
+int32_t sprint_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, int base, int width, bool leading_zeros, size_t * count, bool capitalization) {
+	return print_number(putc, arg, number, 0, base, width, leading_zeros, count, capitalization, true);
 }
-int uprint_number(int (*putc)(void* arg, int chr), void* arg, uint64_t unumber, int base, int width, bool leading_zeros) {
-	return print_number(putc, arg, 0, unumber, base, width, leading_zeros, false);
+int32_t uprint_number(int (*putc)(void* arg, int chr), void* arg, uint64_t unumber, int base, int width, bool leading_zeros, size_t * count, bool capitalization) {
+	return print_number(putc, arg, 0, unumber, base, width, leading_zeros, count, capitalization, false);
 }
 
 // returns the number of bytes written or ENOIMPL if something is not implemented
 // if putc is null it will only count the chars
-int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* format, va_list args)
+int32_t internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* format, va_list args, size_t * count)
 {
-	size_t count = 0;
+	int32_t error = 0;
 	while (*format != '\0') {
 		if (*format == '%') {
 			format++;
@@ -82,11 +90,42 @@ int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* form
 				zero_padding = true;
 				format++;
 			}
-			int min_width = atoi(format); // width
+			int min_width = 0;
+			if (*format == '*') { // width
+				min_width = va_arg(args, int);
+				format++;
+			} else {
+				min_width = atoi(format);
+			}
 			while(*format <= '9' && *format >= '0') {
 				format++;
 			}
+			bool hh = false;
+			bool h = false;
+			bool l = false;
+			bool ll = false;
+			bool z = false;
+			if (format[0] == 'h' && format[1] == 'h') { // specifier
+				hh = true;
+				format += 2;
+			} else if (format[0] == 'h') {
+				h = true;
+				format++;
+			} else if (format[0] == 'l' && format[1] == 'l') {
+				ll = true;
+				format += 2;
+			} else if (format[0] == 'l') {
+				l = true;
+				format++;
+			} else if (format[0] == 'z') {
+				z = true;
+				format++;
+			}
 
+			int base = 0;
+			bool is_signed = false;
+			bool print_n = false;
+			bool capitalization = false;
 			// Handle different specifiers
 			switch (*format) { // specifier
 				case '%':
@@ -94,95 +133,37 @@ int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* form
 					break;
 
 				case 'p':
-					{
-						void* ptr = va_arg(args, void*);
-						size_t res = uprint_number(putc, arg, (size_t)ptr, 16, 16, true);
-						count += res;
-					}
+					base = 16;
+					is_signed = false;
+					min_width = sizeof(void*) * 2;
+					print_n = true;
 					break;
 
 				case 'o':
-					{
-						int ptr = va_arg(args, int);
-						size_t res = sprint_number(putc, arg, (int64_t)ptr, 8, min_width, zero_padding);
-						count += res;
-					}
+					base = 8;
+					is_signed = false;
+					print_n = true;
 					break;
-
 				case 'd':
-					{
-						int ptr = va_arg(args, int);
-						size_t res = sprint_number(putc, arg, (int64_t)ptr, 10, min_width, zero_padding);
-						count += res;
-					}
+					base = 10;
+					is_signed = true;
+					print_n = true;
 					break;
-
-				case 'z':
-					{
-						bool success = false;
-						switch (format[1]) {
-							case 'u':
-								{
-									format++;
-									size_t ptr = va_arg(args, size_t);
-									size_t res = uprint_number(putc, arg, (uint64_t)ptr, 10, min_width, zero_padding);
-									count += res;
-									success = true;
-								}
-								break;
-						}
-						if (success) {
-							break;
-						}
-					}
+				case 'u':
+					base = 10;
+					is_signed = false;
+					print_n = true;
 					break;
-
-
-				case 'l':
-					{
-						bool success = false;
-						switch (format[1]) {
-							case 'd':
-								{
-									format++;
-									long ptr = va_arg(args, long);
-									size_t res = sprint_number(putc, arg, (int64_t)ptr, 10, min_width, zero_padding);
-									count += res;
-									success = true;
-								}
-								break;
-							case 'o':
-								{
-									format++;
-									long ptr = va_arg(args, long);
-									size_t res = sprint_number(putc, arg, (int64_t)ptr, 8, min_width, zero_padding);
-									count += res;
-									success = true;
-								}
-								break;
-							case 'x':
-								{
-									format++;
-									long ptr = va_arg(args, long);
-									size_t res = sprint_number(putc, arg, (int64_t)ptr, 16, min_width, zero_padding);
-									count += res;
-									success = true;
-								}
-								break;
-							case 'u':
-								{
-									format++;
-									unsigned long ptr = va_arg(args, unsigned long);
-									size_t res = uprint_number(putc, arg, (uint64_t)ptr, 10, min_width, zero_padding);
-									count += res;
-									success = true;
-								}
-								break;
-						}
-						if (success) {
-							break;
-						}
-					}
+				case 'x':
+					base = 16;
+					is_signed = false;
+					print_n = true;
+					break;
+				case 'X':
+					base = 16;
+					is_signed = false;
+					print_n = true;
+					capitalization = true;
 					break;
 
 				case 's': // Handle string
@@ -199,7 +180,8 @@ int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* form
 
 				default:
 					{
-						debug_printf("not implemented %s", format);
+						debug_printf("not implemented \"%s\"", format);
+						__builtin_trap();
 						const char* str = "\nnot implemented in printf ";
 						while (*str != '\0') {
 							CHECKPUTC(*str)
@@ -213,6 +195,47 @@ int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* form
 					// Handle error or unexpected input
 					break;
 			}
+			if (print_n) {
+				size_t res = 0; 
+				if (hh && is_signed) {
+					signed   char      ptr = va_arg(args, signed char       );
+					CHECK(sprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
+				} else if (h && is_signed) {
+					signed   short     ptr = va_arg(args, signed short      );
+					CHECK(sprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
+				} else if (l && is_signed) {
+					signed   long      ptr = va_arg(args, signed long       );
+					CHECK(sprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
+				} else if (ll && is_signed) {
+					signed   long long ptr = va_arg(args, signed long long  );
+					CHECK(sprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
+				} else if (z && is_signed) {
+					size_t             ptr = va_arg(args,        size_t     );
+					CHECK(sprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
+				} else if (is_signed) {
+					signed   int       ptr = va_arg(args, signed int        );
+					CHECK(sprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
+
+				} else if (hh) {
+					unsigned char      ptr = va_arg(args, unsigned char     );
+					CHECK(uprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
+				} else if (h) {
+					unsigned short     ptr = va_arg(args, unsigned short    );
+					CHECK(uprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
+				} else if (l) {
+					unsigned long      ptr = va_arg(args, unsigned long     );
+					CHECK(uprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
+				} else if (ll) {
+					unsigned long long ptr = va_arg(args, unsigned long long);
+					CHECK(uprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
+				} else if (z) {
+					size_t             ptr = va_arg(args, size_t            );
+					CHECK(uprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
+				} else {
+					unsigned int       ptr = va_arg(args, unsigned int      );
+					CHECK(uprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
+				}
+			}
 		}
 		else {
 			CHECKPUTC(*format);
@@ -221,7 +244,7 @@ int internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* form
 		format++;
 	}
 
-	return count;
+	return error;
 }
 
 
@@ -252,7 +275,12 @@ int debug_printf(char* format, ...) {
 	struct print_state state = { buf, debug_puts_buf, 0, 0 };
 	va_start(args, format);
 
-	const int ret = internal_printf(debug_puts, &state, format, args); 
+	size_t ret = 0;
+	int32_t err = internal_printf(debug_puts, &state, format, args, &ret); 
+	if (err != SUCCESS) {
+		errno = err;
+		return -1;
+	}
 	state.buf[state.to_write] = '\0';
 	__write(state.buf);
 	if (ret < 0) { __exit(-1); }
@@ -264,7 +292,7 @@ int debug_printf(char* format, ...) {
 
 int snprintf_puts(void* arg, int c) {
 	struct print_state * state = (struct print_state*)arg;
-	if (state->to_write >= state->buf_size) {
+	if (state->to_write >= state->buf_size - 1) {
 		return 0;
 	}
 	state->buf[state->to_write] = c;
@@ -274,8 +302,13 @@ int snprintf_puts(void* arg, int c) {
 DLL_PUBLIC
 int vsnprintf(char * s, size_t n, const char * format, va_list args) {
 	struct print_state state = { s, n, 0, 0 };
-	const int ret = internal_printf(snprintf_puts, &state, format, args); 
-	if (ret < 0) { __exit(-1); }
+	size_t ret = 0;
+	const int32_t err = internal_printf(snprintf_puts, &state, format, args, &ret); 
+	if (err != SUCCESS) {
+		errno = err;
+		return -1;
+	}
+	s[state.to_write] = '\0';
 	return ret;
 }
 
@@ -299,7 +332,12 @@ int sprintf(char * s, const char * format, ...) {
 
 DLL_PUBLIC
 int vasprintf(char ** strp, const char * format, va_list args) {
-	const int ret = internal_printf(0, 0, format, args); 
+	size_t ret = 0;
+	int32_t err = internal_printf(0, 0, format, args, &ret); 
+	if (err != SUCCESS) {
+		errno = err;
+		return -1;
+	}
 	char* p = (char*)malloc(ret);
 	*strp = p;
 	return vsnprintf(p, ret, format, args);
@@ -330,7 +368,12 @@ int vfprintf(FILE* file, const char *restrict format, va_list args) {
 	char buf[vfprintf_bufsz];
 	struct print_state state = { buf, vfprintf_bufsz, 0, file };
 
-	const int ret = internal_printf(vfprintf_puts, &state, format, args); 
+	size_t ret = 0;
+	int32_t err = internal_printf(vfprintf_puts, &state, format, args, &ret); 
+	if (err != SUCCESS) {
+		errno = err;
+		return -1;
+	}
 	fwrite(state.buf, 1, state.to_write, state.file);
 	if (ret < 0) { __exit(-1); }
 

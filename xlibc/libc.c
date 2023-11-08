@@ -453,7 +453,7 @@ int sscanf(const char *str, const char *format, ...) {
 //
 DLL_PUBLIC
 void free(void* ptr) {
-	debug_printf("execute os free %p\n", ptr);
+	//debug_printf("execute os free %p\n", ptr);
 	if (isWin) {
 		return free_ms(ptr);
 	} else {
@@ -474,7 +474,7 @@ void free(void* ptr) {
 #define MAP_ANONYMOUS   32
 
 DLL_PUBLIC void* malloc(size_t new_size) {
-	debug_printf("execute os malloc %ld ", new_size);
+	//debug_printf("execute os malloc %ld ", new_size);
 	void* result = 0;
 	if (isWin) {
 		result = malloc_ms(new_size);
@@ -487,12 +487,12 @@ DLL_PUBLIC void* malloc(size_t new_size) {
 		result = malloc_sysv(new_size);
 #endif
 	}
-	debug_printf("= %p\n", result);
+	//debug_printf("= %p\n", result);
 	return result;
 }
 
 DLL_PUBLIC void *calloc(size_t nmemb, size_t size) {
-	debug_printf("execute os calloc %ld x %ld ", nmemb, size);
+	//debug_printf("execute os calloc %ld x %ld ", nmemb, size);
 	void* result = 0;
 	if (isWin) {
 		result = calloc_ms(nmemb, size);
@@ -504,26 +504,26 @@ DLL_PUBLIC void *calloc(size_t nmemb, size_t size) {
 		result = calloc_sysv(nmemb, size);
 #endif
 	}
-	debug_printf("= %p\n", result);
+	//debug_printf("= %p\n", result);
 	return result;
 }
 
 DLL_PUBLIC
 void* aligned_alloc(size_t alignment, size_t new_size) {
-	debug_printf("execute os aligned_alloc alignment %d size %d", alignment, new_size);
+	//debug_printf("execute os aligned_alloc alignment %d size %d", alignment, new_size);
 	void* ret=0;
 	if (isWin) {
 		ret = aligned_alloc_ms(new_size, alignment);
 	} else {
 		ret = aligned_alloc_sysv(alignment, new_size);
 	}
-	debug_printf("= %p\n", ret);
+	//debug_printf("= %p\n", ret);
 	return ret;
 }
 
 DLL_PUBLIC
 void aligned_free(void* ptr) {
-	debug_printf("execute os aligned_free %p\n", ptr);
+	//debug_printf("execute os aligned_free %p\n", ptr);
 	if (isWin) {
 		return aligned_free_ms(ptr);
 	} else {
@@ -533,7 +533,7 @@ void aligned_free(void* ptr) {
 
 DLL_PUBLIC
 void *realloc(void *ptr, size_t size) {
-	debug_printf("execute os realloc %p %p\n", ptr, size);
+	//debug_printf("execute os realloc %p %p\n", ptr, size);
 	if (isWin) {
 		return realloc_ms(ptr, size);
 	} else {
@@ -1355,7 +1355,68 @@ long int strtol(const char* str, char** endptr, int base) {
 
 DLL_PUBLIC
 unsigned long int strtoul(const char* str, char** endptr, int base) {
-    return (unsigned long int)strtol(str, endptr, base);
+    // Check for valid base
+    if (base < 0 || (base != 0 && (base < 2 || base > 36))) {
+        errno = EINVAL;  // Invalid argument
+        return 0;
+    }
+
+    // Handle optional leading whitespace
+    while (*str == ' ' || (*str >= '\t' && *str <= '\r')) {
+        str++;
+    }
+
+    // Handle optional base prefix (0x or 0X for hexadecimal)
+    if (base == 0) {
+        if (*str == '0') {
+            if (*(str + 1) == 'x' || *(str + 1) == 'X') {
+                base = 16;
+                str += 2;
+            } else {
+                base = 8;
+                str++;
+            }
+        } else {
+            base = 10;
+        }
+    }
+
+    // Parse digits and calculate the result
+    long int result = 0;
+    int overflow = 0;
+    while (*str != '\0') {
+        int digit;
+        if (*str >= '0' && *str <= '9') {
+            digit = *str - '0';
+        } else if (*str >= 'a' && *str <= 'z') {
+            digit = *str - 'a' + 10;
+        } else if (*str >= 'A' && *str <= 'Z') {
+            digit = *str - 'A' + 10;
+        } else {
+            break;  // Invalid character
+        }
+
+        if (digit >= base) {
+            break;  // Invalid digit for base
+        }
+
+        if (!overflow) {
+            long int prev = result;
+            result = result * base + digit;
+            if (result / base != prev) {
+                overflow = 1;
+            }
+        }
+
+        str++;
+    }
+
+    // Set the end pointer if requested
+    if (endptr != NULL) {
+        *endptr = (char*)str;
+    }
+
+    return result;
 }
 
 DLL_PUBLIC
@@ -1365,7 +1426,7 @@ long long int strtoll(const char* str, char** endptr, int base) {
 
 DLL_PUBLIC
 unsigned long long int strtoull(const char* str, char** endptr, int base) {
-    return (unsigned long long int)strtol(str, endptr, base);
+    return (unsigned long long int)strtoul(str, endptr, base);
 }
 
 //DLL_PUBLIC
