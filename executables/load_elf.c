@@ -624,7 +624,6 @@ int printf2(const char *restrict format, ...) {
 
 __attribute__((sysv_abi))
 int write2(const char *s) {
-	if (!zwolf_debug) { return strlen(s); }
 #ifdef WIN32
 	// Calculate the length of the UTF-8 string (excluding the null-terminator)
 	int utf8_length = strlen(s);

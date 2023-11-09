@@ -21,6 +21,11 @@
 		return error;\
 	}
 
+bool DEBUG=false;
+__attribute__((constructor)) void isDebug() {
+	if (getenv("XLIB_DEBUG")) { DEBUG=true; }
+}
+
 #define MAX_NUM_WIDTH 32
 int32_t print_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, uint64_t unumber, int base, int width, bool leading_zeros, size_t * count, bool capitalization, bool sign)
 {
@@ -269,6 +274,7 @@ int debug_puts(void* arg, int c) {
 	return 1;
 }
 int debug_printf(char* format, ...) {
+	if (!DEBUG) { return 0; }
 	va_list args;
 	char buf[debug_puts_buf + 1];
 	buf[debug_puts_buf] = '\0';

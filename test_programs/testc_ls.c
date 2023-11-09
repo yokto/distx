@@ -1,27 +1,34 @@
 //#include <dirent.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
 
 int main() {
-    const char* directory_path = ".";
+    const char* directory_path = "/__zwolf_run__/test_programs";
     DIR* directory = opendir(directory_path);
+
+    bool foundBin = false;
 
     if (directory) {
         struct dirent* entry;
         while ((entry = readdir(directory)) != NULL) {
-            //if (entry->d_type == DT_REG) {
-                // Regular file
-                printf("File: %s\n", entry->d_name);
-            //} else if (entry->d_type == DT_DIR) {
-                // Directory
-             //   printf("Directory: %s\n", entry->d_name);
-            //} else {
-                // Other file types like symbolic links, etc.
-            //    printf("Other: %s\n", entry->d_name);
-            //}
-        }
+		if (strcmp(entry->d_name, "bin") == 0) {
+			foundBin = true;
+		} else if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) { // nothing
+		} else {
+			fprintf(stderr, "found unexpected file %s\n", entry->d_name);
+			return -1;
+		}
+	}
         closedir(directory);
     } else {
-        fprintf(stdout, "Failed to open the directory");
+        fprintf(stdout, "Failed to open the directory\n");
+	return -1;
+    }
+
+    if (!foundBin) {
+	    fprintf(stderr, "not found bin dir\n");
+	    return -1;
     }
 
     return 0;

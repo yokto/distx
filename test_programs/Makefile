@@ -6,7 +6,7 @@ LIBFOOBAR := $(BUILDDIR)/lib/libfoobar.so
 HELLOC := $(BUILDDIR)/bin/helloc
 LIBC := $(DEPDIR)/xlibc/lib/libc.so
 #LIBBASE := $(BUILDDIR)/libbase/lib/libbase.so
-HELLORUST := $(BUILDDIR)/hellorust/bin/hellorust
+HELLORUST := $(BUILDDIR)/bin/hellorust
 HELLOCPP := $(BUILDDIR)/hellocpp/bin/hellocpp
 #TEST_IOSTREAM := $(BUILDDIR)/bin/test_iostream
 CONSTANTS := $(BUILDDIR)/bin/constants
@@ -92,6 +92,7 @@ $(BUILDDIR)/bin/testc_zlib: testc_zlib.c
 $(BUILDDIR)/bin/testc_%: testc_%.c
 	mkdir -p "$(BUILDDIR)/bin"
 	${CC} -femulated-tls -g \
+		-lm \
 		"-Wl,-soname,test_programs/bin/testc_$*" \
 		-o "$@" "$<"
 
