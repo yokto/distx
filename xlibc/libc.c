@@ -248,7 +248,7 @@ __attribute__((constructor)) void init() {
 
 	init_fs(isWin, libc);
 	init_threads(isWin, libc);
-	init_proc(isWin, libc);
+	init_proc(isWin, libc, kernel32);
 	if (isWin) {
 		vswprintf_ms = dlsym(libc, "vswprintf");
 		malloc_ms = dlsym(libc, "malloc");

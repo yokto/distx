@@ -914,8 +914,9 @@ int main(int argc, char ** argv) {
 	const char * exec_env = "ZWOLF_EXECUTABLE";
 #ifdef WIN32
 	const char * path = _fullpath(0, argv[0], 0);
-	char* path2 = calloc(strlen(path) + strlen(exec_env) + 1, 1);
+	char* path2 = calloc(strlen(path) + strlen(exec_env) + 2, 1);
 	strcat(path2, exec_env);
+	strcat(path2, "=");
 	strcat(path2, path);
 	free(path);
 	_putenv(path2);

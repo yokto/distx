@@ -29,6 +29,7 @@ __attribute__((constructor)) void isDebug() {
 #define MAX_NUM_WIDTH 32
 int32_t print_number(int (*putc)(void* arg, int chr), void* arg, int64_t number, uint64_t unumber, int base, int width, bool leading_zeros, size_t * count, bool capitalization, bool sign)
 {
+    if (width < 1) { width = 1; }
     // Allocate a buffer for the number representation
     char buffer[MAX_NUM_WIDTH+2];  // Assuming a maximum width of 32 characters
     
@@ -36,7 +37,7 @@ int32_t print_number(int (*putc)(void* arg, int chr), void* arg, int64_t number,
     size_t index = sizeof(buffer) - 1;
     buffer[index] = '\0';
     
-    const char * const nums = capitalization ? "0123456789abcdef" : "0123456789ABCDEF";
+    const char * const nums = capitalization ? "0123456789ABCDEF" : "0123456789abcdef";
     if (sign) {
 	    const bool negative = number < 0;
 	    if (negative) {
@@ -140,8 +141,10 @@ int32_t internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* 
 				case 'p':
 					base = 16;
 					is_signed = false;
-					min_width = sizeof(void*) * 2;
 					print_n = true;
+					z = true;
+					CHECKPUTC('0')
+					CHECKPUTC('x')
 					break;
 
 				case 'o':
