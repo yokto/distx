@@ -6,6 +6,10 @@
 #include "json.hpp"
 
 int main(int argc, char** argv) {
+	if (argc < 2) {
+		std::cerr << "./testcpp_runtests <jsonfile>" << std::endl;
+		return -1;
+	}
 	std::ifstream file(argv[1]);
 
 	if (!file.is_open()) {

@@ -85,7 +85,7 @@ extern FILE* stderr; // not really supposed to be here
 int fprintf(FILE* stream, const char * format, ...); // not really supposed to be here
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
-void exit(int status);
+_Noreturn void exit(int status);
 void abort() __attribute__ ((__noreturn__));
 
 #define MB_CUR_MAX 1

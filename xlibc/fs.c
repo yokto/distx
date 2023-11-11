@@ -36,7 +36,7 @@ int32_t base_fs_open(const char *path, uintptr_t* fd, uint32_t flags) {
 	debug_printf("open %s flags %d\n", path, flags);
 
 	uint32_t error = SUCCESS;
-	char * nativepath = NULL;
+	void * nativepath = NULL;
 
 	do {
 		error = tonativepath(path, &nativepath);
@@ -231,7 +231,7 @@ int32_t base_fs_tonativepathlen(const char *pathname, uintptr_t* length) {
 
 static const char basealias[] = "/__zwolf_run__/";
 #define basealias_len (sizeof(basealias) - 1)
-int32_t tonativepath(const char* filenameOrig, const char** output) {
+int32_t tonativepath(const char* filenameOrig, void** output) {
 	*output = NULL;
 	int filelen = strlen(filenameOrig);
 
@@ -261,4 +261,27 @@ int32_t tonativepath(const char* filenameOrig, const char** output) {
 	}
 	*output = nativepath;
 	return SUCCESS;
+}
+
+// needs to be freed
+// takes an ABSOLUTE windows path and gives back segments
+int32_t alloc_windows_path(uint16_t* orig_path, char** outpath) {
+	int32_t err = 0;
+	uintptr_t len = 0;
+	err = utf16to8len(orig_path, &len);
+	if (err) { return err; }
+
+	char * path = alloca(len + 1);
+	path[0] = '/';
+	err = utf16to8(orig_path, path + 1);
+	if (err) { free(path); return err; }
+	for (char* p = path; true; p++) {
+		if (p[0] == '\\') {
+			p[0] =  p[1] == '\0' ?
+				'\0' :
+				'/';
+		}
+	}
+	*outpath = path;
+	return err;
 }

@@ -74,7 +74,7 @@ int32_t futex_wait(_Atomic uint32_t *addr, uint32_t val, const struct timespec *
 		}
 		return 0;
 	} else {
-            int32_t ret = syscall(SYS_futex, addr, FUTEX_WAIT_PRIVATE, val, to, NULL, 0);
+            int32_t ret = syscall(SYS_futex, (uint32_t*)addr, FUTEX_WAIT_PRIVATE, val, to, NULL, 0);
 	    debug_printf("futex_wait done\n");
 	    return ret;
 	}
@@ -90,7 +90,7 @@ int futex_signal(_Atomic uint32_t *addr)
 	debug_printf("futex_signal done\n");
 		return 0;
 	} else {
-		return (syscall(SYS_futex, addr, FUTEX_WAKE_PRIVATE, 1, NULL, NULL, 0) >= 1) ? 0 : 1;
+		return (syscall(SYS_futex, (uint32_t*)addr, FUTEX_WAKE_PRIVATE, 1, NULL, NULL, 0) >= 1) ? 0 : 1;
 	}
 }
 
@@ -102,7 +102,7 @@ int futex_broadcast(_Atomic uint32_t *addr)
 		WakeByAddressAll(addr);
 		return 0;
 	} else {
-		return (syscall(SYS_futex, addr, FUTEX_WAKE_PRIVATE, (uint32_t)(-1), NULL, NULL, 0) >= 1) ? 0 : 1;
+		return (syscall(SYS_futex, (uint32_t*)addr, FUTEX_WAKE_PRIVATE, (uint32_t)(-1), NULL, NULL, 0) >= 1) ? 0 : 1;
 	}
 }
 

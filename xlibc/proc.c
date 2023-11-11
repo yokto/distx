@@ -73,18 +73,18 @@ void init_proc(bool iswin, void* lib, void* kernel32) {
 }
 
 // todo check all the errors
-uintptr_t wincmdlen(const char * const argv[]) {
+uint32_t wincmdlen(char * const argv[], uintptr_t* length) {
 	uintptr_t count = 0; 
 	uint32_t codepoint = 0;
 	uint8_t codelength = 0;
 	int32_t err = 0;
 	while (*argv != 0) {
-		for (const char * str = *argv; *str != '\0'; str) {
+		for (const char * str = *argv; *str != '\0';) {
 			if (*str == '\\' || *str == '"') {
 				count++; // for escaping
 			}
 			// for the character itself
-			err = utf8decode(str, -1, &codelength, &codepoint);
+			err = utf8decode((uint8_t*)str, -1, &codelength, &codepoint);
 			str += codelength;
 			uint16_t encoded[2];
 			err = utf16encode(codepoint, &codelength, encoded);
@@ -94,9 +94,10 @@ uintptr_t wincmdlen(const char * const argv[]) {
 		count += 2; // for quotes
 		argv++;
 	}
-	return 2 * count; // twice because it's utf16
+	*length = 2 * count; // twice because it's utf16
+	return err;
 }
-void wincmd(const char * const argv[], uint16_t * cmd) {
+int32_t wincmd(char * const argv[], uint16_t * cmd) {
 	debug_printf("asdf\n");
 	uint32_t codepoint = 0;
 	uint8_t codelength = 0;
@@ -110,7 +111,7 @@ void wincmd(const char * const argv[], uint16_t * cmd) {
 				cmd[0] = (uint16_t)'\\';
 				cmd++;
 			}
-			err = utf8decode(str, -1, &codelength, &codepoint);
+			err = utf8decode((uint8_t*)str, -1, &codelength, &codepoint);
 			str += codelength;
 			err = utf16encode(codepoint, &codelength, cmd);
 			cmd += codelength;
@@ -122,13 +123,14 @@ void wincmd(const char * const argv[], uint16_t * cmd) {
 		argv++;
 	}
 	cmd[-1] = 0; // we assume there is at least one argument
+	return err;
 }
 
 DLL_PUBLIC
-int32_t base_proc_exec(const char *path, const char *const argv[], const char *const envp[], uintptr_t* id) {
+int32_t base_proc_exec(const char *path, char *const argv[], char *const envp[], uintptr_t* id) {
 	debug_printf("base_proc_exec %s\n", argv[0]);
 	int32_t ret = 0;
-	const char * native_path = 0;
+	void* native_path = 0;
 	ret = tonativepath(argv[0], &native_path);
 
 	debug_printf("base_proc_exec %s\n", native_path);
@@ -136,8 +138,8 @@ int32_t base_proc_exec(const char *path, const char *const argv[], const char *c
 
 	if (isWin) {
 		size_t count = 0;
-		for (const char* const* args = argv; *args != 0; args++) { count++; }
-		const char ** argv2 = alloca((count+2) * sizeof(char*));
+		for (char* const* args = argv; *args != 0; args++) { count++; }
+		char ** argv2 = alloca((count+2) * sizeof(char*));
 		argv2[count+1] = 0;
 
 		// make args in utf8
@@ -146,15 +148,16 @@ int32_t base_proc_exec(const char *path, const char *const argv[], const char *c
 		ret = utf16to8len(native_path, &len);
 		argv2[1] = alloca(len + 1);
 		ret = utf16to8(native_path, argv2[1]);
-		for (int i = 1 ; i < count; i++) {
+		for (size_t i = 1 ; i < count; i++) {
 			argv2[i+1] = argv[i];
 		}
-		for (int i = 0 ; i <= count; i++) {
+		for (size_t i = 0 ; i <= count; i++) {
 			debug_printf("arg %s \n", argv2[i]);
 		}
 
-		uint16_t * cmd = alloca(wincmdlen(argv2));
-		memset(cmd, 0 , wincmdlen(argv2));
+		wincmdlen(argv2, &len);
+		uint16_t * cmd = alloca(len);
+		memset(cmd, 0 , len);
 		wincmd(argv2, cmd);
 
 		// just for debugging
@@ -166,8 +169,6 @@ int32_t base_proc_exec(const char *path, const char *const argv[], const char *c
 		ret = utf8to16len(argv2[0], &len);
 		uint16_t * file = alloca(2*len + 2);
 		ret = utf8to16(argv2[0], file);
-
-		const uint16_t * envp2[] = { 0, 0 };
 
 		STARTUPINFOW startup;
 		memset(&startup, 0, sizeof(STARTUPINFOW));
@@ -191,13 +192,11 @@ int32_t base_proc_exec(const char *path, const char *const argv[], const char *c
 		*id = info.hProcess;
 		debug_printf("ret %d\n", ret);
 		debug_printf("errno %d\n", __errno());
-		debug_printf("pid %d\n", info.hThread);
 	} else {
-		debug_printf("pid %p\n", *id);
 		uint32_t pid = linux_fork();
 		if (pid == 0) {
 			size_t count = 0;
-			for (const char* const* args = argv; *args != 0; args++) { count++; }
+			for (char* const* args = argv; *args != 0; args++) { count++; }
 			char ** argv2 = alloca((count+2) * sizeof(char*));
 			argv2[count+1] = 0;
 			argv2[1] = native_path;
@@ -213,12 +212,14 @@ int32_t base_proc_exec(const char *path, const char *const argv[], const char *c
 			ret = 0;
 		}
 	}
+	debug_printf("pid %d\n", *id);
 	free(native_path);
 	return ret;
 }
 
 DLL_PUBLIC
 int32_t base_proc_wait(uintptr_t pid, uint8_t* exit_code) {
+	int32_t err = 0;
 	if (isWin) {
 		debug_printf("wait for %p\n", pid);
 		debug_printf("wait for %p\n", win_WaitForSingleObject);
@@ -230,12 +231,13 @@ int32_t base_proc_wait(uintptr_t pid, uint8_t* exit_code) {
 		*exit_code = (uint8_t)exitCode;
 	} else {
 		int status = 0;
-		uint32_t ret = linux_waitpid(pid, &status, 0);
-		if (ret != pid) {
-			return EINVAL;
+		uint32_t err = linux_waitpid(pid, &status, 0);
+		if (err != pid) {
+			err = EINVAL;
 		} else {
-			*exit_code = (uint8_t)status;
-			return 0;
+			*exit_code = (uint8_t)((0xff00 & status) >> 8);
 		}
 	}
+	debug_printf("exit code %d\n", *exit_code);
+	return err;
 }

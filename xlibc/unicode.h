@@ -4,8 +4,8 @@
 extern "C" {
 #endif
 
-int32_t utf8decode(uint8_t* ptr, uintptr_t length, uint8_t* codelength, uint32_t* codepoint);
-int32_t utf16decode(uint16_t* ptr, uintptr_t length, uint8_t* codelength, uint32_t* codepoint);
+int32_t utf8decode(const uint8_t* ptr, uintptr_t length, uint8_t* codelength, uint32_t* codepoint);
+int32_t utf16decode(const uint16_t* ptr, uintptr_t length, uint8_t* codelength, uint32_t* codepoint);
 int32_t utf8encode(uint32_t codepoint, uint8_t* length, uint8_t* encoded);
 int32_t utf16encode(uint32_t codepoint, uint8_t* length, uint16_t* encoded);
 

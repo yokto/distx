@@ -20,6 +20,7 @@
 #include <wctype.h>
 #include <common.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
 #include <fs.h>
 #include <thread_impl.h>
 #include <unistd.h>
@@ -160,7 +161,8 @@ DECLARE(int, mkdir, const char *pathname, mode_t mode);
 int (*_mkdir_ms)(const char *pathname) __attribute((ms_abi));
 DECLARE(int, stat, const char * pathname, struct stat * statbuf);
 DECLARE(int, fstat, int fd, struct stat * statbuf);
-DECLARE(char*, getcwd, char *buf, size_t size);
+char* (*getcwd_sysv)(char *buf, size_t size);
+uint16_t* (*wgetcwd_ms)(uint16_t * path, size_t size) __attribute((ms_abi));
 DECLARE(struct dirent*, readdir, DIR * dir);
 DECLARE(int, closedir, DIR* dir);
 DECLARE(int, chdir, const char *path);
@@ -291,10 +293,11 @@ __attribute__((constructor)) void init() {
 		clock_gettime_ms = 0; //dlsym(libc, "clock_gettime");
 		getentropy_ms = 0; //dlsym(libc, "getentropy");
 		realpath_ms = 0; //dlsym(libc, "realpath");
+		mkdir_ms = 0;
 		_mkdir_ms = dlsym(libc, "_mkdir");
 		stat_ms = dlsym(libc, "_stat");
 		fstat_ms = dlsym(libc, "_fstat");
-		getcwd_ms = 0; //dlsym(libc, "getcwd");
+		wgetcwd_ms = dlsym(libc, "_wgetcwd");
 		readdir_ms = 0; //dlsym(libc, "readdir");
 		closedir_ms = 0; //dlsym(libc, "closedir");
 		chdir_ms = 0; //dlsym(libc, "chdir");
@@ -854,9 +857,9 @@ DLL_PUBLIC int tss_set(tss_t tss_id, void *val) {
 DLL_PUBLIC int stat(const char * p, struct stat * statbuf) {
 	debug_printf("execute os stat on path %s buf %p\n", p, statbuf);
 
-	char * pathname = 0;
+	void * pathname = 0;
 	int ret = -1;
-	int32_t error = tonativepath(p, &pathname);
+	tonativepath(p, &pathname);
 	debug_printf("execute os stat on path %s buf %p\n", pathname, statbuf);
 
 	if (isWin) {
@@ -935,7 +938,35 @@ DLL_PUBLIC int mkdir(const char *pathname, mode_t mode) {
 		return mkdir_sysv(pathname, mode);
 	}
 }
-DLL_PUBLIC char* getcwd(char *buf, size_t size) IMPLEMENT(getcwd, buf, size)
+DLL_PUBLIC char* getcwd(char *buf, size_t size) {
+	debug_printf("getcwd\n");
+	int32_t err = 0;
+	if (isWin) {
+		// nothing to do
+		uint16_t buffer[4096];
+		uint16_t * ret = wgetcwd_ms(buffer, 4096);
+		if (ret == 0) { err = 1; }
+
+		char * path = 0;
+		err = alloc_windows_path(buffer, &path);
+
+		debug_printf("path %s", path);
+
+		size_t len = strlen(path);
+		if (size <= len) {
+			err = 1;
+		} else {
+			strcpy(buf, path);
+		}
+
+		free(path);
+		if (err) { return 0; errno = err; }
+		return buf;
+	} else {
+		return getcwd_sysv(buf, size);
+	}
+}
+
 DLL_PUBLIC struct dirent* readdir(DIR * dir) {
 	debug_printf("execute os readdir\n");
 	if (isWin) {
@@ -2194,12 +2225,12 @@ locale_t newlocale(int category_mask, const char *locale, locale_t base) {
 }
 void freelocale(locale_t locobj) {
     UNUSED(locobj);
-    debug_printf(stderr, "freelocale not implemented\n");
+    debug_printf("freelocale not implemented\n");
 }
 char *setlocale(int category, const char *locale) {
     UNUSED(category);
     UNUSED(locale);
-    debug_printf(stderr, "setlocale not implemented\n");
+    debug_printf("setlocale not implemented\n");
     return 0;
 }
 
@@ -2220,7 +2251,7 @@ DLL_PUBLIC int mtime(const char *pathname, struct timespec * time) {
 }
 
 DLL_PUBLIC
-void exit(int status)
+_Noreturn void exit(int status)
 {
 	__exit(status);
 }

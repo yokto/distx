@@ -23,7 +23,7 @@
 
 bool DEBUG=false;
 __attribute__((constructor)) void isDebug() {
-	if (getenv("XLIB_DEBUG")) { DEBUG=true; }
+	if (getenv("XLIBC_DEBUG")) { DEBUG=true; }
 }
 
 #define MAX_NUM_WIDTH 32
@@ -204,12 +204,11 @@ int32_t internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* 
 					break;
 			}
 			if (print_n) {
-				size_t res = 0; 
 				if (hh && is_signed) {
-					signed   char      ptr = va_arg(args, signed char       );
+					signed   char      ptr = (signed char) va_arg(args, signed int       );
 					CHECK(sprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
 				} else if (h && is_signed) {
-					signed   short     ptr = va_arg(args, signed short      );
+					signed   short     ptr = (signed short) va_arg(args, signed int      );
 					CHECK(sprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
 				} else if (l && is_signed) {
 					signed   long      ptr = va_arg(args, signed long       );
@@ -225,10 +224,10 @@ int32_t internal_printf(int (*putc)(void* arg, int chr), void* arg, const char* 
 					CHECK(sprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
 
 				} else if (hh) {
-					unsigned char      ptr = va_arg(args, unsigned char     );
+					unsigned char      ptr = (unsigned char) va_arg(args, unsigned int     );
 					CHECK(uprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
 				} else if (h) {
-					unsigned short     ptr = va_arg(args, unsigned short    );
+					unsigned short     ptr = (unsigned short) va_arg(args, unsigned int    );
 					CHECK(uprint_number(putc, arg, ptr, base, min_width, zero_padding, count, capitalization));
 				} else if (l) {
 					unsigned long      ptr = va_arg(args, unsigned long     );
@@ -389,8 +388,8 @@ int vfprintf(FILE* file, const char *restrict format, va_list args) {
 	return ret;
 }
 
-DLL_PUBLIC
-int putchar(int c) {
-	char out = c;
-	fwrite(&c, 1, 1, stdout);
-}
+//DLL_PUBLIC
+//int putchar(int c) {
+//	char out = (char)c;
+//	fwrite(&c, 1, 1, stdout);
+//}
