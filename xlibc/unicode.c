@@ -173,7 +173,7 @@ int32_t utf16to8(const uint16_t *inputOrig, void* outputOrig) {
 		error = utf16decode(input, 4, &utf16len, &codepoint);
 		if (error != SUCCESS) { return error; }
 
-		if (codepoint == '/') { codepoint = '\\'; }
+		//if (codepoint == '/') { codepoint = '\\'; }
 
 		char utf8[4];
 		uint8_t utf8len;

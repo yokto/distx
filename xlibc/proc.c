@@ -98,7 +98,7 @@ uint32_t wincmdlen(char * const argv[], uintptr_t* length) {
 	return err;
 }
 int32_t wincmd(char * const argv[], uint16_t * cmd) {
-	debug_printf("asdf\n");
+	uint16_t * origcmd = cmd;
 	uint32_t codepoint = 0;
 	uint8_t codelength = 0;
 	int32_t err = 0;
@@ -150,9 +150,6 @@ int32_t base_proc_exec(const char *path, char *const argv[], char *const envp[],
 		ret = utf16to8(native_path, argv2[1]);
 		for (size_t i = 1 ; i < count; i++) {
 			argv2[i+1] = argv[i];
-		}
-		for (size_t i = 0 ; i <= count; i++) {
-			debug_printf("arg %s \n", argv2[i]);
 		}
 
 		wincmdlen(argv2, &len);

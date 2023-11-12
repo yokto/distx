@@ -3,6 +3,7 @@
 #include "base/fs.h"
 #include "common.h"
 #include "stdlib.h"
+#include "stdio.h"
 #include "errno.h"
 #include "fs_windows.h"
 #include "fs_linux.h"
@@ -33,7 +34,7 @@ void init_fs(bool iswin, void* lib) {
 }
 
 int32_t base_fs_open(const char *path, uintptr_t* fd, uint32_t flags) {
-	debug_printf("open %s flags %d\n", path, flags);
+	debug_printf("open %s flag %d\n", path, flags);
 
 	uint32_t error = SUCCESS;
 	void * nativepath = NULL;
@@ -42,7 +43,7 @@ int32_t base_fs_open(const char *path, uintptr_t* fd, uint32_t flags) {
 		error = tonativepath(path, &nativepath);
 		if (error) { break; }
 		if (isWin) {
-			uint32_t flag = 0;
+			uint32_t flag = WIN_O_BINARY;
 			if ((flags & BASE_FS_OPEN_READ) && (flags & BASE_FS_OPEN_WRITE)) { flag |= WIN_O_RDWR; }
 			else if (flags & BASE_FS_OPEN_READ) { flag |= WIN_O_RDONLY; }
 			else if (flags & BASE_FS_OPEN_WRITE) { flag |= WIN_O_WRONLY; }
@@ -53,9 +54,11 @@ int32_t base_fs_open(const char *path, uintptr_t* fd, uint32_t flags) {
 			if (flags & BASE_FS_OPEN_APPEND) { flag |= WIN_O_APPEND; }
 			if (flags & BASE_FS_OPEN_CREATE) { flag |= WIN_O_CREAT; }
 			int ret = win_wopen(nativepath, flag, 0666);
+			debug_printf("fd %d\n", ret);
 			if (ret >= 0) {
 				*fd = ret;
 			} else {
+				debug_printf("open errno %d\n", __errno());
 				error = __errno();
 			}
 		} else {
@@ -81,7 +84,9 @@ int32_t base_fs_open(const char *path, uintptr_t* fd, uint32_t flags) {
 		}
 	} while (false);
 	if (nativepath) { free(nativepath); }
-	debug_printf("open failed with %d\n", error);
+	if (*fd < 0) {
+		debug_printf("open failed with %d\n", error);
+	}
 	return error;
 }
 
@@ -162,6 +167,11 @@ int32_t base_fs_read(uintptr_t fd, void *buf, uintptr_t count, uintptr_t* read) 
 		int ret = win_read(fd, buf, count);
 		if (ret >= 0) {
 			*read = ret;
+//			char* b = buf;
+//			char c = b[count-1];
+//			b[count-1] = '\0';
+//			debug_printf("read %s", b);
+//			b[count-1] = c;
 			return SUCCESS;
 		} else {
 			return __errno();
@@ -271,11 +281,11 @@ int32_t alloc_windows_path(uint16_t* orig_path, char** outpath) {
 	err = utf16to8len(orig_path, &len);
 	if (err) { return err; }
 
-	char * path = alloca(len + 1);
+	char * path = malloc(len + 1);
 	path[0] = '/';
 	err = utf16to8(orig_path, path + 1);
 	if (err) { free(path); return err; }
-	for (char* p = path; true; p++) {
+	for (char* p = path; p[0] != '\0' ; p++) {
 		if (p[0] == '\\') {
 			p[0] =  p[1] == '\0' ?
 				'\0' :
@@ -285,3 +295,11 @@ int32_t alloc_windows_path(uint16_t* orig_path, char** outpath) {
 	*outpath = path;
 	return err;
 }
+
+DLL_PUBLIC
+int putchar(int c) {
+       char out = c;
+       fwrite(&out, 1, 1, stdout);
+       return c;
+}
+

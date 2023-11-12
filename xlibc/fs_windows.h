@@ -9,6 +9,7 @@
 #define WIN_O_RDONLY   0
 #define WIN_O_WRONLY   1
 #define WIN_O_RDWR     2
+#define WIN_O_BINARY   32768
 
 int (*win_wopen)(const uint16_t *filename, int oflag, int mode) __attribute((ms_abi));
 int64_t (*win_lseeki64)(int fd, int64_t offset, int origin) __attribute((ms_abi));

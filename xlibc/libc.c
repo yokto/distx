@@ -157,9 +157,11 @@ int (*_rmdir_ms)(const char *pathname) __attribute((ms_abi));
 DECLARE(int, clock_gettime, clockid_t clockid, struct timespec *tp);
 DECLARE(int, getentropy, void *buffer, size_t length);
 DECLARE(char*, realpath, const char * path, char * resolved_path);
+uint16_t * (*_wfullpath_ms)(uint16_t *absPath, const uint16_t *relPath, size_t maxLength) __attribute((ms_abi));
 DECLARE(int, mkdir, const char *pathname, mode_t mode);
 int (*_mkdir_ms)(const char *pathname) __attribute((ms_abi));
 DECLARE(int, stat, const char * pathname, struct stat * statbuf);
+int (*_wstat_ms)(uint16_t * pathname, struct stat * statbuf) __attribute((ms_abi));
 DECLARE(int, fstat, int fd, struct stat * statbuf);
 char* (*getcwd_sysv)(char *buf, size_t size);
 uint16_t* (*wgetcwd_ms)(uint16_t * path, size_t size) __attribute((ms_abi));
@@ -293,9 +295,11 @@ __attribute__((constructor)) void init() {
 		clock_gettime_ms = 0; //dlsym(libc, "clock_gettime");
 		getentropy_ms = 0; //dlsym(libc, "getentropy");
 		realpath_ms = 0; //dlsym(libc, "realpath");
+		_wfullpath_ms = dlsym(libc, "_wfullpath");
 		mkdir_ms = 0;
 		_mkdir_ms = dlsym(libc, "_mkdir");
 		stat_ms = dlsym(libc, "_stat");
+		_wstat_ms = dlsym(libc, "_wstat");
 		fstat_ms = dlsym(libc, "_fstat");
 		wgetcwd_ms = dlsym(libc, "_wgetcwd");
 		readdir_ms = 0; //dlsym(libc, "readdir");
@@ -860,15 +864,14 @@ DLL_PUBLIC int stat(const char * p, struct stat * statbuf) {
 	void * pathname = 0;
 	int ret = -1;
 	tonativepath(p, &pathname);
-	debug_printf("execute os stat on path %s buf %p\n", pathname, statbuf);
 
 	if (isWin) {
 		struct windows_stat ls;
-		ret = stat_ms(pathname, (struct stat*)&ls);
+		ret = _wstat_ms(pathname, (struct stat*)&ls);
 		if (ret == -1) { errno = __errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
-		statbuf->st_ino = ls.st_ino;
+		statbuf->st_ino = rand();
 		statbuf->st_nlink = ls.st_nlink;
 		statbuf->st_size = ls.st_size;
 		statbuf->st_mtim.tv_sec = ls.wst_mtime / 1000;
@@ -884,7 +887,7 @@ DLL_PUBLIC int stat(const char * p, struct stat * statbuf) {
 		statbuf->st_nlink = ls.st_nlink;
 		statbuf->st_size = ls.st_size;
 		statbuf->st_mtim = ls.st_mtim;
-		debug_printf("stat returned %d %p mode %ld\n", ret, statbuf, ls.st_mode);
+		debug_printf("stat returned %d %p mode %lx\n", ret, statbuf, ls.st_mode);
 	}
 	if (pathname) { free(pathname); }
 	return ret;
@@ -897,12 +900,12 @@ DLL_PUBLIC int fstat(int fd, struct stat * statbuf) {
 		if (ret == -1) { errno = __errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
-		statbuf->st_ino = ls.st_ino;
+		statbuf->st_ino = rand();
 		statbuf->st_nlink = ls.st_nlink;
 		statbuf->st_size = ls.st_size;
 		statbuf->st_mtim.tv_sec = ls.wst_mtime / 1000;
 		statbuf->st_mtim.tv_nsec = (ls.wst_mtime % 1000) * 1000000;
-		debug_printf("stat returned %d %p mode %lx\n", ret, statbuf, ls.st_mode);
+		debug_printf("stat returned %d %p mode %lx inode %ld \n", ret, statbuf, ls.st_mode, statbuf->st_ino);
 		return ret;
 	} else {
 		struct linux_stat ls;
@@ -920,7 +923,40 @@ DLL_PUBLIC int fstat(int fd, struct stat * statbuf) {
 }
 DLL_PUBLIC int clock_gettime(clockid_t clockid, struct timespec *tp) IMPLEMENT(clock_gettime, clockid, tp)
 DLL_PUBLIC int getentropy(void *buffer, size_t length) IMPLEMENT(getentropy, buffer, length)
-DLL_PUBLIC char* realpath(const char * path, char * resolved_path) IMPLEMENT(realpath, path, resolved_path)
+DLL_PUBLIC char* realpath(const char * path, char * resolved_path) {
+	debug_printf("execute os realpath %s = ", path);
+	if (isWin) {
+		void * native_path = 0;
+		char* ret_path = 0;
+		uint32_t err = tonativepath(path, &native_path);
+		if (err) { goto error; }
+		uint16_t * ret = _wfullpath_ms(0, native_path, 0);
+		if (ret == 0) { err = 1; goto error; }
+		err = alloc_windows_path(ret, &ret_path);
+		if (err) { goto error; }
+
+
+		if (resolved_path) {
+			if (strlen(ret_path) > PATH_MAX) { err = 1; goto error; }
+			strcpy(resolved_path, ret_path);
+			free(ret_path);
+		}
+
+		free(native_path);
+		debug_printf("%s\n", resolved_path);
+		return resolved_path;
+error:
+		free(ret_path);
+		free(native_path);
+		errno = err;
+		return 0;
+
+	} else {
+		char* ret = realpath_sysv(path, resolved_path);
+		debug_printf("%s\n", ret);
+		return ret;
+	}
+}
 struct win_dir {
 	struct dirent linux_dirent;
 	WIN32_FIND_DATA win_dirent;
@@ -942,33 +978,36 @@ DLL_PUBLIC char* getcwd(char *buf, size_t size) {
 	debug_printf("getcwd\n");
 	int32_t err = 0;
 	if (isWin) {
-		// nothing to do
 		uint16_t buffer[4096];
 		uint16_t * ret = wgetcwd_ms(buffer, 4096);
 		if (ret == 0) { err = 1; }
 
 		char * path = 0;
 		err = alloc_windows_path(buffer, &path);
+		if (err) { errno = err; return 0; }
 
-		debug_printf("path %s", path);
+		debug_printf("getcwd path %s\n", path);
 
 		size_t len = strlen(path);
-		if (size <= len) {
-			err = 1;
-		} else {
-			strcpy(buf, path);
+		if (buf != 0) {
+			if (size <= len) {
+				errno = err;
+				free(path);
+				return 0;
+			} else {
+				strcpy(buf, path);
+				free(path);
+			}
+			return buf;
 		}
-
-		free(path);
-		if (err) { return 0; errno = err; }
-		return buf;
+		return path;
 	} else {
 		return getcwd_sysv(buf, size);
 	}
 }
 
 DLL_PUBLIC struct dirent* readdir(DIR * dir) {
-	debug_printf("execute os readdir\n");
+	debug_printf("execute os readdir %p\n", dir);
 	if (isWin) {
 		struct win_dir* windir = (struct win_dir*)dir;
 		if (windir->initialized) {
@@ -1003,7 +1042,7 @@ DLL_PUBLIC int closedir(DIR* dir) {
 }
 DLL_PUBLIC int chdir(const char *path) IMPLEMENT(chdir, path)
 DLL_PUBLIC DIR* opendir(const char * path) {
-	debug_printf("execute os opendir\n");
+	debug_printf("execute os opendir %s = ", path);
 	if (isWin) {
 		struct win_dir* dir = calloc(1, sizeof(struct win_dir));
 		size_t len = strlen(path);
@@ -1016,9 +1055,12 @@ DLL_PUBLIC DIR* opendir(const char * path) {
 		dir->path[len] = '\\';
 		dir->path[len+1] = '*';
 		dir->path[len+2] = '\0';
+		debug_printf("%p\n", dir);
 		return (void*)dir;
 	} else {
-		return opendir_sysv(path);
+		DIR* ret = opendir_sysv(path);
+		debug_printf("%p\n", ret);
+		return ret;
 	}
 }
 DLL_PUBLIC ssize_t readlink(const char * pathname, char * buf, size_t bufsiz) IMPLEMENT(readlink, pathname, buf, bufsiz)
