@@ -32,7 +32,7 @@
 	["build-compiler-rt", "env", "DESTDIR=..", "ninja", "install"],
 	[".", "mkdir", "-p", "build-compiler-rt-arm"],
 	["build-compiler-rt-arm",
-		"echo", "env",
+		"env",
 		"CC=clang",
 		"CXX=clang++",
 		"cmake",
@@ -43,15 +43,13 @@
 		"-DCMAKE_C_COMPILER=clang",
 		"-DCMAKE_SYSTEM_NAME=zwolf",
 		"-DCMAKE_C_COMPILER_FORCED=TRUE",
-		"-DCMAKE_ASM_FLAGS=-march=armv7a",
-		"-DCMAKE_C_FLAGS=-march=armv7a",
 		"-DCMAKE_CXX_COMPILER_FORCED=TRUE",
-		"-DCMAKE_INSTALL_PREFIX=/__zwolf_run__/llvm-compiler-rt/arm",
+		"-DCMAKE_INSTALL_PREFIX=/__zwolf_run__/llvm-compiler-rt/aarch64",
 		"-DCMAKE_INSTALL_INCLUDEDIR=/__zwolf_run__/llvm-compiler-rt/common/include",
-		"-DCMAKE_C_COMPILER_TARGET=arm-unknown-linux-zwolf",
-		"-DCMAKE_ASM_COMPILER_TARGET=arm-unknown-linux-zwolf",
-		"-DLLVM_DEFAULT_TARGET_TRIPLE=arm-unknown-linux-zwolf",
-		"-DLLVM_TARGET_TRIPLE=arm-unknown-linux-zwolf",
+		"-DCMAKE_C_COMPILER_TARGET=aarch64-unknown-linux-zwolf",
+		"-DCMAKE_ASM_COMPILER_TARGET=aarch64-unknown-linux-zwolf",
+		"-DLLVM_DEFAULT_TARGET_TRIPLE=aarch64-unknown-linux-zwolf",
+		"-DLLVM_TARGET_TRIPLE=aarch64-unknown-linux-zwolf",
 		"-DDEFAULT_SYSROOT=/home/silvio/stuff/sources/elf_release_linux/",
 
 		"-DCOMPILER_RT_BUILD_BUILTINS=ON",
@@ -64,6 +62,6 @@
 		"-DCOMPILER_RT_INSTALL_LIBRARY_DIR:PATH=lib",
 		"-G", "Ninja"
 	],
-	["build-compiler-rt-arm", "echo", "ninja", "compiler-rt"],
-	["build-compiler-rt-arm", "echo", "env", "DESTDIR=..", "ninja", "install"]
+	["build-compiler-rt-arm", "ninja", "compiler-rt"],
+	["build-compiler-rt-arm", "env", "DESTDIR=..", "ninja", "install"]
 ]

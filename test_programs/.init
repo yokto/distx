@@ -4,6 +4,7 @@ pathadd() {
     fi
 }
 pathadd "/home/silvio/stuff/sources/elf_src/llvm/__zwolf_build__/llvm/bin"
+pathadd "/home/silvio/stuff/sources/elf_src/llvm/__zwolf_build__/llvm/x86_64/bin"
 ph () {
 	echo "#include <$1>" | gcc -x c -E -  -o -
 }

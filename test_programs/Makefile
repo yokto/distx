@@ -1,5 +1,5 @@
-CC := __zwolf_build__/llvm/bin/clang
-CXX := __zwolf_build__/llvm/bin/clang++
+CC := __zwolf_build__/llvm/x86_64/bin/clang
+CXX := __zwolf_build__/llvm/x86_64/bin/clang++
 BUILDDIR := __zwolf_run__/test_programs# $(realpath $(dir ${PWD}))
 DEPDIR := __zwolf_run__# $(realpath $(dir ${PWD})/..)
 LIBFOOBAR := $(BUILDDIR)/lib/libfoobar.so
