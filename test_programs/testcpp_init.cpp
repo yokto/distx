@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <cstdlib>
 class Foo {
 	public:
 	Foo() {
@@ -12,5 +13,6 @@ class Foo {
 Foo foo = Foo();
 
 int main() {
+	exit(1);
 	return 0;
 }

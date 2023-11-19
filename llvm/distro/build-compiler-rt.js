@@ -48,6 +48,7 @@
 		"-DCMAKE_INSTALL_INCLUDEDIR=/__zwolf_run__/llvm-compiler-rt/common/include",
 		"-DCMAKE_C_COMPILER_TARGET=aarch64-unknown-linux-zwolf",
 		"-DCMAKE_ASM_COMPILER_TARGET=aarch64-unknown-linux-zwolf",
+		"-DCMAKE_ASM_FLAGS=-target aarch64-unknown-linux-zwolf",
 		"-DLLVM_DEFAULT_TARGET_TRIPLE=aarch64-unknown-linux-zwolf",
 		"-DLLVM_TARGET_TRIPLE=aarch64-unknown-linux-zwolf",
 		"-DDEFAULT_SYSROOT=/home/silvio/stuff/sources/elf_release_linux/",

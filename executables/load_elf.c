@@ -121,6 +121,8 @@ __attribute__((sysv_abi)) uint32_t get_os() {
 #endif
 }
 
+void fini_libs(loaded_libs* libs);
+
 int alloc_loaded_libs(loaded_libs* libs) {
 	libs->libs = calloc(8, sizeof(loaded_lib));
 	libs->libs_count = 0;
@@ -183,6 +185,7 @@ void * reserve_memory(size_t size) {
 
 #ifndef WIN32
 void add_local_libs() {
+	if (!&_r_debug) { return; }
 	_r_debug.r_state = RT_ADD;
 	DEBUG("brk %p", _r_debug)
 	((void(*)())(_r_debug.r_brk))();
@@ -209,6 +212,7 @@ void add_local_libs() {
 	}
 }
 void remove_local_libs() {
+	if (!&_r_debug) { return; }
 	_r_debug.r_state = RT_DELETE;
 	((void(*)())(_r_debug.r_brk))();
 	struct link_map* current_map = _r_debug.r_map;
@@ -508,6 +512,9 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 	struct link_map* new_map = malloc(sizeof(struct link_map));
 	memset(new_map, 0, sizeof(struct link_map));
 	const char * pwd = libs->basedir;
+	if (!libs->basedir) {
+		ERR("main executable has no soname\n");
+	}
 	const int pwd_len = strlen(pwd);
 	const int lib_len = strlen(lib->path);
 	DEBUG("\tlib-path %s\n", lib->path);
@@ -611,6 +618,7 @@ Elf64_Half lookup(char* name, loaded_lib* lib) {
 
 __attribute__((sysv_abi))
 void exit2(int ret) {
+	fini_libs(&zwolf_global_libs);
 	exit(ret);
 }
 
@@ -876,6 +884,7 @@ void fini_libs(loaded_libs* libs) {
 			for (int j = 0; j * sizeof(void*) < lib->fini_arraysz ; j++) {
 				// this is already absolute because of relocation
 				size_t rel_f = lib->fini_array[j];
+				DEBUG("\t\tfini %d from library %s with pointer %p\n", j, lib->path, (void*)((void*)rel_f - lib->base))
 				((void (*)())(rel_f))();
 			}
 		}
@@ -957,10 +966,8 @@ int main(int argc, char ** argv) {
 		link(&libs->libs[i], libs);
 	}
 #ifndef WIN32
-	DEBUG("f %p\n", _r_debug.r_map)
 	add_local_libs();
-	DEBUG("f %p\n", _r_debug.r_brk)
-	DEBUG("f %p\n", &_dl_debug_state)
+	//DEBUG("f %p\n", &_dl_debug_state)
 #endif
 	DEBUG("start init libs\n")
 	init_libs(libs);
@@ -974,6 +981,7 @@ int main(int argc, char ** argv) {
 	int ret = main_f(argc - 1, argv2 + 1);
 	DEBUG("main returned %d\n", ret)
 	DEBUG("fini\n")
+	fini_libs(libs);
 	fflush(stdout);
 	return ret;
 }

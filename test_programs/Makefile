@@ -5,19 +5,19 @@ DEPDIR := __zwolf_run__# $(realpath $(dir ${PWD})/..)
 LIBFOOBAR := $(BUILDDIR)/lib/libfoobar.so
 HELLOC := $(BUILDDIR)/bin/helloc
 LIBC := $(DEPDIR)/xlibc/lib/libc.so
-#LIBBASE := $(BUILDDIR)/libbase/lib/libbase.so
 HELLORUST := $(BUILDDIR)/bin/hellorust
 HELLOCPP := $(BUILDDIR)/hellocpp/bin/hellocpp
 #TEST_IOSTREAM := $(BUILDDIR)/bin/test_iostream
 CONSTANTS := $(BUILDDIR)/bin/constants
 
 TESTCPP_SOURCES := $(wildcard testcpp_*.cpp)
-TESTCPP_EXECS := $(patsubst %.cpp, $(BUILDDIR)/bin/%, $(TESTCPP_SOURCES))
-TESTC_SOURCES := $(wildcard testc_*.c)
-TESTC_EXECS := $(patsubst %.c, $(BUILDDIR)/bin/%, $(TESTC_SOURCES))
+TESTCPP_EXECS := $(patsubst %.cpp, $(BUILDDIR)/x86_64/bin/%, $(TESTCPP_SOURCES))
+TESTC_SOURCEST := $(wildcard testc_*.c)
+TESTC_SOURCES = $(filter-out testc_zlib.c, $(TESTC_SOURCEST))
+TESTC_EXECS := $(patsubst %.c, $(BUILDDIR)/x86_64/bin/%, $(TESTC_SOURCES))
+TESTC_EXECS += $(patsubst %.c, $(BUILDDIR)/aarch64/bin/%, $(TESTC_SOURCES))
 
 all: $(HELLORUST) \
-	$(LIBBASE) \
 	$(CONSTANTS) \
 	$(TESTCPP_EXECS) \
 	$(TESTC_EXECS)
@@ -89,18 +89,28 @@ $(BUILDDIR)/bin/testc_zlib: testc_zlib.c
 #		"-Wl,-soname,test_programs/bin/testc_zlib" \
 #		-o "$@" "$<"
 
-$(BUILDDIR)/bin/testc_%: testc_%.c
-	mkdir -p "$(BUILDDIR)/bin"
+$(BUILDDIR)/x86_64/bin/testc_%: testc_%.c
+	mkdir -p "$(BUILDDIR)/x86_64/bin"
 	${CC} -femulated-tls -g \
 		-lm \
-		"-Wl,-soname,test_programs/bin/testc_$*" \
+		-target x86_64-unknown-linux-zwolf \
+		"-Wl,-soname,test_programs/x86_64/bin/testc_$*" \
 		-o "$@" "$<"
 
-$(BUILDDIR)/bin/testcpp_%: testcpp_%.cpp
-	mkdir -p "$(BUILDDIR)/bin"
+$(BUILDDIR)/aarch64/bin/testc_%: testc_%.c
+	mkdir -p "$(BUILDDIR)/aarch64/bin"
+	${CC} -femulated-tls -g \
+		-lm \
+		-target aarch64-unknown-linux-zwolf \
+		"-Wl,-soname,test_programs/aarch64/bin/testc_$*" \
+		-o "$@" "$<"
+
+$(BUILDDIR)/x86_64/bin/testcpp_%: testcpp_%.cpp
+	mkdir -p "$(BUILDDIR)/x86_64/bin"
 	${CXX} -femulated-tls -g \
 		"-Wl,--no-undefined" \
-		"-Wl,-soname,test_programs/bin/testcpp_$*" \
+		-target x86_64-unknown-linux-zwolf \
+		"-Wl,-soname,test_programs/x86_64/bin/testcpp_$*" \
 		-o "$@" "$<"
 
 $(CONSTANTS): constants.c

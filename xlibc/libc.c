@@ -1293,14 +1293,42 @@ void __tls_get_addr() {
     abort();
 }
 
+struct atexit {
+	void (*func)(void*);
+	void* arg;
+};
+size_t at_exit_cnt = 0;
+size_t at_exit_size = 0;
+struct atexit* at_exit_entries = 0;
+
+
 DLL_PUBLIC
 int __cxa_atexit(void (*func) (void *), void * arg, void * dso_handle) {
+    if (at_exit_entries == 0) {
+	    at_exit_entries = malloc(10 * sizeof(struct atexit));
+	    at_exit_size = 10;
+    }
+    if (at_exit_cnt >= at_exit_size) {
+	    at_exit_size *= 2;
+	    struct atexit* tmp = malloc(at_exit_size * sizeof(struct atexit));
+	    memcpy(tmp, at_exit_entries, at_exit_cnt * sizeof(struct atexit));
+	    free(at_exit_entries);
+	    at_exit_entries = tmp;
+    }
+    at_exit_entries[at_exit_cnt].func = func;
+    at_exit_entries[at_exit_cnt].arg = arg;
+    at_exit_cnt ++ ;
     UNUSED(dso_handle); // todo
-    UNUSED(func);
-    UNUSED(arg);
-    //fprintf(stderr, "cxa_atexit not implemented properly\n");
     return 0;
 }
+
+__attribute__((destructor)) void fini() {
+	debug_printf("fini %d\n", at_exit_cnt);
+	for (size_t i = 0 ; i < at_exit_cnt; i++ ){
+		at_exit_entries[i].func(at_exit_entries[i].arg);
+	}
+}
+
 
 DLL_PUBLIC
 int __cxa_thread_atexit_impl(void (*func) (void *), void * arg, void * dso_handle) {
@@ -1780,9 +1808,7 @@ size_t wcstombs(char *dest, const wchar_t *src, size_t len) {
 
 DLL_PUBLIC
 int wcrtomb(char *s, wchar_t wc, mbstate_t *ps) {
-    fprintf(stderr, "wcrtomb not implemented %s %d %p\n", s, wc, ps);
-    fflush(stderr);
-    abort();
+    debug_printf("wcrtomb not implemented %s %d %p\n", s, wc, ps);
     return 0;
 }
 

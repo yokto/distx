@@ -14,7 +14,7 @@ __attribute__((constructor)) void init_foo() {
 }
 
 __attribute__((destructor)) void fini_foo() {
-	//printf("fini foo\n");
+	printf("fini foo\n");
 	free(foo);
 }
 

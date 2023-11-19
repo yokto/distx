@@ -11,7 +11,7 @@ extern "C" {
 typedef __SIZE_TYPE__ size_t;
 typedef signed long ssize_t;
 //#ifdef __SSIZE_TYPE__
-//typedef __SSIZE_TYPE__ ssize_t;
+typedef __SSIZE_TYPE__ ssize_t;
 //#else
 //#endif
 

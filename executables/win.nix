@@ -6,6 +6,6 @@ libc = "msvcrt";
 };
 
 mkShell {
-  nativeBuildInputs = [  ];
+  nativeBuildInputs = [ zlib ];
   buildInputs = [ zlib ];
 }
