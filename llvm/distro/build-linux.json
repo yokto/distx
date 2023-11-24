@@ -1,15 +1,18 @@
 [
-	[".", "mkdir", "-p", "build"],
-	["build",
+	[".", "mkdir", "-p", "build_linux"],
+	["build_linux",
 		"cmake",
 		"../llvm",
 		"-DLLVM_ENABLE_PROJECTS=clang;lld",
 		"-DCMAKE_BUILD_TYPE=Release",
 		"-DCMAKE_C_COMPILER=clang",
-		"-DDEFAULT_SYSROOT=/home/silvio/stuff/sources/elfx86/llvm/src/__zwolf_rundir__/xlibc/",
-		"-DCMAKE_INSTALL_PREFIX=/home/silvio/stuff/sources/elfx86/llvm",
+		"-DDEFAULT_SYSROOT=/home/silvio/stuff/sources/elf_linux2/",
+		"-DCMAKE_INSTALL_PREFIX=/home/silvio/stuff/sources/elf_linux2/llvm",
+		"-DCMAKE_INSTALL_BINDIR=x86_64/bin",
+		"-DLLVM_TOOLS_INSTALL_DIR=x86_64/bin",
+		"-DCMAKE_INSTALL_INCLUDEDIR=common/include",
 		"-DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-linux-zwolf",
-		"-DLLVM_TARGETS_TO_BUILD=X86",
+		"-DLLVM_TARGETS_TO_BUILD=X86;AArch64",
 		"-DLLVM_INCLUDE_BENCHMARKS=OFF",
 		"-DLLVM_ENABLE_TERMINFO=OFF",
 		"-DLIBCXX_USE_COMPILER_RT=ON",
@@ -25,6 +28,6 @@
 		"-DLIBCXX_ENABLE_DEBUG_MODE=ON",
 		"-G", "Ninja"
 	],
-	["build", "ninja"],
-	["build", "ninja", "install"]
+	["build_linux", "ninja"],
+	["build_linux", "ninja", "install"]
 ]

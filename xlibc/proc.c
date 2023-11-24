@@ -98,7 +98,6 @@ uint32_t wincmdlen(char * const argv[], uintptr_t* length) {
 	return err;
 }
 int32_t wincmd(char * const argv[], uint16_t * cmd) {
-	uint16_t * origcmd = cmd;
 	uint32_t codepoint = 0;
 	uint8_t codelength = 0;
 	int32_t err = 0;

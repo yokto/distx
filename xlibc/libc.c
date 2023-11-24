@@ -170,13 +170,13 @@ DECLARE(int, closedir, DIR* dir);
 DECLARE(int, chdir, const char *path);
 DECLARE(DIR*, opendir, const char * path);
 #define MAX_WIN_PATH 260
-typedef struct WIN32_FIND_DATA {
+typedef struct WIN32_FIND_DATAW {
 	char somedata[44];
-	char name[MAX_WIN_PATH];
+	uint16_t name[MAX_WIN_PATH];
 	char restdata[16];
-} WIN32_FIND_DATA;
-int32_t (*FindFirstFileA_ms)(char * path, WIN32_FIND_DATA* lpFindFileData) __attribute((ms_abi));
-bool (*FindNextFileA_ms)(int32_t hFindFile, WIN32_FIND_DATA* lpFindFileData) __attribute((ms_abi));
+} WIN32_FIND_DATAW;
+int32_t (*FindFirstFileW_ms)(uint16_t * path, WIN32_FIND_DATAW* lpFindFileData) __attribute((ms_abi));
+bool (*FindNextFileW_ms)(int32_t hFindFile, WIN32_FIND_DATAW* lpFindFileData) __attribute((ms_abi));
 DECLARE(ssize_t, readlink, const char * pathname, char * buf, size_t bufsiz);
 DECLARE(int, rename, const char *oldpath, const char *newpath);
 DECLARE(int, truncate, const char *path, off_t length);
@@ -306,8 +306,8 @@ __attribute__((constructor)) void init() {
 		closedir_ms = 0; //dlsym(libc, "closedir");
 		chdir_ms = 0; //dlsym(libc, "chdir");
 		opendir_ms = 0; //dlsym(libc, "opendir");
-		FindFirstFileA_ms = dlsym(kernel32, "FindFirstFileA");
-		FindNextFileA_ms = dlsym(kernel32, "FindNextFileA");
+		FindFirstFileW_ms = dlsym(kernel32, "FindFirstFileW");
+		FindNextFileW_ms = dlsym(kernel32, "FindNextFileW");
 		readlink_ms = 0; //dlsym(libc, "readlink");
 		rename_ms = dlsym(libc, "rename");
 		truncate_ms = 0; //dlsym(libc, "truncate");
@@ -959,10 +959,10 @@ error:
 }
 struct win_dir {
 	struct dirent linux_dirent;
-	WIN32_FIND_DATA win_dirent;
+	WIN32_FIND_DATAW win_dirent;
 	int32_t handle;
 	bool initialized;
-	char path[MAX_WIN_PATH];
+	uint16_t path[MAX_WIN_PATH];
 };
 DLL_PUBLIC int mkdir(const char *pathname, mode_t mode) {
 	debug_printf("execute os mkdir\n");
@@ -1011,18 +1011,20 @@ DLL_PUBLIC struct dirent* readdir(DIR * dir) {
 	if (isWin) {
 		struct win_dir* windir = (struct win_dir*)dir;
 		if (windir->initialized) {
-			bool hasNext = FindNextFileA_ms(windir->handle, &windir->win_dirent);
+			bool hasNext = FindNextFileW_ms(windir->handle, &windir->win_dirent);
 			if (!hasNext) {
 				return 0;
 			}
-			strncpy((char*)&windir->linux_dirent.d_name, windir->win_dirent.name, 256);
+			//strncpy((char*)&windir->linux_dirent.d_name, windir->win_dirent.name, 256);
+			utf16to8(windir->win_dirent.name, &windir->linux_dirent.d_name);
 			return &windir->linux_dirent;
 		} else {
-			int32_t handle = FindFirstFileA_ms(windir->path, &windir->win_dirent);
+			int32_t handle = FindFirstFileW_ms(windir->path, &windir->win_dirent);
 			if (handle == -1) {
 				return 0;
 			}
-			strncpy((char*)&windir->linux_dirent.d_name, windir->win_dirent.name, 256);
+			//strncpy((char*)&windir->linux_dirent.d_name, windir->win_dirent.name, 256);
+			utf16to8(windir->win_dirent.name, &windir->linux_dirent.d_name);
 			windir->handle = handle;
 			windir->initialized = true;
 			return &windir->linux_dirent;
@@ -1043,25 +1045,34 @@ DLL_PUBLIC int closedir(DIR* dir) {
 DLL_PUBLIC int chdir(const char *path) IMPLEMENT(chdir, path)
 DLL_PUBLIC DIR* opendir(const char * path) {
 	debug_printf("execute os opendir %s = ", path);
+
+	void * pathname = 0;
+	DIR* ret = 0;
+	tonativepath(path, &pathname);
+
 	if (isWin) {
 		struct win_dir* dir = calloc(1, sizeof(struct win_dir));
-		size_t len = strlen(path);
+		uint16_t * winpath = pathname;
+		size_t len = 0;
+		for (; winpath[len] != 0; len++) {}
 		if (len >= MAX_WIN_PATH - 3) {
 			fprintf(stderr, "path too long");
 			fflush(stderr);
 			abort();
 		}
-		strncpy((char*)&dir->path, path, MAX_WIN_PATH);
+		memcpy(&dir->path, winpath, len * 2);
 		dir->path[len] = '\\';
 		dir->path[len+1] = '*';
 		dir->path[len+2] = '\0';
 		debug_printf("%p\n", dir);
-		return (void*)dir;
+		ret = (void*)dir;
 	} else {
-		DIR* ret = opendir_sysv(path);
+		ret = opendir_sysv(pathname);
 		debug_printf("%p\n", ret);
-		return ret;
 	}
+
+	if (pathname) { free(pathname); }
+	return ret;
 }
 DLL_PUBLIC ssize_t readlink(const char * pathname, char * buf, size_t bufsiz) IMPLEMENT(readlink, pathname, buf, bufsiz)
 DLL_PUBLIC int rename(const char *oldpath, const char *newpath) IMPLEMENT(rename, oldpath, newpath)
@@ -2506,4 +2517,32 @@ int open(const char *pathname, int flags, ...) {
 		errno = ret;
 		return -1;
 	}
+}
+
+DLL_PUBLIC
+int shm_open(const char *name, int oflag, int mode) {
+	debug_printf("shm_open not implemented");
+	__builtin_trap();
+}
+
+DLL_PUBLIC
+char *fgets(char * s, int size, FILE * stream) {
+	debug_printf("fgets not implemented");
+	__builtin_trap();
+}
+
+DLL_PUBLIC
+int scanf(const char *format, ...) {
+	debug_printf("scanf not implemented");
+	__builtin_trap();
+}
+DLL_PUBLIC
+int mprotect(void *addr, size_t len, int prot) {
+	debug_printf("mprotect not implemented");
+	__builtin_trap();
+}
+DLL_PUBLIC
+int shm_unlink(const char *name) {
+	debug_printf("shm_unlink not implemented");
+	__builtin_trap();
 }

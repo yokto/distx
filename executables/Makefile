@@ -1,6 +1,6 @@
 CC = gcc
 
-all: load_elf # load_elf.exe load_elf_android
+all: load_elf load_elf.exe load_elf_android
 
 load_elf: load_elf.c
 	mkdir -p ../build
