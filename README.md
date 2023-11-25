@@ -395,6 +395,61 @@ FileSiz can be shorter than MemSiz. This happens for instance for the .bss secti
     mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
     echo ":zwolf:M:0:\\x7FELF\\x02\\x01\\x01\\x13::/home/silvio/stuff/sources/elf_src/zwolf/build/load_elf:" > /proc/sys/fs/binfmt_misc/register
 
+### Bootstrap llvm from linux
+
+We assume ZWOLF_SRC points to your zwolf repository "https://github.com/yokto/elf".
+We assume LLVM_SRC points to your llvm src reporitory "https://github.com/yokto/llvm-project".
+We assume OPENLIBM points to your openlibm src reporitory "https://github.com/yokto/openlibm".
+We assume STAGE1 to point to an empty dir for stage1.
+We assume STAGE2 to point to an empty dir for stage2.
+
+Build the stage1 cross compiler - without runtime.
+Adapt $(ZWOLF_SRC)/llvm/build-linux.json with the appropriate path.
+This adoption is only needed for stage1
+
+    cd "$LLVM_SRC"
+    ln -s "$STAGE1" __zwolf_build__ 
+    ln -s "$STAGE1" __zwolf_run__ 
+    $(ZWOLF_SRC)/build/build.js $(ZWOLF_SRC)/llvm/build-linux.json
+
+Copy headers:
+
+    mkdir -p "${STAGE1}/xlibc/common/"
+    cp -r ${ZWOLF_SRC}/xlibc/include "${STAGE1}/xlibc/common"
+
+Build compiler-rt (in llvm src)
+
+    export PATH="$${STAGE1}/llvm/x86_64/bin:$PATH"
+    CC=clang CXX=clang++ $(ZWOLF_SRC)/build/build.js $(ZWOLF_SRC)/llvm/build-compiler-rt.json
+    
+Build xlibc
+
+    cd "${ZWOLF_SRC}/xlibc"
+    ln -s "$STAGE1" __zwolf_build__ 
+    ln -s "$STAGE1" __zwolf_run__ 
+    export PATH="${STAGE1}/llvm/x86_64/bin:$PATH"
+    CC=clang CXX=clang++ $(ZWOLF_SRC)/build/build.js distro/build.json
+
+Build openlibm
+
+    cd "${ZWOLF_SRC}/openlibm"
+    ln -s "$STAGE1" __zwolf_build__ 
+    ln -s "$STAGE1" __zwolf_run__ 
+    CC=clang CXX=clang++ $(ZWOLF_SRC)/build/build.js $(ZWOLF_SRC)/openlibm/build.json
+
+Build c++ runtime
+
+    cd "$LLVM_SRC"
+    CC=clang CXX=clang++ $(ZWOLF_SRC)/build/build.js $(ZWOLF_SRC)/llvm/build-runtime.json
+
+Build stage2
+
+    rm __build_run__
+    ln -s "$STAGE2" __zwolf_run__
+    CC=clang CXX=clang++ $(ZWOLF_SRC)/build/build.js $(ZWOLF_SRC)/llvm/build-zwolf.json
+
+Copy all the libraries from stage1 or build them again.
+
 # REFERENCES
 
 ### Thread local Storage
