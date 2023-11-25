@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 int main() {
-    const char* directory_path = "/__zwolf_run__/test_programs/x86_64";
+    const char* directory_path = "/_zwolf/test_programs/x86_64";
     DIR* directory = opendir(directory_path);
 
     bool foundBin = false;

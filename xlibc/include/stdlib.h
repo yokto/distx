@@ -93,7 +93,6 @@ void abort() __attribute__ ((__noreturn__));
 static inline long llabs(long long l) { return (l >= 0) ? l : -l; }
 static inline int abs(int l) { return (l >= 0) ? l : -l; }
 
-char* getenv(const char* name);
 void qsort(void* base, size_t nmemb, size_t size, int (*compar)(const void*, const void*));
 int atoi(const char *nptr);
 double atof(const char *nptr);

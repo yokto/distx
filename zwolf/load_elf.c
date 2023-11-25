@@ -47,10 +47,10 @@ bool zwolf_debug = false;
 #endif
 
 #ifndef WIN32
-#include "../lib/jit.h"
+#include "lib/jit.h"
 #endif
 
-#include "../lib/elf.h"
+#include "lib/elf.h"
 
 static const size_t MAX_SIZE_T = 0xffffffffffffffff;
 static const size_t PAGE_SIZE = 0x1000;
@@ -476,7 +476,9 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 				}
 				if (dynamic->d_tag == DT_NEEDED) {
 					char* needed = lib->strtab + dynamic->d_un.d_ptr;
-					loaded_lib * lib = load(needed, libs);
+					if (strcmp(needed, "_zwolf") != 0) {
+						loaded_lib * lib = load(needed, libs);
+					}
 				}
 				if (dynamic->d_tag == DT_VERSYM) {
 					lib->versym = (Elf64_Half*)(memory + dynamic->d_un.d_ptr);
@@ -722,14 +724,6 @@ void dlclose2(void* lib) {
 #endif
 }
 
-#if defined(WIN32)
-#define EXTERNAL_PREFIX "external_windows_c_"
-#define EXTERNAL_PREFIX_LEN 19
-#else
-#define EXTERNAL_PREFIX "external_linux_c_"
-#define EXTERNAL_PREFIX_LEN 17
-#endif
-
 void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 	int sym = ELF64_R_SYM(rela->r_info);
 	int type = ELF64_R_TYPE(rela->r_info);
@@ -743,40 +737,22 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 		DEBUG("\t\tlinking symbol: %s\n", sym_name)
 
 		void* ret = 0;
-		if (strncmp(sym_name, EXTERNAL_PREFIX, EXTERNAL_PREFIX_LEN) == 0) {
-			void* libc = dlopen2("libc.so.6");
-			if (!libc) {
-				// on android
-				libc = dlopen2("libc.so");
+		char * file = verneedstr(sym, lib);
+		if (file && strcmp(file, "_zwolf") == 0) {
+			if (strcmp(sym_name, "zwolf_write") == 0) {
+				ret = &write2;
+			} else if (strcmp(sym_name, "zwolf_errno") == 0) {
+				ret = &errno2;
+				//		} else if (strcmp(sym_name, "__resolve") == 0) {
+				//			ret = &resolve_addr;
+			} else if (strcmp(sym_name, "zwolf_sym") == 0) {
+				ret = &dlsym2;
+			} else if (strcmp(sym_name, "zwolf_open") == 0) {
+				ret = &dlopen2;
+			} else if (strcmp(sym_name, "zwolf_exit") == 0) {
+				ret = &exit2;
 			}
-			if (!libc) {
-				ERR("could not open libc\n");
-			}
-			void* val = dlsym2(libc, sym_name+ EXTERNAL_PREFIX_LEN);
-			if (!val) {
-				ERR("could not load external %s\n", sym_name+ EXTERNAL_PREFIX_LEN);
-			}
-			//DEBUG("setting name %s, at %x from base %x to %x", sym_name, rela->r_offset, lib->base, val)
-			ret = val;
-			dlclose2(libc);
-		} else if (strcmp(sym_name, "__printf") == 0) {
-			ret = &printf2;
-		} else if (strcmp(sym_name, "__write") == 0) {
-			ret = &write2;
-		} else if (strcmp(sym_name, "__errno") == 0) {
-			ret = &errno2;
-//		} else if (strcmp(sym_name, "__resolve") == 0) {
-//			ret = &resolve_addr;
-		} else if (strcmp(sym_name, "__dlsym") == 0) {
-			ret = &dlsym2;
-		} else if (strcmp(sym_name, "__dlopen") == 0) {
-			ret = &dlopen2;
-		} else if (strcmp(sym_name, "__exit") == 0) {
-			ret = &exit2;
-		} else if (strncmp(sym_name, "external_", 9) == 0) {
-			// ignore
 		} else {
-			char * file = verneedstr(sym, lib);
 			if (!file) {
 				// symbol not in dependencies
 				// try finding it in file itself

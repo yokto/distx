@@ -83,6 +83,7 @@ void _exit(int status);
 #define F_OK 8
 
 int access(const char *pathname, int mode);
+int eaccess(const char *pathname, int mode);
 
 int symlink(const char *target, const char *linkpath);
 

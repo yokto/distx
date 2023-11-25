@@ -5,6 +5,7 @@
 // https://github.com/m-ou-se/atomic-wait/blob/main/src/macos.rs
 #include "thread_impl.h"
 #include "common.h"
+#include <zwolf.h>
 #include <errno.h>
 #include "threads.h"
 #include <stdlib.h>
@@ -25,12 +26,12 @@ static bool isWin = false;
 void init_threads(bool iswin, void* lib) {
 	isWin = iswin;
 	if (isWin) {
-		void* sync = __dlopen("api-ms-win-core-synch-l1-2-0.dll");
-		WaitOnAddress = __dlsym(sync, "WaitOnAddress");
-		WakeByAddressAll = __dlsym(sync, "WakeByAddressAll");
-		WakeByAddressSingle = __dlsym(sync, "WakeByAddressSingle");
+		void* sync = zwolf_open("api-ms-win-core-synch-l1-2-0.dll");
+		WaitOnAddress = zwolf_sym(sync, "WaitOnAddress");
+		WakeByAddressAll = zwolf_sym(sync, "WakeByAddressAll");
+		WakeByAddressSingle = zwolf_sym(sync, "WakeByAddressSingle");
 	} else {
-		syscall = __dlsym(lib, "syscall");
+		syscall = zwolf_sym(lib, "syscall");
 	}
 }
 

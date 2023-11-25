@@ -1,6 +1,8 @@
 #include <stdarg.h>
+#include <zwolf.h>
 #include <base/fs.h>
 #include <proc.h>
+#include <dirent.h>
 #include <locale.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -112,14 +114,6 @@ struct windows_stat {
 
 //void print_backtrace();
 
-void* __dlopen(char* name) __attribute__ ((weak));
-void* __dlopen(char* name __attribute__((unused))) { return 0; }
-void* __dlsym(void* handle, char* name) __attribute__ ((weak));
-void* __dlsym(void* handle __attribute__((unused)), char* name __attribute__((unused))) { return 0; }
-int __printf(char* restrict fmt, ...) __attribute__ ((weak));
-int __printf(char* restrict fmt __attribute__((unused)), ...) { return 0; }
-int __write(char* str __attribute__((unused))) { return 0; }
-
 static bool isWin = false;
 
 DECLARE(int, vswprintf, wchar_t * ws, size_t len, const wchar_t * format, va_list arg);
@@ -222,10 +216,10 @@ DLL_PUBLIC FILE * stdout = 0;
 DLL_PUBLIC FILE * stderr = 0;
 
 static void* dlsym(void* lib, char* name) {
-	void* ret = __dlsym(lib, name);
+	void* ret = zwolf_sym(lib, name);
 	if (ret) { return ret; }
 	debug_printf("couldn't find symbol %s\n", name);
-	__exit(-1);
+	__builtin_trap();
 	return 0;
 }
 
@@ -234,12 +228,12 @@ __attribute__((constructor)) void init() {
 	void* libc = 0;
 	void* kernel32 = 0;
 	if (!libc) {
-		libc = __dlopen("msvcrt.dll");
-		kernel32 = __dlopen("KERNEL32.DLL");
+		libc = zwolf_open("msvcrt.dll");
+		kernel32 = zwolf_open("KERNEL32.DLL");
 		isWin = true;
 	}
 	if (!libc) {
-		libc = __dlopen("libc.so.6");
+		libc = zwolf_open("libc.so.6");
 		isWin = false;
 	}
 	if (!libc) {
@@ -247,7 +241,7 @@ __attribute__((constructor)) void init() {
 	}
 	if (isWin && kernel32 == 0) { 
 		debug_printf("couldn't open kernel32\n");
-		__exit(-1);
+		__builtin_trap();
 	}
 
 	init_fs(isWin, libc);
@@ -586,7 +580,7 @@ DLL_PUBLIC int remove(const char *pathname) {
 	}
 }
 
-static const char basealias[] = "/__zwolf_run__/";
+static const char basealias[] = "/_zwolf/";
 #define basealias_len (sizeof(basealias) - 1)
 
 DLL_PUBLIC
@@ -868,7 +862,7 @@ DLL_PUBLIC int stat(const char * p, struct stat * statbuf) {
 	if (isWin) {
 		struct windows_stat ls;
 		ret = _wstat_ms(pathname, (struct stat*)&ls);
-		if (ret == -1) { errno = __errno(); }
+		if (ret == -1) { errno = zwolf_errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
 		statbuf->st_ino = rand();
@@ -880,7 +874,7 @@ DLL_PUBLIC int stat(const char * p, struct stat * statbuf) {
 	} else {
 		struct linux_stat ls;
 		ret = stat_sysv(pathname, (struct stat*)&ls);
-		if (ret == -1) { errno = __errno(); }
+		if (ret == -1) { errno = zwolf_errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
 		statbuf->st_ino = ls.st_ino;
@@ -897,7 +891,7 @@ DLL_PUBLIC int fstat(int fd, struct stat * statbuf) {
 	if (isWin) {
 		struct windows_stat ls;
 		const int ret = fstat_ms(fd, (struct stat*)&ls);
-		if (ret == -1) { errno = __errno(); }
+		if (ret == -1) { errno = zwolf_errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
 		statbuf->st_ino = rand();
@@ -910,7 +904,7 @@ DLL_PUBLIC int fstat(int fd, struct stat * statbuf) {
 	} else {
 		struct linux_stat ls;
 		const int ret = fstat_sysv(fd, (struct stat*)&ls);
-		if (ret == -1) { errno = __errno(); }
+		if (ret == -1) { errno = zwolf_errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
 		statbuf->st_ino = ls.st_ino;
@@ -1084,7 +1078,7 @@ DLL_PUBLIC int lstat(const char * pathname, struct stat * statbuf) {
 	if (isWin) {
 		struct windows_stat ls;
 		const int ret = stat_ms(pathname, (struct stat*)&ls);
-		if (ret == -1) { errno = __errno(); }
+		if (ret == -1) { errno = zwolf_errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
 		statbuf->st_ino = ls.st_ino;
@@ -1097,7 +1091,7 @@ DLL_PUBLIC int lstat(const char * pathname, struct stat * statbuf) {
 	} else {
 		struct linux_stat ls;
 		const int ret = lstat_sysv(pathname, (struct stat*)&ls);
-		if (ret == -1) { errno = __errno(); }
+		if (ret == -1) { errno = zwolf_errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
 		statbuf->st_ino = ls.st_ino;
@@ -2332,7 +2326,7 @@ DLL_PUBLIC int mtime(const char *pathname, struct timespec * time) {
 DLL_PUBLIC
 _Noreturn void exit(int status)
 {
-	__exit(status);
+	zwolf_exit(status);
 }
 
 //void print_addr(void * ptr) {
@@ -2403,6 +2397,7 @@ DLL_PUBLIC int access(const char *pathname, int mode) {
 	errno = error;
 	return -1;
 }
+DLL_PUBLIC int eaccess(const char *pathname, int mode) { return access(pathname, mode); }
 
 DLL_PUBLIC int getpwuid_r(uid_t uid, struct passwd * pwd, char * buf, size_t buflen, struct passwd ** result) NO_IMPL(getpwuid_r)
 DLL_PUBLIC uid_t getuid(void) NO_IMPL(getuid)
@@ -2487,7 +2482,7 @@ DLL_PUBLIC int madvise(void *addr, size_t length, int advice) NO_IMPL(madvise)
 DLL_PUBLIC int getpwnam_r(const char * name, struct passwd * pwd, char * buf, size_t buflen, struct passwd ** result) NO_IMPL(getpwnam_r)
 DLL_PUBLIC int fstatfs(int fd, struct statfs *buf) NO_IMPL(fstatfs)
 DLL_PUBLIC void _exit(int status) {
-	__exit(status);
+	zwolf_exit(status);
 }
 DLL_PUBLIC struct tm *localtime_r(const time_t *timer, struct tm* result) NO_IMPL(localtime_r)
 DLL_PUBLIC int usleep(useconds_t usec) NO_IMPL(usleep)
@@ -2546,3 +2541,9 @@ int shm_unlink(const char *name) {
 	debug_printf("shm_unlink not implemented");
 	__builtin_trap();
 }
+
+DLL_PUBLIC
+int ferror(FILE *stream) {
+	return 0;
+}
+

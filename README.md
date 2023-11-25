@@ -399,18 +399,14 @@ FileSiz can be shorter than MemSiz. This happens for instance for the .bss secti
 
 We assume ZWOLF_SRC points to your zwolf repository "https://github.com/yokto/elf".
 We assume LLVM_SRC points to your llvm src reporitory "https://github.com/yokto/llvm-project".
-We assume OPENLIBM points to your openlibm src reporitory "https://github.com/yokto/openlibm".
+We assume OPENLIBM_SRC points to your openlibm src reporitory "https://github.com/yokto/openlibm".
 We assume STAGE1 to point to an empty dir for stage1.
 We assume STAGE2 to point to an empty dir for stage2.
 
 Build the stage1 cross compiler - without runtime.
-Adapt $(ZWOLF_SRC)/llvm/build-linux.json with the appropriate path.
-This adoption is only needed for stage1
 
     cd "$LLVM_SRC"
-    ln -s "$STAGE1" __zwolf_build__ 
-    ln -s "$STAGE1" __zwolf_run__ 
-    $(ZWOLF_SRC)/build/build.js $(ZWOLF_SRC)/llvm/build-linux.json
+    STAGE1="$STAGE1" ${ZWOLF_SRC}/llvm/build-linux.sh
 
 Copy headers:
 
@@ -419,36 +415,40 @@ Copy headers:
 
 Build compiler-rt (in llvm src)
 
-    export PATH="$${STAGE1}/llvm/x86_64/bin:$PATH"
-    CC=clang CXX=clang++ $(ZWOLF_SRC)/build/build.js $(ZWOLF_SRC)/llvm/build-compiler-rt.json
+    cd "$LLVM_SRC"
+    ln -s "$STAGE1" _zwolf 
+    mkdir _zwolf_install
+    ln -s "$STAGE1" _zwolf_install/_zwolf
+    ${ZWOLF_SRC}/llvm/build-compiler-rt.sh
     
 Build xlibc
 
     cd "${ZWOLF_SRC}/xlibc"
-    ln -s "$STAGE1" __zwolf_build__ 
-    ln -s "$STAGE1" __zwolf_run__ 
-    export PATH="${STAGE1}/llvm/x86_64/bin:$PATH"
-    CC=clang CXX=clang++ $(ZWOLF_SRC)/build/build.js distro/build.json
+    ln -s "$STAGE1" _zwolf 
+    ln -s "$STAGE1" _zwolf_install
+    make
 
 Build openlibm
 
-    cd "${ZWOLF_SRC}/openlibm"
-    ln -s "$STAGE1" __zwolf_build__ 
-    ln -s "$STAGE1" __zwolf_run__ 
-    CC=clang CXX=clang++ $(ZWOLF_SRC)/build/build.js $(ZWOLF_SRC)/openlibm/build.json
+    cd "${OPENLIBM_SRC}"
+    ln -s "$STAGE1" _zwolf 
+    ln -s "$STAGE1" _zwolf_install
+    ${ZWOLF_SRC}/openlibm/build.sh
 
 Build c++ runtime
 
     cd "$LLVM_SRC"
-    CC=clang CXX=clang++ $(ZWOLF_SRC)/build/build.js $(ZWOLF_SRC)/llvm/build-runtime.json
+    ${ZWOLF_SRC}/llvm/build-runtime.sh
 
 Build stage2
 
-    rm __build_run__
-    ln -s "$STAGE2" __zwolf_run__
-    CC=clang CXX=clang++ $(ZWOLF_SRC)/build/build.js $(ZWOLF_SRC)/llvm/build-zwolf.json
+    rm _zwolf_install/_zwolf
+    ln -s "$STAGE2" _zwolf_install/_zwolf
+    ${ZWOLF_SRC}/llvm/build-zwolf.sh
 
 Copy all the libraries from stage1 or build them again.
+When developing normal programs you don't need _zwolf_install.
+This is just so we can build things in our toolchain without immediately overwriting the toolchain.
 
 # REFERENCES
 

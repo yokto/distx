@@ -1,17 +1,19 @@
-CC := __zwolf_build__/llvm/x86_64/bin/clang
-CXX := __zwolf_build__/llvm/x86_64/bin/clang++
-BUILDDIR := __zwolf_run__/test_programs# $(realpath $(dir ${PWD}))
-DEPDIR := __zwolf_run__# $(realpath $(dir ${PWD})/..)
+CC := _zwolf/llvm/x86_64/bin/clang
+CXX := _zwolf/llvm/x86_64/bin/clang++
+BUILDDIR := _zwolf/test_programs# $(realpath $(dir ${PWD}))
+DEPDIR := _zwolf # $(realpath $(dir ${PWD})/..)
 LIBFOOBAR := $(BUILDDIR)/lib/libfoobar.so
 HELLOC := $(BUILDDIR)/bin/helloc
 LIBC := $(DEPDIR)/xlibc/lib/libc.so
-HELLORUST := $(BUILDDIR)/bin/hellorust
+#HELLORUST := $(BUILDDIR)/bin/hellorust
 HELLOCPP := $(BUILDDIR)/hellocpp/bin/hellocpp
 #TEST_IOSTREAM := $(BUILDDIR)/bin/test_iostream
 CONSTANTS := $(BUILDDIR)/bin/constants
 
 TESTCPP_SOURCES := $(wildcard testcpp_*.cpp)
 TESTCPP_EXECS := $(patsubst %.cpp, $(BUILDDIR)/x86_64/bin/%, $(TESTCPP_SOURCES))
+TESTCPP_EXECS := $(patsubst %.cpp, $(BUILDDIR)/aarch64/bin/%, $(TESTCPP_SOURCES))
+
 TESTC_SOURCEST := $(wildcard testc_*.c)
 TESTC_SOURCES = $(filter-out testc_zlib.c, $(TESTC_SOURCEST))
 TESTC_EXECS := $(patsubst %.c, $(BUILDDIR)/x86_64/bin/%, $(TESTC_SOURCES))
@@ -23,9 +25,9 @@ all: $(HELLORUST) \
 	$(TESTC_EXECS)
 
 test: test 
-	../build/load_elf __zwolf_run__/test_programs/bin/testc_empty
-	../build/load_elf __zwolf_run__/test_programs/bin/testc_exit
-	../build/load_elf __zwolf_run__/test_programs/bin/testcpp_vector
+	../build/load_elf _zwolf/test_programs/bin/testc_empty
+	../build/load_elf _zwolf/test_programs/bin/testc_exit
+	../build/load_elf _zwolf/test_programs/bin/testcpp_vector
 
 #nolibc: foobar.so nolibc.c ../lib/* Makefile
 #	gcc -shared -nostdlib '-Wl,--dynamic-linker=/home/silvio/stuff/sources/elf/executables/load_elf.so' -fvisibility=hidden -fPIC -o nolibc -lfoobar -L. nolibc.c
@@ -57,9 +59,9 @@ $(LIBFOOBAR): foobar.c Makefile foobar.map
 	${CC} -Wl,-soname,test_programs/lib/libfoobar.so -Wl,--version-script=foobar.map -nostdlib -shared -o $(LIBFOOBAR) foobar.c \
 		-Wl,--hash-style=sysv
 
-$(HELLORUST): hellorust.rs Makefile
-	mkdir -p $(dir $(HELLORUST))
-	rustc hellorust.rs --crate-type cdylib -o $(HELLORUST)
+#$(HELLORUST): hellorust.rs Makefile
+#	mkdir -p $(dir $(HELLORUST))
+#	rustc hellorust.rs --crate-type cdylib -o $(HELLORUST)
 
 
 #$(HELLOCPP): hellocpp.cpp Makefile hellocpp.map
@@ -110,6 +112,14 @@ $(BUILDDIR)/x86_64/bin/testcpp_%: testcpp_%.cpp
 	${CXX} -femulated-tls -g \
 		"-Wl,--no-undefined" \
 		-target x86_64-unknown-linux-zwolf \
+		"-Wl,-soname,test_programs/x86_64/bin/testcpp_$*" \
+		-o "$@" "$<"
+
+$(BUILDDIR)/aarch64/bin/testcpp_%: testcpp_%.cpp
+	mkdir -p "$(BUILDDIR)/x86_64/bin"
+	${CXX} -femulated-tls -g \
+		"-Wl,--no-undefined" \
+		-target aarch64-unknown-linux-zwolf \
 		"-Wl,-soname,test_programs/x86_64/bin/testcpp_$*" \
 		-o "$@" "$<"
 

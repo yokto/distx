@@ -1,5 +1,6 @@
 #include <fs.h>
 
+#include <zwolf.h>
 #include "base/fs.h"
 #include "common.h"
 #include "stdlib.h"
@@ -17,19 +18,19 @@ static bool isWin = 0;
 void init_fs(bool iswin, void* lib) {
 	isWin = iswin;
 	if (isWin) {
-		win_wopen = __dlsym(lib, "_wopen");
-		win_lseeki64 = __dlsym(lib, "_lseeki64");
-		win_chsize_s = __dlsym(lib, "_chsize_s");
-		win_read = __dlsym(lib, "_read");
-		win_write = __dlsym(lib, "_write");
-		win_close = __dlsym(lib, "_close");
+		win_wopen = zwolf_sym(lib, "_wopen");
+		win_lseeki64 = zwolf_sym(lib, "_lseeki64");
+		win_chsize_s = zwolf_sym(lib, "_chsize_s");
+		win_read = zwolf_sym(lib, "_read");
+		win_write = zwolf_sym(lib, "_write");
+		win_close = zwolf_sym(lib, "_close");
 	} else {
-		linux_open = __dlsym(lib, "open");
-		linux_lseek = __dlsym(lib, "lseek");
-		linux_ftruncate = __dlsym(lib, "ftruncate");
-		linux_read = __dlsym(lib, "read");
-		linux_write = __dlsym(lib, "write");
-		linux_close = __dlsym(lib, "close");
+		linux_open = zwolf_sym(lib, "open");
+		linux_lseek = zwolf_sym(lib, "lseek");
+		linux_ftruncate = zwolf_sym(lib, "ftruncate");
+		linux_read = zwolf_sym(lib, "read");
+		linux_write = zwolf_sym(lib, "write");
+		linux_close = zwolf_sym(lib, "close");
 	}
 }
 
@@ -58,8 +59,8 @@ int32_t base_fs_open(const char *path, uintptr_t* fd, uint32_t flags) {
 			if (ret >= 0) {
 				*fd = ret;
 			} else {
-				debug_printf("open errno %d\n", __errno());
-				error = __errno();
+				debug_printf("open errno %d\n", zwolf_errno());
+				error = zwolf_errno();
 			}
 		} else {
 			uint32_t flag = 0;
@@ -74,12 +75,12 @@ int32_t base_fs_open(const char *path, uintptr_t* fd, uint32_t flags) {
 			if (flags & BASE_FS_OPEN_CREATE) { flag |= LINUX_O_CREAT; }
 			debug_printf("open path %s\n", nativepath);
 			int ret = linux_open(nativepath, flag, 0666);
-			debug_printf("open errno %d\n", __errno());
+			debug_printf("open errno %d\n", zwolf_errno());
 			debug_printf("open fd %d\n", ret);
 			if (ret >= 0) {
 				*fd = ret;
 			} else {
-				error = __errno();
+				error = zwolf_errno();
 			}
 		}
 	} while (false);
@@ -97,14 +98,14 @@ int32_t base_fs_truncate(uintptr_t fd, int64_t length) {
 		if (ret == 0) {
 			return ret;
 		} else {
-			return __errno();
+			return zwolf_errno();
 		}
 	} else {
 		int ret = linux_ftruncate(fd, length);
 		if (ret == 0) {
 			return ret;
 		} else {
-			return __errno();
+			return zwolf_errno();
 		}
 	}
 }
@@ -119,7 +120,7 @@ int32_t base_fs_seek(uintptr_t fd, int64_t offset, uint32_t flags, int64_t* new_
 		else { return EINVAL; }
 		int ret = win_lseeki64(fd, offset, flag);
 		if (ret == -1) {
-			return __errno();
+			return zwolf_errno();
 		} else {
 			*new_offset = ret;
 			return SUCCESS;
@@ -132,7 +133,7 @@ int32_t base_fs_seek(uintptr_t fd, int64_t offset, uint32_t flags, int64_t* new_
 		else { return EINVAL; }
 		int ret = linux_lseek(fd, offset, flag);
 		if (ret == -1) {
-			return __errno();
+			return zwolf_errno();
 		} else {
 			*new_offset = ret;
 			return SUCCESS;
@@ -148,7 +149,7 @@ int32_t base_fs_write(uintptr_t fd, const void *buf, uintptr_t count, uintptr_t*
 			*written = ret;
 			return SUCCESS;
 		} else {
-			return __errno();
+			return zwolf_errno();
 		}
 	} else {
 		int ret = linux_write(fd, buf, count);
@@ -156,7 +157,7 @@ int32_t base_fs_write(uintptr_t fd, const void *buf, uintptr_t count, uintptr_t*
 			*written = ret;
 			return SUCCESS;
 		} else {
-			return __errno();
+			return zwolf_errno();
 		}
 	}
 }
@@ -174,7 +175,7 @@ int32_t base_fs_read(uintptr_t fd, void *buf, uintptr_t count, uintptr_t* read) 
 //			b[count-1] = c;
 			return SUCCESS;
 		} else {
-			return __errno();
+			return zwolf_errno();
 		}
 	} else {
 		int ret = linux_read(fd, buf, count);
@@ -186,7 +187,7 @@ int32_t base_fs_read(uintptr_t fd, void *buf, uintptr_t count, uintptr_t* read) 
 			*read = ret;
 			return SUCCESS;
 		} else {
-			return __errno();
+			return zwolf_errno();
 		}
 	}
 }
@@ -204,7 +205,7 @@ int32_t base_fs_close(uintptr_t fd) {
 			return SUCCESS;
 		}
 	}
-	return __errno();
+	return zwolf_errno();
 }
 
 int32_t base_fs_tonativepath(const char *pathname, void* nativepath) {
@@ -239,7 +240,7 @@ int32_t base_fs_tonativepathlen(const char *pathname, uintptr_t* length) {
 	}
 }
 
-static const char basealias[] = "/__zwolf_run__/";
+static const char basealias[] = "/_zwolf/";
 #define basealias_len (sizeof(basealias) - 1)
 int32_t tonativepath(const char* filenameOrig, void** output) {
 	*output = NULL;

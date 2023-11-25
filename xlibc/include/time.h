@@ -9,7 +9,7 @@ extern "C" {
 
 #define CLOCKS_PER_SEC 1
 
-typedef uint64_t time_t;
+typedef int64_t time_t;
 
 #define CLOCK_REALTIME 1
 #define CLOCK_MONOTONIC 2

@@ -1,4 +1,5 @@
 #include <common.h>
+#include <zwolf.h>
 #include <base/types.h>
 #include <unicode.h>
 #include <stdbool.h>
@@ -61,14 +62,14 @@ void init_proc(bool iswin, void* lib, void* kernel32) {
 	isWin = iswin;
 	debug_printf("xxx open\n");
 	if (isWin) {
-		win_create_process_w = __dlsym(kernel32, "CreateProcessW");
-		win_WaitForSingleObject = __dlsym(kernel32, "WaitForSingleObject");
-		win_GetExitCodeProcess = __dlsym(kernel32, "GetExitCodeProcess");
+		win_create_process_w = zwolf_sym(kernel32, "CreateProcessW");
+		win_WaitForSingleObject = zwolf_sym(kernel32, "WaitForSingleObject");
+		win_GetExitCodeProcess = zwolf_sym(kernel32, "GetExitCodeProcess");
 		debug_printf("xxx open%p\n",win_create_process_w);
 	} else {
-		linux_fork = __dlsym(lib, "fork");
-		linux_execve = __dlsym(lib, "execve");
-		linux_waitpid = __dlsym(lib, "waitpid");
+		linux_fork = zwolf_sym(lib, "fork");
+		linux_execve = zwolf_sym(lib, "execve");
+		linux_waitpid = zwolf_sym(lib, "waitpid");
 	}
 }
 
@@ -187,7 +188,7 @@ int32_t base_proc_exec(const char *path, char *const argv[], char *const envp[],
 			);
 		*id = info.hProcess;
 		debug_printf("ret %d\n", ret);
-		debug_printf("errno %d\n", __errno());
+		debug_printf("errno %d\n", zwolf_errno());
 	} else {
 		uint32_t pid = linux_fork();
 		if (pid == 0) {

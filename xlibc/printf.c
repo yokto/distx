@@ -1,5 +1,6 @@
 #include <stdarg.h>
 #include <common.h>
+#include <zwolf.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -270,7 +271,7 @@ int debug_puts(void* arg, int c) {
 	state->buf[state->to_write] = c;
 	state->to_write ++;
 	if (state->to_write >= state->buf_size) {
-		__write(state->buf);
+		zwolf_write(state->buf);
 		state->to_write = 0;
 	}
 	return 1;
@@ -290,8 +291,8 @@ int debug_printf(char* format, ...) {
 		return -1;
 	}
 	state.buf[state.to_write] = '\0';
-	__write(state.buf);
-	if (ret < 0) { __exit(-1); }
+	zwolf_write(state.buf);
+	if (ret < 0) { zwolf_exit(-1); }
 
 	va_end(args);
 	return ret;
@@ -383,7 +384,7 @@ int vfprintf(FILE* file, const char *restrict format, va_list args) {
 		return -1;
 	}
 	fwrite(state.buf, 1, state.to_write, state.file);
-	if (ret < 0) { __exit(-1); }
+	if (ret < 0) { zwolf_exit(-1); }
 
 	return ret;
 }

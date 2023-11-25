@@ -1,12 +1,12 @@
 {
 	"dependencies": [],
 	"tests": [
-		["/__zwolf_run__/test_programs/x86_64/bin/testc_ls"],
-		["/__zwolf_run__/test_programs/x86_64/bin/testc_empty"],
-		["/__zwolf_run__/test_programs/x86_64/bin/testc_mtx"],
-		["/__zwolf_run__/test_programs/x86_64/bin/testc_cnd"],
-		["/__zwolf_run__/test_programs/x86_64/bin/testcpp_vector"],
-		["/__zwolf_run__/test_programs/x86_64/bin/testc_futex"],
-		["/__zwolf_run__/test_programs/x86_64/bin/testc_math"]
+		["/_zwolf/test_programs/x86_64/bin/testc_ls"],
+		["/_zwolf/test_programs/x86_64/bin/testc_empty"],
+		["/_zwolf/test_programs/x86_64/bin/testc_mtx"],
+		["/_zwolf/test_programs/x86_64/bin/testc_cnd"],
+		["/_zwolf/test_programs/x86_64/bin/testcpp_vector"],
+		["/_zwolf/test_programs/x86_64/bin/testc_futex"],
+		["/_zwolf/test_programs/x86_64/bin/testc_math"]
 	]
 }

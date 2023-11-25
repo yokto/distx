@@ -48,6 +48,7 @@ int vasprintf(char ** strp, const char * format, va_list arg );
 int feof(FILE *stream);
 //int __printf_chk(int flag, const char * format, ...);
 int puts(const char* str);
+int putchar(int c);
 int fputs(const char* str, FILE* f);
 int fputc(int c, FILE *stream);
 int vsscanf(const char *s, const char *format, va_list arg);
@@ -70,18 +71,6 @@ int remove(const char *pathname);
 int mtime(const char *pathname, struct timespec * time);
 int setmtime(const char *pathname, struct timespec * time);
 
-typedef void* DIR;
-struct dirent {
-	uint64_t       d_ino;       /* Inode number */
-	uint64_t       d_off;       /* Not an offset; see below */
-	unsigned short d_reclen;    /* Length of this record */
-	unsigned char  d_type;      /* Type of file; not supported
-				       by all filesystem types */
-	char           d_name[256];
-};
-DIR* opendir(const char * path);
-struct dirent* readdir(DIR * dir);
-int closedir(DIR* dir);
 //int chmod(const char *pathname, mode_t mode);
 
 
@@ -125,6 +114,8 @@ struct statvfs {
                unsigned long  f_namemax;  /* Maximum filename length */
            };
 int statvfs(const char * path, struct statvfs * buf);
+
+int ferror(FILE *stream);
 
 
 #define O_CLOEXEC 524288

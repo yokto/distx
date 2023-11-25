@@ -61,6 +61,20 @@ char* strcpy(char* dest, const char* src) {
     return original_dest; // Return the original destination pointer
 }
 
+DLL_PUBLIC
+char* stpcpy(char* dest, const char* src) {
+    // Copy characters from source to destination until null terminator is reached
+    while (*src != '\0') {
+        *dest = *src; // Copy the character
+        dest++;       // Move destination pointer to the next position
+        src++;        // Move source pointer to the next position
+    }
+
+    *dest = '\0'; // Null-terminate the destination string
+
+    return dest;
+}
+
 
 DLL_PUBLIC
 int strcmp(const char *s1, const char *s2) {
@@ -137,6 +151,19 @@ void* memcpy(void* dest, const void* src, size_t n) {
     }
 
     return dest;
+}
+
+DLL_PUBLIC
+void* mempcpy(void* dest, const void* src, size_t n) {
+    char* dest_ptr = (char*)dest;
+    const char* src_ptr = (const char*)src;
+
+    // Copy bytes from source to destination
+    for (size_t i = 0; i < n; i++) {
+        *dest_ptr++ = *src_ptr++;
+    }
+
+    return dest_ptr + n;
 }
 
 DLL_PUBLIC
@@ -439,4 +466,44 @@ char* strcat(char* dest, const char* src) {
     *dest = '\0';
 
     return original_dest;
+}
+
+DLL_PUBLIC
+char *strstr(const char *haystack, const char *needle) {
+    if (*needle == '\0') {
+        return (char *)haystack;  // Empty needle, return the whole haystack
+    }
+
+    while (*haystack != '\0') {
+        const char *h = haystack;
+        const char *n = needle;
+
+        while (*n != '\0' && *h == *n) {
+            h++;
+            n++;
+        }
+
+        if (*n == '\0') {
+            return (char *)haystack;  // Found the substring
+        }
+
+        haystack++;
+    }
+
+    return NULL;  // Substring not found
+}
+
+DLL_PUBLIC
+void *memrchr(const void *s, int c, size_t n) {
+    const unsigned char *p = (const unsigned char *)s + n - 1;
+
+    while (n > 0) {
+        if (*p == (unsigned char)c) {
+            return (void *)p;
+        }
+        p--;
+        n--;
+    }
+
+    return NULL;
 }

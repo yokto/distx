@@ -7,7 +7,7 @@
 #define SUCCESS 0
 
 int main() {
-    const char* filename = "/__zwolf_basedir__/test_programs/example.txt";
+    const char* filename = "/_zwolf/test_programs/example.txt";
     int32_t error = 0;
     char buffer[BUFFER_SIZE];
     ssize_t bytesRead, bytesWritten;

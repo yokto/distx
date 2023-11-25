@@ -1,0 +1,8 @@
+[
+	[".", "make", "clean"],
+	[".", "env", "CC=__zwolf_build__/llvm/x86_64/bin/clang", "make"],
+	[".", "cp", "libopenlibm.so.4.0", "__zwolf_run__/xlibc/x86_64/lib/libm.so"],
+	[".", "make", "clean"],
+	[".", "env", "CC=__zwolf_build__/llvm/x86_64/bin/clang", "ARCH=aarch64", "LDFLAGS=-nostdlib -target aarch64-unknown-linux-zwolf", "CFLAGS=-target aarch64-unknown-linux-zwolf", "make"],
+	[".", "cp", "libopenlibm.so.4.0", "__zwolf_run__/xlibc/aarch64/lib/libm.so"]
+]

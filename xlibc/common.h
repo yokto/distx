@@ -5,13 +5,8 @@
 
 #define DLL_PUBLIC __attribute__ ((visibility ("default")))
 #define UNUSED(x) (void)(x)
-void __exit(int ret) __attribute__ ((weak, noreturn));
-int __write(char* str) __attribute__ ((weak));
-//extern int __resolve(void* ptr, const char ** libfile, size_t* offset);
+
 int debug_printf(char* restrict fmt, ...);
-extern int __errno();
-void* __dlsym(void* handle, char* name) __attribute__ ((weak));
-void* __dlopen(char* name) __attribute__ ((weak));
 
 #define concatH(X, Y) X ## Y
 #define concat(X, Y) concatH(X, Y)

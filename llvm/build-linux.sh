@@ -1,0 +1,36 @@
+if [ $STAGE1 == "" ]
+then
+	"set STAGE1"
+fi
+
+mkdir -p build_linux
+(
+	cd build_linux
+	cmake ../llvm \
+		"-DLLVM_ENABLE_PROJECTS=clang;lld" \
+		"-DCMAKE_BUILD_TYPE=Release" \
+		"-DCMAKE_C_COMPILER=clang" \
+		"-DDEFAULT_SYSROOT=${STAGE1}" \
+		"-DCMAKE_INSTALL_PREFIX=${STAGE1}/llvm" \
+		"-DCMAKE_INSTALL_BINDIR=x86_64/bin" \
+		"-DLLVM_TOOLS_INSTALL_DIR=x86_64/bin" \
+		"-DCMAKE_INSTALL_INCLUDEDIR=common/include" \
+		"-DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-linux-zwolf" \
+		"-DLLVM_TARGETS_TO_BUILD=X86;AArch64" \
+		"-DLLVM_INCLUDE_BENCHMARKS=OFF" \
+		"-DLLVM_ENABLE_TERMINFO=OFF" \
+		"-DLIBCXX_USE_COMPILER_RT=ON" \
+		"-DLIBCXXABI_USE_COMPILER_RT=ON" \
+		"-DCLANG_DEFAULT_LINKER=lld" \
+		"-DCLANG_BUILD_TOOLS:BOOL=ON" \
+		"-DCLANG_ENABLE_ARCMT=OFF" \
+		"-DCOMPILER_RT_INCLUDE_TESTS=OFF" \
+		"-DCLANG_DEFAULT_RTLIB=compiler-rt" \
+		"-DCLANG_DEFAULT_UNWINDLIB=libunwind" \
+		"-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON" \
+		"-DCLANG_DEFAULT_CXX_STDLIB=libc++" \
+		"-DLIBCXX_ENABLE_DEBUG_MODE=ON" \
+		"-G" "Ninja"
+	ninja
+	ninja install
+)

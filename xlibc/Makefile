@@ -1,13 +1,13 @@
-CC := __zwolf_build__/llvm/x86_64/bin/clang
-INSTALL := __zwolf_run__/xlibc/
+CC := _zwolf/llvm/x86_64/bin/clang
+INSTALL := _zwolf_install/xlibc/
 LIBC := $(INSTALL)x86_64/lib/libc.so $(INSTALL)aarch64/lib/libc.so
-LIBM := $(INSTALL)x86_64/lib/libm.so
+LIBZWOLF := $(INSTALL)x86_64/lib/libzwolf.so $(INSTALL)aarch64/lib/libzwolf.so
 
 HEADERS = $(addprefix $(INSTALL)common/,$(wildcard include/*.h)) $(addprefix $(INSTALL)common/,$(wildcard include/*/*.h))
 
-all: $(LIBC) $(HEADERS) # $(LIBM)
+all: $(LIBC) $(HEADERS) $(LIBZWOLF)
 
-$(INSTALL)%/lib/libc.so: libc.c printf.c string.c time.c unicode.c fs.c qsort.c proc.c thread_impl.c emutls.c Makefile
+$(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so libc.c printf.c string.c time.c unicode.c fs.c qsort.c proc.c thread_impl.c emutls.c Makefile
 	mkdir -p $(INSTALL)$*/lib
 	echo ${CC}
 	${CC} \
@@ -15,11 +15,14 @@ $(INSTALL)%/lib/libc.so: libc.c printf.c string.c time.c unicode.c fs.c qsort.c 
 		-Wall -Wextra \
 		-Wl,-soname,xlibc/$*/lib/libc.so \
 		-Wl,--export-dynamic-symbol=__* \
+		-Wl,--no-undefined \
 		--target=$*-unknown-linux-zwolf \
 		-Wno-unused-parameter \
 		-nolibc -shared \
 		-femulated-tls \
 		--unwindlib=none \
+		-lzwolf \
+		-L "${INSTALL}/$*/lib" \
 		-Ilibc \
 		-I. \
 		-fPIC \
@@ -35,23 +38,18 @@ $(INSTALL)%/lib/libc.so: libc.c printf.c string.c time.c unicode.c fs.c qsort.c 
 		fs.c \
 		qsort.c thread_impl.c
 
-#               -Werror \
-
-#$(LIBM): libm.c Makefile libm.map
-#	mkdir -p $(dir $(LIBC))
-#	${CC} \
-#		-g \
-#		-Wall -Wextra -Werror \
-#		-Wl,-soname,xlibc/lib/libm.so \
-#		-nostdlib -shared \
-#		-fno-stack-protector \
-#		-fPIC \
-#		-fno-builtin \
-#		-Ilibc \
-#		-Iinclude \
-#		-o $(LIBM) \
-#		libm.c \
-#		-lc -L$(dir $(LIBC)) 
+$(INSTALL)%/lib/libzwolf.so: libzwolf/libzwolf.c
+	mkdir -p $(INSTALL)$*/lib
+	echo ${CC}
+	${CC} \
+		-g \
+		-Wl,-soname,_zwolf \
+		--target=$*-unknown-linux-zwolf \
+		-nolibc -shared \
+		--unwindlib=none \
+		-Iinclude \
+		-o $@ \
+		libzwolf/libzwolf.c
 
 # copy headers
 $(INSTALL)common/include/%.h: include/%.h
