@@ -36,6 +36,7 @@ $(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so libc.c printf.c string.c ti
 		unicode.c \
 		time.c \
 		fs.c \
+		base/futex.c \
 		qsort.c thread_impl.c
 
 $(INSTALL)%/lib/libzwolf.so: libzwolf/libzwolf.c

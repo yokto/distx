@@ -24,7 +24,7 @@
 #include <sys/stat.h>
 #include <sys/vfs.h>
 #include <fs.h>
-#include <thread_impl.h>
+#include <base/futex_p.h>
 #include <unistd.h>
 
 //#define FENCE 1
@@ -245,7 +245,7 @@ __attribute__((constructor)) void init() {
 	}
 
 	init_fs(isWin, libc);
-	init_threads(isWin, libc);
+	base_futex_p_init(isWin, libc);
 	init_proc(isWin, libc, kernel32);
 	if (isWin) {
 		vswprintf_ms = dlsym(libc, "vswprintf");
