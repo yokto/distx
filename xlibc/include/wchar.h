@@ -18,6 +18,7 @@ typedef __WCHAR_TYPE__ wchar_t;
 #endif
 
 wchar_t* wcschr(const wchar_t* str, wchar_t wc);
+size_t wcslen(const wchar_t* str);
 wchar_t* wcspbrk(const wchar_t* str, const wchar_t* chars);
 wchar_t* wcsstr(const wchar_t* str, const wchar_t* substr);
 wchar_t* wcsrchr(const wchar_t* str, wchar_t wc);

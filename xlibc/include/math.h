@@ -37,6 +37,10 @@ extern double ldexp(double x, int exp);
 extern float ldexpf(float x, int exp);
 extern long double ldexpl(long double x, int exp);
 
+double frexp(double x, int* exp);
+float frexpf(float x, int* exp);
+long double frexpl(long double x, int* exp);
+
 extern double pow(double x, double y);
 
 MATH_BUILTIN_1(tan)

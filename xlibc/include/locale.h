@@ -4,6 +4,8 @@
 extern "C" {
 #endif
 
+#define LC_CTYPE 1
+
 #define LC_CTYPE_MASK   (1 << 0)
 #define LC_COLLATE_MASK (1 << 1)
 #define LC_NUMERIC_MASK (1 << 2)

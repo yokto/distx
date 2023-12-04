@@ -1,9 +1,10 @@
 #!/bin/bash
+ZWOLF=${ZWOLF:-${PWD}/_zwolf}
 export CC="clang"
 export CXX="clang++"
-export PATH=$"$PWD/_zwolf/llvm/x86_64/bin:$PATH"
-TBLGEN="$PWD/_zwolf/llvm/x86_64/bin/tblgen"
-TOOLS="$PWD/_zwolf/llvm/x86_64/bin"
+export PATH=$"${ZWOLF}/llvm/x86_64/bin:$PATH"
+TBLGEN="${ZWOLF}/llvm/x86_64/bin/tblgen"
+TOOLS="${ZWOLF}/llvm/x86_64/bin"
 mkdir -p build_release_archs
 (
 	cd build_release_archs

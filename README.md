@@ -393,7 +393,7 @@ FileSiz can be shorter than MemSiz. This happens for instance for the .bss secti
 ### Register executable on linux
 
     mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
-    echo ":zwolf:M:0:\\x7FELF\\x02\\x01\\x01\\x13::/home/silvio/stuff/sources/elf_src/zwolf/build/load_elf:" > /proc/sys/fs/binfmt_misc/register
+    echo ":zwolf:M:0:\\x7FELF\\x02\\x01\\x01\\x13::/home/silvio/stuff/sources/elf_src/zwolf/zwolf/_zwolf/zwolf/x86_64/bin/load_elf_linux:" > /proc/sys/fs/binfmt_misc/register
 
 ### Bootstrap llvm from linux
 

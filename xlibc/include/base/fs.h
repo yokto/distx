@@ -17,9 +17,9 @@ extern "C" {
 
 
 // standard file handles
-extern intptr_t base_fs_stdout;
-extern intptr_t base_fs_stderr;
-extern intptr_t base_fs_stdin;
+extern uintptr_t base_fs_stdout;
+extern uintptr_t base_fs_stderr;
+extern uintptr_t base_fs_stdin;
 
 #define BASE_FS_OPEN_READ        1
 #define BASE_FS_OPEN_WRITE       2
@@ -58,6 +58,8 @@ int32_t base_fs_close(uintptr_t fd);
 int32_t base_fs_seek(uintptr_t fd, int64_t offset, uint32_t whence, int64_t* new_offset);
 
 int32_t base_fs_truncate(uintptr_t fd, int64_t length);
+
+int32_t base_fs_tell(uintptr_t fd, int64_t * pos);
 
 #ifdef __cplusplus
 }

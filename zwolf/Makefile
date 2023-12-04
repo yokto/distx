@@ -9,6 +9,7 @@ load_elf: load_elf.c
 load_elf.exe: load_elf.c
 	mkdir -p _zwolf/zwolf/x86_64/bin
 	x86_64-w64-mingw32-gcc load_elf.c -o _zwolf/zwolf/x86_64/bin/load_elf_windows.exe
+	x86_64-w64-mingw32-gcc load_elf.c -D WIN_GUI -o _zwolf/zwolf/x86_64/bin/load_elf_windows_gui.exe
 
 load_elf_android: load_elf.c
 	mkdir -p ../build

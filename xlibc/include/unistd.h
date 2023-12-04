@@ -18,6 +18,7 @@ extern "C" {
 #define O_WRONLY BASE_FS_OPEN_WRITE
 #define O_RDWR (BASE_FS_OPEN_WRITE | BASE_FS_OPEN_READ)
 #define O_CREAT BASE_FS_OPEN_CREATE
+#define O_LARGEFILE 0
 #define O_EXCL 0
 #define O_TRUNC 0
 #define O_APPEND 0
@@ -48,6 +49,9 @@ inline static int64_t lseek(int fd, int64_t offset, int whence) {
 	base_fs_seek(fd, offset, whence, &ret);
 	return ret;
 }
+#define lseek64 lseek
+
+inline static int fsync(uintptr_t fd) { return 0; }
 
 inline static int unlink(const char* path) {
 	return remove(path);

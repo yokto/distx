@@ -1,7 +1,8 @@
-CC := _zwolf/llvm/x86_64/bin/clang
-CXX := _zwolf/llvm/x86_64/bin/clang++
-BUILDDIR := _zwolf/test_programs# $(realpath $(dir ${PWD}))
-DEPDIR := _zwolf # $(realpath $(dir ${PWD})/..)
+ZWOLF ?= ${PWD}/_zwolf
+CC := ${ZWOLF}/llvm/x86_64/bin/clang
+CXX := ${ZWOLF}/llvm/x86_64/bin/clang++
+BUILDDIR := ${ZWOLF}/test_programs# $(realpath $(dir ${PWD}))
+DEPDIR := ${ZWOLF}
 LIBFOOBAR := $(BUILDDIR)/lib/libfoobar.so
 HELLOC := $(BUILDDIR)/bin/helloc
 LIBC := $(DEPDIR)/xlibc/lib/libc.so
@@ -19,10 +20,15 @@ TESTC_SOURCES = $(filter-out testc_zlib.c, $(TESTC_SOURCEST))
 TESTC_EXECS := $(patsubst %.c, $(BUILDDIR)/x86_64/bin/%, $(TESTC_SOURCES))
 TESTC_EXECS += $(patsubst %.c, $(BUILDDIR)/aarch64/bin/%, $(TESTC_SOURCES))
 
+TESTCGUI_SOURCES := $(wildcard testcgui_*.c)
+TESTCGUI_EXECS := $(patsubst %.c, $(BUILDDIR)/x86_64/bin/%, $(TESTCGUI_SOURCES))
+#TESTCGUI_EXECS := $(patsubst %.cpp, $(BUILDDIR)/aarch64/bin/%, $(TESTCGUI_SOURCES))
+
 all: $(HELLORUST) \
 	$(CONSTANTS) \
 	$(TESTCPP_EXECS) \
 	$(TESTC_EXECS)
+	#$(TESTCGUI_EXECS)
 
 test: test 
 	../build/load_elf _zwolf/test_programs/bin/testc_empty
@@ -40,7 +46,7 @@ $(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile helloc.map foobar.h
 		-I $(DEPDIR)/xlibc/include \
 		helloc.c \
 		-Wl,--no-undefined \
-		-Wl,-soname,test_programs/bin/libhelloc.so \
+		-Wl,-soname,/test_programs/bin/libhelloc.so \
 		-Wl,--version-script=helloc.map \
 		-Wl,-Bsymbolic \
 		-Wl,-Bsymbolic-functions \
@@ -56,7 +62,7 @@ $(HELLOC): $(LIBFOOBAR) $(LIBC) helloc.c Makefile helloc.map foobar.h
 
 $(LIBFOOBAR): foobar.c Makefile foobar.map
 	mkdir -p $(dir $(LIBFOOBAR))
-	${CC} -Wl,-soname,test_programs/lib/libfoobar.so -Wl,--version-script=foobar.map -nostdlib -shared -o $(LIBFOOBAR) foobar.c \
+	${CC} -Wl,-soname,/test_programs/lib/libfoobar.so -Wl,--version-script=foobar.map -nostdlib -shared -o $(LIBFOOBAR) foobar.c \
 		-Wl,--hash-style=sysv
 
 #$(HELLORUST): hellorust.rs Makefile
@@ -69,7 +75,7 @@ $(LIBFOOBAR): foobar.c Makefile foobar.map
 #	${CXX} \
 #		hellocpp.cpp \
 #		-g \
-#		-Wl,-soname,hellocpp/bin/libhellocpp.so \
+#		-Wl,-soname,/hellocpp/bin/libhellocpp.so \
 #		-Wl,--version-script=hellocpp.map \
 #		-Wl,-Bsymbolic \
 #		-Wl,-Bsymbolic-functions \
@@ -88,7 +94,7 @@ $(BUILDDIR)/bin/testc_zlib: testc_zlib.c
 #		"-lz" \
 #		"-L/__zwolf_builddir__/zlib/lib" \
 #		"-I/__zwolf_builddir__/zlib/include" \
-#		"-Wl,-soname,test_programs/bin/testc_zlib" \
+#		"-Wl,-soname,/test_programs/bin/testc_zlib" \
 #		-o "$@" "$<"
 
 $(BUILDDIR)/x86_64/bin/testc_%: testc_%.c
@@ -96,7 +102,17 @@ $(BUILDDIR)/x86_64/bin/testc_%: testc_%.c
 	${CC} -femulated-tls -g \
 		-lm \
 		-target x86_64-unknown-linux-zwolf \
-		"-Wl,-soname,test_programs/x86_64/bin/testc_$*" \
+		"-Wl,-soname,/test_programs/x86_64/bin/testc_$*" \
+		-o "$@" "$<"
+
+$(BUILDDIR)/x86_64/bin/testcgui_%: testcgui_%.c
+	mkdir -p "$(BUILDDIR)/x86_64/bin"
+	${CC} -femulated-tls -g \
+		-lm \
+		-lxgui \
+		-L$(DEPDIR)/xgui/x86_64/lib \
+		-target x86_64-unknown-linux-zwolf \
+		"-Wl,-soname,/test_programs/x86_64/bin/testcgui_$*" \
 		-o "$@" "$<"
 
 $(BUILDDIR)/aarch64/bin/testc_%: testc_%.c
@@ -104,7 +120,7 @@ $(BUILDDIR)/aarch64/bin/testc_%: testc_%.c
 	${CC} -femulated-tls -g \
 		-lm \
 		-target aarch64-unknown-linux-zwolf \
-		"-Wl,-soname,test_programs/aarch64/bin/testc_$*" \
+		"-Wl,-soname,/test_programs/aarch64/bin/testc_$*" \
 		-o "$@" "$<"
 
 $(BUILDDIR)/x86_64/bin/testcpp_%: testcpp_%.cpp
@@ -112,15 +128,15 @@ $(BUILDDIR)/x86_64/bin/testcpp_%: testcpp_%.cpp
 	${CXX} -femulated-tls -g \
 		"-Wl,--no-undefined" \
 		-target x86_64-unknown-linux-zwolf \
-		"-Wl,-soname,test_programs/x86_64/bin/testcpp_$*" \
+		"-Wl,-soname,/test_programs/x86_64/bin/testcpp_$*" \
 		-o "$@" "$<"
 
 $(BUILDDIR)/aarch64/bin/testcpp_%: testcpp_%.cpp
-	mkdir -p "$(BUILDDIR)/x86_64/bin"
+	mkdir -p "$(BUILDDIR)/aarch64/bin"
 	${CXX} -femulated-tls -g \
 		"-Wl,--no-undefined" \
 		-target aarch64-unknown-linux-zwolf \
-		"-Wl,-soname,test_programs/x86_64/bin/testcpp_$*" \
+		"-Wl,-soname,/test_programs/aarch/bin/testcpp_$*" \
 		-o "$@" "$<"
 
 $(CONSTANTS): constants.c

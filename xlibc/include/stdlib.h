@@ -79,10 +79,6 @@ float strtof(const char *nptr, char **endptr);
 double strtod(const char *nptr, char **endptr);
 long double strtold (const char* nptr, char** endptr);
 
-
-typedef void* FILE; // not really supposed to be here
-extern FILE* stderr; // not really supposed to be here
-int fprintf(FILE* stream, const char * format, ...); // not really supposed to be here
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
 _Noreturn void exit(int status);

@@ -11,8 +11,10 @@ extern "C" {
 
 typedef __SIZE_TYPE__ size_t;
 typedef signed long ssize_t;
+typedef int64_t off_t;
+typedef int64_t off64_t;
 
-typedef void* FILE;
+typedef uint64_t FILE;
 typedef uint64_t fpos_t;
 
 extern FILE* stderr;
@@ -36,6 +38,7 @@ extern FILE* stdin;
 #define L_tmpnam 0x40
 
 char getc(FILE* file);
+int fileno(FILE* file);
 char getchar();
 char *fgets(char * s, int size, FILE * stream);
 int vfprintf(FILE* stream, const char * format, va_list argp);
@@ -58,7 +61,9 @@ FILE *fopen(const char *filename, const char *mode);
 size_t fread(void * ptr, size_t size, size_t nmemb, FILE * stream);
 size_t fwrite(const void * ptr, size_t size, size_t nmemb, FILE * stream);
 long ftell(FILE* stream);
+int64_t ftello64(FILE* stream);
 int fseek(FILE *stream, long int offset, int whence);
+int fseeko64(FILE *fp, off64_t offset, int whence );
 FILE *fdopen(int fd, const char *mode);
 int fclose(FILE* stream);
 int ungetc(int c, FILE *stream);

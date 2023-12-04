@@ -4,6 +4,7 @@
 // Define a thread-local variable
 _Thread_local int threadLocalVariable;
 
+
 int thread_function(void* arg) {
     // Access and modify the thread-local variable
     threadLocalVariable = *(int*)arg;

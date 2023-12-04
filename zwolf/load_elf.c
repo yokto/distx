@@ -895,7 +895,13 @@ char ** init_win_argv(int count) {
 }
 #endif
 
+#ifdef WINGUI
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+	int argc = 0;
+	char ** argv = CommandLineToArgvW(lpCmdLine, &argc);
+#else
 int main(int argc, char ** argv) {
+#endif
 	const char * exec_env = "ZWOLF_EXECUTABLE";
 #ifdef WIN32
 	const char * path = _fullpath(0, argv[0], 0);

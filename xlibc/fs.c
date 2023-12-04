@@ -13,6 +13,10 @@
 
 #define SUCCESS 0
 
+uintptr_t base_fs_stdin = 0;
+uintptr_t base_fs_stdout = 1;
+uintptr_t base_fs_stderr = 2;
+
 static bool isWin = 0;
 
 void init_fs(bool iswin, void* lib) {
@@ -35,7 +39,7 @@ void init_fs(bool iswin, void* lib) {
 }
 
 int32_t base_fs_open(const char *path, uintptr_t* fd, uint32_t flags) {
-	debug_printf("open %s flag %d\n", path, flags);
+	debug_printf("base_fs_open %s flag %d\n", path, flags);
 
 	uint32_t error = SUCCESS;
 	void * nativepath = NULL;
@@ -240,8 +244,86 @@ int32_t base_fs_tonativepathlen(const char *pathname, uintptr_t* length) {
 	}
 }
 
-static const char basealias[] = "/_zwolf/";
+static const char basealias[] = "/_zwolf";
 #define basealias_len (sizeof(basealias) - 1)
+int32_t alloc_libc_to_base_path(const char* filename, char** output) {
+	debug_printf("convert libc %s\n", filename);
+
+	char abspath_orig[4200];
+	char* abspath = abspath_orig;
+	if (filename[0] != '/') { // relative path
+		char cwd2[4200];
+		char* cwd = cwd2;
+		getcwd(cwd, 4200);
+		for (; cwd[0] != '\0'; cwd++) {
+			if (abspath - abspath_orig > 4197) { return EINVAL; }
+			abspath[0] = cwd[0];
+			abspath++;
+		}
+		if (abspath[-1] != '/') {
+			abspath[0] = '/';
+			abspath++;
+		}
+	} else {
+		abspath[0] = '/';
+		abspath++;
+		filename++;
+	}
+
+	while (true) {
+		if (filename[0] == '.' && filename[1] == '.' && (filename[2] == '\0' || filename[2] == '/')) {
+			abspath-=2;
+			if (abspath <= abspath_orig) { return EINVAL; }
+			while (abspath[0] != '/') { abspath--; }
+			abspath++; //
+			filename += 2;
+		} else if (filename[0] == '.' && (filename[1] == '\0' || filename[1] == '/')) {
+			filename += 1;
+		} else if (filename[0] == '/') {
+			filename += 1;
+		} else {
+			while (filename[0] != '\0' && filename[0] != '/') {
+				if (abspath - abspath_orig > 4197) { return EINVAL; }
+				abspath[0] = filename[0];
+				abspath++;
+				filename++;
+			}
+		}
+		if (filename[0] == '\0') {
+			abspath[0] = '\0';
+			break;
+		} else if (filename[0] == '/') {
+			abspath[0] = '/';
+			abspath++;
+			filename++;
+		}
+	}
+	if (abspath[-1] == '/') {
+		abspath[-1] = '\0';
+	}
+	filename = abspath_orig;
+	int filelen = strlen(filename);
+	
+	debug_printf("converted abs libc (%s)\n", filename);
+	
+	if (strncmp(basealias, filename, basealias_len) == 0 && (filename[basealias_len] == '\0' || filename[basealias_len] == '/')) {
+		char* base = getenv("ZWOLF_RUNDIR");
+		if (base) {
+			int baselen = strlen(base);
+
+			*output = malloc(baselen + filelen - basealias_len + 1);
+			if (output == 0) { return ENOMEM; }
+			memcpy(*output, base, baselen);
+			memcpy(*output + baselen, filename + basealias_len, filelen - basealias_len + 1);
+		}
+	} else {
+		*output = malloc(filelen + 1);
+		if (output == 0) { return ENOMEM; }
+		strcpy(*output, filename);
+	}
+	debug_printf("converted base (%s)\n", *output);
+	return SUCCESS;
+}
 int32_t tonativepath(const char* filenameOrig, void** output) {
 	*output = NULL;
 	int filelen = strlen(filenameOrig);

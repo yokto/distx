@@ -1,12 +1,14 @@
 #!/bin/bash
-export CC=$PWD/_zwolf/llvm/x86_64/bin/clang
-export CXX=$PWD/_zwolf/llvm/x86_64/bin/clang++
+ZWOLF=${ZWOLF:-$PWD/_zwolf}
+export CC="$ZWOLF/llvm/x86_64/bin/clang"
+export CXX="$ZWOLF/llvm/x86_64/bin/clang++"
+echo CC = $CC
 for arch in x86_64 aarch64
 do
-	mkdir build-compiler-rt-${arch}
+	mkdir -p build-compiler-rt-${arch}
 	(
 		cd build-compiler-rt-${arch}
-		CC=clang CXX=clang++ cmake ../runtimes \
+		cmake ../runtimes \
 			"-DLLVM_ENABLE_RUNTIMES=compiler-rt" \
 			"-DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON" \
 			"-DCMAKE_BUILD_TYPE=Release" \

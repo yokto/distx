@@ -1,5 +1,7 @@
-export CC=$PWD/_zwolf/llvm/x86_64/bin/clang
-export CXX=$PWD/_zwolf/llvm/x86_64/bin/clang++ 
+#!/bin/bash
+ZWOLF=${ZWOLF:-${PWD}/_zwolf}
+export CC=${ZWOLF}/llvm/x86_64/bin/clang
+export CXX=${ZWOLF}/llvm/x86_64/bin/clang++ 
 for arch in x86_64 aarch64
 do
 	mkdir -p "build-runtime-$arch"

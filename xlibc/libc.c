@@ -123,17 +123,8 @@ DECLARE(void*, aligned_alloc, size_t alignment, size_t size); // strictly speaki
 DECLARE(void*, realloc, void *ptr, size_t size)
 DECLARE(void, free, void* ptr)
 DECLARE(void, aligned_free, void *ptr);
-DECLARE(int, fflush, FILE* file)
-DECLARE(size_t, fwrite, const void * ptr, size_t size, size_t nmemb, FILE * stream)
-static FILE* (*_wfopen_ms)(const uint16_t *filename, const uint16_t *mode) __attribute((ms_abi)); 
-static FILE* (*fopen_sysv)(const char *filename, const char *mode);
 void *(*mmap_sysv)(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 int (*munmap_sysv)(void *addr, size_t length);
-DECLARE(FILE*, fdopen, int fd, const char *mode)
-DECLARE(int, fclose, FILE* stream)
-DECLARE(long, ftell, FILE* stream)
-DECLARE(int, fseek, FILE *stream, long int offset, int whence)
-DECLARE(size_t, fread, void * ptr, size_t size, size_t nmemb, FILE * stream)
 DECLARE(int, remove, const char *pathname)
 int (*_rmdir_ms)(const char *pathname) __attribute((ms_abi));
 //DECLARE(int, cnd_init, cnd_t* cond)
@@ -183,6 +174,7 @@ DECLARE(int, tss_set, tss_t tss_id, void *val )
 int tss_create(tss_t* tss_key, tss_dtor_t destructor);
 static int (*tss_create_sysv)(tss_t* tss_key, tss_dtor_t destructor);
 static uint32_t (*tss_create_ms)() __attribute((ms_abi));
+static int (*fchmod_sysv)(int fd, mode_t mode);
 
 // THRD
 DECLARE(void, thrd_yield, void)
@@ -255,7 +247,6 @@ __attribute__((constructor)) void init() {
 		aligned_free_ms = dlsym(libc, "_aligned_free");
 		realloc_ms = dlsym(libc, "realloc");
 		free_ms = dlsym(libc, "free");
-		fflush_ms = dlsym(libc, "fflush");
 		thrd_yield_ms = dlsym(kernel32, "SwitchToThread");
 		thrd_current_ms = dlsym(kernel32, "GetCurrentThread");
 		thrd_sleep_ms = dlsym(kernel32, "SleepEx");
@@ -263,13 +254,6 @@ __attribute__((constructor)) void init() {
 		tss_delete_ms = dlsym(kernel32, "TlsFree");
 		tss_get_ms = dlsym(kernel32, "TlsGetValue");
 		tss_set_ms = dlsym(kernel32, "TlsSetValue");
-		fwrite_ms = dlsym(libc, "fwrite");
-		_wfopen_ms = dlsym(libc, "_wfopen");
-		fdopen_ms = dlsym(libc, "_fdopen");
-		fclose_ms = dlsym(libc, "fclose");
-		ftell_ms = dlsym(libc, "ftell");
-		fseek_ms = dlsym(libc, "fseek");
-		fread_ms = dlsym(libc, "fread");
 		remove_ms = dlsym(libc, "remove");
 		_rmdir_ms = dlsym(libc, "_rmdir");
 		//cnd_init_ms = dlsym(kernel32, "InitializeConditionVariable");
@@ -323,7 +307,6 @@ __attribute__((constructor)) void init() {
 		aligned_free_sysv = dlsym(libc, "free");
 		realloc_sysv = dlsym(libc, "realloc");
 		free_sysv = dlsym(libc, "free");
-		fflush_sysv = dlsym(libc, "fflush");
 		thrd_yield_sysv = dlsym(libc, "thrd_yield");
 		thrd_current_sysv = dlsym(libc, "thrd_current");
 		thrd_sleep_sysv = dlsym(libc, "thrd_sleep");
@@ -331,13 +314,6 @@ __attribute__((constructor)) void init() {
 		tss_delete_sysv = dlsym(libc, "tss_delete");
 		tss_get_sysv = dlsym(libc, "tss_get");
 		tss_set_sysv = dlsym(libc, "tss_set");
-		fwrite_sysv = dlsym(libc, "fwrite");
-		fopen_sysv = dlsym(libc, "fopen");
-		fdopen_sysv = dlsym(libc, "fdopen");
-		fclose_sysv = dlsym(libc, "fclose");
-		ftell_sysv = dlsym(libc, "ftell");
-		fseek_sysv = dlsym(libc, "fseek");
-		fread_sysv = dlsym(libc, "fread");
 		remove_sysv = dlsym(libc, "remove");
 		//cnd_init_ms = dlsym(libc, "cnd_init");
 		//cnd_broadcast_sysv = dlsym(libc, "cnd_broadcast");
@@ -372,11 +348,15 @@ __attribute__((constructor)) void init() {
 		lstat_sysv = dlsym(libc, "lstat");
 		mmap_sysv = dlsym(libc, "mmap");
 		munmap_sysv = dlsym(libc, "munmap");
+		fchmod_sysv = dlsym(libc, "fchmod");
 		environ = *(void**)dlsym(libc, "__environ");
 		stdin = dlsym(libc, "_IO_2_1_stdin_");
 		stdout = dlsym(libc, "_IO_2_1_stdout_");
 		stderr = dlsym(libc, "_IO_2_1_stderr_");
 	}
+	stdin = &base_fs_stdin;
+	stdout = &base_fs_stdout;
+	stderr = &base_fs_stderr;
 	//external_linux_c_dprintf(1, "setting stdin=%p, stdout=%p, stderr=%p\n", stdin, stdout, stderr);
 	//printf("setting stdin=%p, stdout=%p, stderr=%p\n", stdin, stdout, stderr);
 }
@@ -551,22 +531,14 @@ void *realloc(void *ptr, size_t size) {
 }
 
 DLL_PUBLIC
-int fprintf(FILE *stream, const char *format, ...) {
-    va_list args;
-    va_start(args, format);
-    const int ret = vfprintf(stream, format, args);
-    va_end(args);
-    return ret;
-}
-
-DLL_PUBLIC
 int fflush(FILE* file) {
 	debug_printf("execute os fflush\n");
-	if (isWin) {
-		return fflush_ms(file);
-	} else {
-		return fflush_sysv(file);
-	}
+	//if (isWin) {
+	//	return fflush_ms(file);
+	//} else {
+	//	return fflush_sysv(file);
+	//}
+	return 0;
 }
 
 DLL_PUBLIC int remove(const char *pathname) {
@@ -580,69 +552,120 @@ DLL_PUBLIC int remove(const char *pathname) {
 	}
 }
 
-static const char basealias[] = "/_zwolf/";
-#define basealias_len (sizeof(basealias) - 1)
-
 DLL_PUBLIC
-FILE *fopen(const char *filenameOrig, const char *mode) {
-	debug_printf("execute os fopen %s (%s)\n", filenameOrig, mode);
-	int filelen = strlen(filenameOrig);
+FILE *fopen(const char *filename, const char *mode) {
+	debug_printf("fopen %s flag %s\n", filename, mode);
 
-	const char* filename = filenameOrig;
-	
-	if (strncmp(basealias, filename, basealias_len) == 0) {
-		char* base = getenv("ZWOLF_RUNDIR");
-		if (base) {
-			int baselen = strlen(base);
+	uint32_t error = SUCCESS;
+	char * basep = NULL;
+	FILE *fd = NULL;
 
-			char * filename_tmp = __builtin_alloca(baselen + filelen - basealias_len + 1);
-			memcpy(filename_tmp, base, baselen);
-			memcpy(filename_tmp + baselen, filenameOrig + basealias_len, filelen - basealias_len + 1);
-			filename = filename_tmp;
-		}
+	fd = malloc(sizeof(FILE));
+	if (!fd) {
+		error = ENOMEM;
+		goto end;
 	}
+	*fd = -1;
+	error = alloc_libc_to_base_path(filename, &basep);
+	if (error) { goto end; }
 
-	if (isWin) {
-		uintptr_t len = 0;
-		int32_t error = base_fs_tonativepathlen(filename, &len);
-		if (error != SUCCESS) { 
-			errno = error;
-			return NULL;
-		}
-		uint16_t* nativepath = __builtin_alloca(len * 2);
-		error = base_fs_tonativepath(filename, nativepath);
-		if (error != SUCCESS) {
-			errno = error;
-			return NULL;
-		}
-		uint16_t mode_ms[4] = { 0, 0, 0, 0 };
-		for (int i = 0 ; *mode != '\0' && i < 3 ; i++) {
-			mode_ms[i] = mode[i];
-		}
-		return _wfopen_ms(nativepath, mode_ms);
-	} else {
-		return fopen_sysv(filename, mode);
+	uint32_t flags = 0;
+	if (strcmp(mode, "r") == 0) {
+		flags = BASE_FS_OPEN_READ;
+	} else if (strcmp(mode, "w") == 0) {
+		flags = BASE_FS_OPEN_WRITE | BASE_FS_OPEN_CREATE;
+	} else if (strcmp(mode, "r+") == 0) {
+		flags = BASE_FS_OPEN_READ | BASE_FS_OPEN_WRITE;
+	} else if (strcmp(mode, "w+") == 0) {
+		flags = BASE_FS_OPEN_READ | BASE_FS_OPEN_WRITE | BASE_FS_OPEN_CREATE;
+	} else if (strcmp(mode, "w+") == 0) {
+		flags = BASE_FS_OPEN_READ | BASE_FS_OPEN_WRITE | BASE_FS_OPEN_APPEND | BASE_FS_OPEN_CREATE;
 	}
+	error = base_fs_open(basep, fd, flags);
+end:
+	if (basep) { free(basep); }
+	if (error) {
+		debug_printf("open failed with %d\n", error);
+		errno = error;
+		if (fd) { free(fd); }
+		return 0;
+	}
+	debug_printf("fopen = %d\n", *fd);
+	return fd;
 }
 
 DLL_PUBLIC
-FILE *fdopen(int fd, const char *mode) IMPLEMENT(fdopen, fd, mode)
+FILE *fdopen(int fd, const char *mode) {
+	FILE* file = malloc(sizeof(FILE)); // we have a memory leak here
+	*file = fd;
+	return file;
+}
 
 DLL_PUBLIC
-int fclose(FILE *stream) IMPLEMENT(fclose, stream)
+int fclose(FILE *stream) {
+	int ret = base_fs_close(*stream);
+	free(stream);
+	return ret;
+}
 
 DLL_PUBLIC
-long ftell(FILE* stream) IMPLEMENT(ftell, stream)
+int64_t ftello64(FILE* stream) {
+	int64_t newpos = 0;
+	int32_t error = base_fs_seek(*stream, 0, BASE_FS_SEEK_CUR, &newpos);
+	if (error) {
+		errno = error;
+	}
+	return newpos;
+}
+DLL_PUBLIC
+long ftell(FILE* stream) {
+	return ftello64(stream);
+}
 
 DLL_PUBLIC
-int fseek(FILE *stream, long int offset, int whence) IMPLEMENT(fseek, stream, offset, whence)
+int fseek(FILE *stream, long int offset, int whence) {
+	int64_t newpos = 0;
+	int32_t error = base_fs_seek(*stream, offset, whence, &newpos);
+	if (error) {
+		errno = error;
+	}
+	return newpos;
+}
+
+int fseeko64(FILE *stream, off64_t offset, int whence ) {
+	int64_t newpos = 0;
+	int32_t error = base_fs_seek(*stream, offset, whence, &newpos);
+	if (error) {
+		errno = error;
+	}
+	return newpos;
+}
 
 DLL_PUBLIC
-size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream) IMPLEMENT(fread, ptr, size, nmemb, stream)
+size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream) {
+	debug_printf("fread %lld\n", *stream);
+	uint64_t read = 0;
+	int32_t error = base_fs_read(*stream, ptr, size * nmemb, &read);
+	if (error) {
+		errno = error;
+	}
+	return read / size;
+}
 
 DLL_PUBLIC
-size_t fwrite(const void * ptr, size_t size, size_t nmemb, FILE *restrict stream) IMPLEMENT(fwrite, ptr, size, nmemb, stream)
+size_t fwrite(const void * ptr, size_t size, size_t nmemb, FILE *restrict stream) {
+	debug_printf("fwrite %lld\n", *stream);
+	uint64_t written = 0;
+	int32_t error = base_fs_write(*stream, ptr, size * nmemb, &written);
+	if (error) {
+		errno = error;
+	}
+	return written / size;
+}
 
+DLL_PUBLIC int fileno(FILE *stream) {
+	return *stream;
+}
 DLL_PUBLIC int fputc(int c, FILE *stream) {
 	const int written = fwrite(&c, 1, 1, stream);
 	if (written == 1) { return c; }
@@ -852,6 +875,7 @@ DLL_PUBLIC int tss_set(tss_t tss_id, void *val) {
 //	}
 //}
 
+DLL_PUBLIC int stat64(const char * p, struct stat64 * statbuf) { return stat(p, (struct stat*)statbuf); }
 DLL_PUBLIC int stat(const char * p, struct stat * statbuf) {
 	debug_printf("execute os stat on path %s buf %p\n", p, statbuf);
 
@@ -886,6 +910,8 @@ DLL_PUBLIC int stat(const char * p, struct stat * statbuf) {
 	if (pathname) { free(pathname); }
 	return ret;
 }
+
+DLL_PUBLIC int fstat64(int fd, struct stat64 * statbuf) { return fstat(fd, (struct stat64*)statbuf); }
 DLL_PUBLIC int fstat(int fd, struct stat * statbuf) {
 	debug_printf("execute os fstat on fd %d buf %p\n", fd, statbuf);
 	if (isWin) {
@@ -916,6 +942,27 @@ DLL_PUBLIC int fstat(int fd, struct stat * statbuf) {
 	}
 }
 DLL_PUBLIC int clock_gettime(clockid_t clockid, struct timespec *tp) IMPLEMENT(clock_gettime, clockid, tp)
+int gettimeofday(struct timeval *tv, struct timezone *tz) {
+    // Check if the pointers are valid
+    if (tv == NULL) {
+        errno = EINVAL;  // Invalid argument
+        return -1;
+    }
+
+    // Get the current time in seconds and microseconds
+    struct timespec tp;
+    if (clock_gettime(CLOCK_REALTIME, &tp) == -1) {
+        return -1;  // Error in getting time
+    }
+
+    // Convert seconds and microseconds to timeval structure
+    tv->tv_sec = tp.tv_sec;
+    tv->tv_usec = tp.tv_nsec / 1000;
+
+    // Return success
+    return 0;
+}
+
 DLL_PUBLIC int getentropy(void *buffer, size_t length) IMPLEMENT(getentropy, buffer, length)
 DLL_PUBLIC char* realpath(const char * path, char * resolved_path) {
 	debug_printf("execute os realpath %s = ", path);
@@ -2180,7 +2227,6 @@ size_t mbsrtowcs(wchar_t *dest, const char **src, size_t len, mbstate_t *ps) {
     return count;
 }
 
-
 DLL_PUBLIC size_t wcslen(const wchar_t *s) {
     size_t length = 0;
     while (*s != L'\0') {
@@ -2503,16 +2549,25 @@ DLL_PUBLIC void perror(const char *s) {
 }
 
 DLL_PUBLIC
-int open(const char *pathname, int flags, ...) {
+int open(const char *pathname, int flags, uint32_t mode) {
 	uintptr_t fd;
 	uint32_t ret = base_fs_open(pathname, &fd, flags);
 	if (ret == 0) {
+			debug_printf("nochmod %d %d\n", flags, mode);
+		if (!isWin && (mode & 0111) && (flags & O_CREAT)) {
+			debug_printf("chmod %llu %d %d\n", fd, flags, mode);
+
+			fchmod_sysv(fd, mode);
+		}
 		return fd;
 	} else {
 		errno = ret;
 		return -1;
 	}
 }
+
+DLL_PUBLIC
+int open64(const char *pathname, int flags, uint32_t mode) { return open(pathname, flags, mode); }
 
 DLL_PUBLIC
 int shm_open(const char *name, int oflag, int mode) {

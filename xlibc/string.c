@@ -469,6 +469,28 @@ char* strcat(char* dest, const char* src) {
 }
 
 DLL_PUBLIC
+char* strncat(char* dest, const char* src, size_t n) {
+    // Find the end of the destination string
+    char* destEnd = dest;
+    while (*destEnd != '\0') {
+        destEnd++;
+    }
+
+    // Copy at most n characters from src to dest
+    while (*src != '\0' && n > 0) {
+        *destEnd = *src;
+        destEnd++;
+        src++;
+        n--;
+    }
+
+    // Null-terminate the resulting string
+    *destEnd = '\0';
+
+    return dest;
+}
+
+DLL_PUBLIC
 char *strstr(const char *haystack, const char *needle) {
     if (*needle == '\0') {
         return (char *)haystack;  // Empty needle, return the whole haystack

@@ -26,3 +26,5 @@ int32_t base_fs_fromnativepathlen(const void* nativepath, uintptr_t* length);
 int32_t tonativepath(const char* filenameOrig, void** output);
 
 int32_t alloc_windows_path(uint16_t* orig_path, char** outpath);
+
+int32_t alloc_libc_to_base_path(const char* filename, char** output);

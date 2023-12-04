@@ -1,5 +1,7 @@
-CC := _zwolf/llvm/x86_64/bin/clang
-INSTALL := _zwolf_install/xlibc/
+ZWOLF ?= ${PWD}/_zwolf
+ZWOLF_INSTALL ?= ${PWD}/_zwolf_install
+CC := ${ZWOLF}/llvm/x86_64/bin/clang
+INSTALL := ${ZWOLF_INSTALL}/xlibc/
 LIBC := $(INSTALL)x86_64/lib/libc.so $(INSTALL)aarch64/lib/libc.so
 LIBZWOLF := $(INSTALL)x86_64/lib/libzwolf.so $(INSTALL)aarch64/lib/libzwolf.so
 
@@ -13,7 +15,7 @@ $(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so libc.c printf.c string.c ti
 	${CC} \
 		-g \
 		-Wall -Wextra \
-		-Wl,-soname,xlibc/$*/lib/libc.so \
+		-Wl,-soname,/xlibc/$*/lib/libc.so \
 		-Wl,--export-dynamic-symbol=__* \
 		-Wl,--no-undefined \
 		--target=$*-unknown-linux-zwolf \
@@ -36,6 +38,7 @@ $(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so libc.c printf.c string.c ti
 		unicode.c \
 		time.c \
 		fs.c \
+		endian.c \
 		base/futex.c \
 		qsort.c thread_impl.c
 

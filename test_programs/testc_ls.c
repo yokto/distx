@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <dirent.h>
 
 int main() {
     const char* directory_path = "/_zwolf/test_programs/x86_64";
