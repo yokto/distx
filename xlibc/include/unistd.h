@@ -104,6 +104,8 @@ uid_t getuid(void);
 int usleep(useconds_t usec);
 
 int pipe(int pipefd[2]);
+int rmdir(const char *pathname);
+
 
 #ifdef __cplusplus
 }

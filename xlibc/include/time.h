@@ -15,7 +15,7 @@ typedef int64_t time_t;
 #define CLOCK_MONOTONIC 2
 typedef struct timespec {
     time_t  tv_sec;  /* Seconds */
-    long    tv_nsec; /* Nanoseconds */
+    int64_t    tv_nsec; /* Nanoseconds */
 } timespec;
 typedef int clockid_t;
 int clock_gettime(clockid_t clockid, struct timespec *tp);

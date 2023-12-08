@@ -4,6 +4,7 @@
 #include <base/types.h>
 #include <stdarg.h>
 #include <time.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,9 +13,11 @@ extern "C" {
 typedef __SIZE_TYPE__ size_t;
 typedef signed long ssize_t;
 typedef int64_t off_t;
-typedef int64_t off64_t;
 
-typedef uint64_t FILE;
+typedef struct __FILE__STRUCT__ {
+	uintptr_t fd;
+	bool eof;
+} FILE;
 typedef uint64_t fpos_t;
 
 extern FILE* stderr;
@@ -60,10 +63,9 @@ int scanf(const char *format, ...);
 FILE *fopen(const char *filename, const char *mode);
 size_t fread(void * ptr, size_t size, size_t nmemb, FILE * stream);
 size_t fwrite(const void * ptr, size_t size, size_t nmemb, FILE * stream);
-long ftell(FILE* stream);
+off_t ftell(FILE* stream);
 int64_t ftello64(FILE* stream);
-int fseek(FILE *stream, long int offset, int whence);
-int fseeko64(FILE *fp, off64_t offset, int whence );
+int fseek(FILE *stream, off_t offset, int whence);
 FILE *fdopen(int fd, const char *mode);
 int fclose(FILE* stream);
 int ungetc(int c, FILE *stream);

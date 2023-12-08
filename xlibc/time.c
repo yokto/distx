@@ -206,3 +206,48 @@ size_t strftime(char* s, size_t maxsize, const char* format, const struct tm* ti
     *strPos = '\0';  // Null-terminate the resulting string
     return (size_t)(strPos - s);  // Return the length of the resulting string
 }
+
+DLL_PUBLIC
+time_t mktime(struct tm *timeptr) {
+    time_t result;
+
+    // Normalize the tm structure (adjust overflow in fields)
+    timeptr->tm_hour += timeptr->tm_min / 60;
+    timeptr->tm_min %= 60;
+    timeptr->tm_min += timeptr->tm_sec / 60;
+    timeptr->tm_sec %= 60;
+    timeptr->tm_hour %= 24;
+
+    // Normalize the tm structure (adjust overflow in days)
+    while (timeptr->tm_mon < 0) {
+        timeptr->tm_year--;
+        timeptr->tm_mon += 12;
+    }
+    while (timeptr->tm_mon >= 12) {
+        timeptr->tm_year++;
+        timeptr->tm_mon -= 12;
+    }
+
+    // Calculate days since the epoch (1970-01-01)
+    result = (timeptr->tm_year - 70) * 365 + ((timeptr->tm_year - 69) / 4) - ((timeptr->tm_year - 1) / 100) + ((timeptr->tm_year + 299) / 400);
+    result += (timeptr->tm_yday = 0);
+
+    for (int i = 0; i < timeptr->tm_mon; ++i)
+        result += timeptr->tm_mon * 306 + 5;
+    result += timeptr->tm_mday - 1;
+
+    result *= 24;
+    result += timeptr->tm_hour;
+    result *= 60;
+    result += timeptr->tm_min;
+    result *= 60;
+    result += timeptr->tm_sec;
+
+    // Adjust for local timezone offset
+    if (timeptr->tm_isdst > 0)
+        result -= 3600;
+    else if (timeptr->tm_isdst < 0 && localtime(&result)->tm_isdst > 0)
+        result += 3600;
+
+    return result;
+}

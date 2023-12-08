@@ -14,7 +14,10 @@ extern "C" {
 #define FP_NORMAL 4
 
 #define INFINITY (__builtin_inff())
+#define NAN (__builtin_nanf(""))
+#define HUGE_VAL (__builtin_huge_val())
 #define HUGE_VALF (__builtin_huge_valf())
+#define HUGE_VALL (__builtin_huge_vall())
 
 
 // eventually remove these macros
@@ -42,6 +45,8 @@ float frexpf(float x, int* exp);
 long double frexpl(long double x, int* exp);
 
 extern double pow(double x, double y);
+
+MATH_BUILTIN_1(fabs)
 
 MATH_BUILTIN_1(tan)
 MATH_BUILTIN_1(cos)

@@ -1,9 +1,13 @@
 #!/bin/bash
+
+set -x
+
 ZWOLF=${ZWOLF:-${PWD}/_zwolf}
 export CC="clang"
 export CXX="clang++"
 export PATH=$"${ZWOLF}/llvm/x86_64/bin:$PATH"
-TBLGEN="${ZWOLF}/llvm/x86_64/bin/tblgen"
+CLANGTBLGEN="${ZWOLF}/llvm/x86_64/bin/clang-tblgen"
+LLVMTBLGEN="${ZWOLF}/llvm/x86_64/bin/llvm-tblgen"
 TOOLS="${ZWOLF}/llvm/x86_64/bin"
 mkdir -p build_release_archs
 (
@@ -37,7 +41,8 @@ mkdir -p build_release_archs
 		"-DCMAKE_INSTALL_INCLUDEDIR=common/include" \
 		"-DCMAKE_INSTALL_DATAROOTDIR=common/share" \
 		"-DCLANG_DEFAULT_LINKER=/_zwolf/llvm/x86_64/bin/lld" \
-		"-DCLANG_TBLGEN_EXE=${TBLGEN}" \
+		"-DCLANG_TABLEGEN=${CLANGTBLGEN}" \
+		"-DLLVM_TABLEGEN=${LLVMTBLGEN}" \
 		"-DCLANG_BUILD_TOOLS:BOOL=ON" \
 		"-DCLANG_ENABLE_ARCMT=OFF" \
 		"-DCOMPILER_RT_INCLUDE_TESTS=OFF" \

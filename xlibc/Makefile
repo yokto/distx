@@ -9,11 +9,12 @@ HEADERS = $(addprefix $(INSTALL)common/,$(wildcard include/*.h)) $(addprefix $(I
 
 all: $(LIBC) $(HEADERS) $(LIBZWOLF)
 
-$(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so libc.c printf.c string.c time.c unicode.c fs.c qsort.c proc.c thread_impl.c emutls.c Makefile
+$(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so libc.c printf.c string.c time.c unicode.c fs.c qsort.c proc.c thread_impl.c emutls.c Makefile longjmp.c setjmp.c
 	mkdir -p $(INSTALL)$*/lib
 	echo ${CC}
 	${CC} \
 		-g \
+		-O2 \
 		-Wall -Wextra \
 		-Wl,-soname,/xlibc/$*/lib/libc.so \
 		-Wl,--export-dynamic-symbol=__* \
@@ -32,6 +33,8 @@ $(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so libc.c printf.c string.c ti
 		-o $@ \
 		emutls.c \
 		libc.c \
+		setjmp.c \
+		longjmp.c \
 		printf.c \
 		string.c \
 		proc.c \

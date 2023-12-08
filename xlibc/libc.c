@@ -23,6 +23,7 @@
 #include <common.h>
 #include <sys/stat.h>
 #include <sys/vfs.h>
+#include <sys/time.h>
 #include <fs.h>
 #include <base/futex_p.h>
 #include <unistd.h>
@@ -203,11 +204,14 @@ static uint64_t (*thrd_create_ms)(
 
 
 
-DLL_PUBLIC FILE * stdin = 0;
-DLL_PUBLIC FILE * stdout = 0;
-DLL_PUBLIC FILE * stderr = 0;
+FILE stdinf = { 0, false };
+FILE stdoutf = { 0, false };
+FILE stderrf = { 0, false };
+DLL_PUBLIC FILE * stdin = &stdinf;
+DLL_PUBLIC FILE * stdout = &stdoutf;
+DLL_PUBLIC FILE * stderr = &stderrf;
 
-static void* dlsym(void* lib, char* name) {
+static void* zwolf_dlsym(void* lib, char* name) {
 	void* ret = zwolf_sym(lib, name);
 	if (ret) { return ret; }
 	debug_printf("couldn't find symbol %s\n", name);
@@ -240,123 +244,120 @@ __attribute__((constructor)) void init() {
 	base_futex_p_init(isWin, libc);
 	init_proc(isWin, libc, kernel32);
 	if (isWin) {
-		vswprintf_ms = dlsym(libc, "vswprintf");
-		malloc_ms = dlsym(libc, "malloc");
-		calloc_ms = dlsym(libc, "calloc");
-		aligned_alloc_ms = dlsym(libc, "_aligned_malloc");
-		aligned_free_ms = dlsym(libc, "_aligned_free");
-		realloc_ms = dlsym(libc, "realloc");
-		free_ms = dlsym(libc, "free");
-		thrd_yield_ms = dlsym(kernel32, "SwitchToThread");
-		thrd_current_ms = dlsym(kernel32, "GetCurrentThread");
-		thrd_sleep_ms = dlsym(kernel32, "SleepEx");
-		tss_create_ms = dlsym(kernel32, "TlsAlloc");
-		tss_delete_ms = dlsym(kernel32, "TlsFree");
-		tss_get_ms = dlsym(kernel32, "TlsGetValue");
-		tss_set_ms = dlsym(kernel32, "TlsSetValue");
-		remove_ms = dlsym(libc, "remove");
-		_rmdir_ms = dlsym(libc, "_rmdir");
-		//cnd_init_ms = dlsym(kernel32, "InitializeConditionVariable");
-		//cnd_broadcast_ms = dlsym(kernel32, "WakeAllConditionVariable");
-		//SleepConditionVariableCS = dlsym(kernel32, "SleepConditionVariableCS");
+		vswprintf_ms = zwolf_dlsym(libc, "vswprintf");
+		malloc_ms = zwolf_dlsym(libc, "malloc");
+		calloc_ms = zwolf_dlsym(libc, "calloc");
+		aligned_alloc_ms = zwolf_dlsym(libc, "_aligned_malloc");
+		aligned_free_ms = zwolf_dlsym(libc, "_aligned_free");
+		realloc_ms = zwolf_dlsym(libc, "realloc");
+		free_ms = zwolf_dlsym(libc, "free");
+		thrd_yield_ms = zwolf_dlsym(kernel32, "SwitchToThread");
+		thrd_current_ms = zwolf_dlsym(kernel32, "GetCurrentThread");
+		thrd_sleep_ms = zwolf_dlsym(kernel32, "SleepEx");
+		tss_create_ms = zwolf_dlsym(kernel32, "TlsAlloc");
+		tss_delete_ms = zwolf_dlsym(kernel32, "TlsFree");
+		tss_get_ms = zwolf_dlsym(kernel32, "TlsGetValue");
+		tss_set_ms = zwolf_dlsym(kernel32, "TlsSetValue");
+		remove_ms = zwolf_dlsym(libc, "remove");
+		_rmdir_ms = zwolf_dlsym(libc, "_rmdir");
+		//cnd_init_ms = zwolf_dlsym(kernel32, "InitializeConditionVariable");
+		//cnd_broadcast_ms = zwolf_dlsym(kernel32, "WakeAllConditionVariable");
+		//SleepConditionVariableCS = zwolf_dlsym(kernel32, "SleepConditionVariableCS");
 		//cnd_wait_ms = 0;
-		//cnd_signal_ms = dlsym(kernel32, "WakeConditionVariable");
+		//cnd_signal_ms = zwolf_dlsym(kernel32, "WakeConditionVariable");
 		//cnd_destroy_ms = 0; // not needed
 		//cnd_timedwait_ms = 0;
-//		mtx_init_ms = dlsym(kernel32, "InitializeCriticalSection");
-//		mtx_lock_ms = dlsym(kernel32, "EnterCriticalSection");
-//		mtx_unlock_ms = dlsym(kernel32, "LeaveCriticalSection");
-//		mtx_trylock_ms = dlsym(kernel32, "TryEnterCriticalSection");
-//		mtx_destroy_ms = dlsym(kernel32, "DeleteCriticalSection");
+//		mtx_init_ms = zwolf_dlsym(kernel32, "InitializeCriticalSection");
+//		mtx_lock_ms = zwolf_dlsym(kernel32, "EnterCriticalSection");
+//		mtx_unlock_ms = zwolf_dlsym(kernel32, "LeaveCriticalSection");
+//		mtx_trylock_ms = zwolf_dlsym(kernel32, "TryEnterCriticalSection");
+//		mtx_destroy_ms = zwolf_dlsym(kernel32, "DeleteCriticalSection");
 		thrd_equal_ms = 0;
-		GetThreadId_ms = dlsym(kernel32, "GetThreadId");
-		clock_gettime_ms = 0; //dlsym(libc, "clock_gettime");
-		getentropy_ms = 0; //dlsym(libc, "getentropy");
-		realpath_ms = 0; //dlsym(libc, "realpath");
-		_wfullpath_ms = dlsym(libc, "_wfullpath");
+		GetThreadId_ms = zwolf_dlsym(kernel32, "GetThreadId");
+		clock_gettime_ms = 0; //zwolf_dlsym(libc, "clock_gettime");
+		getentropy_ms = 0; //zwolf_dlsym(libc, "getentropy");
+		realpath_ms = 0; //zwolf_dlsym(libc, "realpath");
+		_wfullpath_ms = zwolf_dlsym(libc, "_wfullpath");
 		mkdir_ms = 0;
-		_mkdir_ms = dlsym(libc, "_mkdir");
-		stat_ms = dlsym(libc, "_stat");
-		_wstat_ms = dlsym(libc, "_wstat");
-		fstat_ms = dlsym(libc, "_fstat");
-		wgetcwd_ms = dlsym(libc, "_wgetcwd");
-		readdir_ms = 0; //dlsym(libc, "readdir");
-		closedir_ms = 0; //dlsym(libc, "closedir");
-		chdir_ms = 0; //dlsym(libc, "chdir");
-		opendir_ms = 0; //dlsym(libc, "opendir");
-		FindFirstFileW_ms = dlsym(kernel32, "FindFirstFileW");
-		FindNextFileW_ms = dlsym(kernel32, "FindNextFileW");
-		readlink_ms = 0; //dlsym(libc, "readlink");
-		rename_ms = dlsym(libc, "rename");
-		truncate_ms = 0; //dlsym(libc, "truncate");
-		statvfs_ms = 0; //dlsym(libc, "statvfs");
-		lstat_ms = 0; //dlsym(libc, "lstat");
-		thrd_join_ms = dlsym(kernel32, "GetExitCodeThread");
-		thrd_join_wait_ms = dlsym(kernel32, "WaitForSingleObject");
-		thrd_create_ms = dlsym(kernel32, "CreateThread");
-		thrd_detach_ms = dlsym(kernel32, "CloseHandle");
-		environ = *(void**)dlsym(libc, "_environ");
-		stdin = fdopen( 0, "r" );
-		stdout = fdopen( 1, "a" );
-		stderr = fdopen( 2, "a" );
+		_mkdir_ms = zwolf_dlsym(libc, "_mkdir");
+		stat_ms = zwolf_dlsym(libc, "_stat");
+		_wstat_ms = zwolf_dlsym(libc, "_wstat");
+		fstat_ms = zwolf_dlsym(libc, "_fstat");
+		wgetcwd_ms = zwolf_dlsym(libc, "_wgetcwd");
+		readdir_ms = 0; //zwolf_dlsym(libc, "readdir");
+		closedir_ms = 0; //zwolf_dlsym(libc, "closedir");
+		chdir_ms = 0; //zwolf_dlsym(libc, "chdir");
+		opendir_ms = 0; //zwolf_dlsym(libc, "opendir");
+		FindFirstFileW_ms = zwolf_dlsym(kernel32, "FindFirstFileW");
+		FindNextFileW_ms = zwolf_dlsym(kernel32, "FindNextFileW");
+		readlink_ms = 0; //zwolf_dlsym(libc, "readlink");
+		rename_ms = zwolf_dlsym(libc, "rename");
+		truncate_ms = 0; //zwolf_dlsym(libc, "truncate");
+		statvfs_ms = 0; //zwolf_dlsym(libc, "statvfs");
+		lstat_ms = 0; //zwolf_dlsym(libc, "lstat");
+		thrd_join_ms = zwolf_dlsym(kernel32, "GetExitCodeThread");
+		thrd_join_wait_ms = zwolf_dlsym(kernel32, "WaitForSingleObject");
+		thrd_create_ms = zwolf_dlsym(kernel32, "CreateThread");
+		thrd_detach_ms = zwolf_dlsym(kernel32, "CloseHandle");
+		environ = *(void**)zwolf_dlsym(libc, "_environ");
 	} else {
-		vswprintf_sysv = dlsym(libc, "vswprintf");
-		malloc_sysv = dlsym(libc, "malloc");
-		calloc_sysv = dlsym(libc, "calloc");
-		aligned_alloc_sysv = dlsym(libc, "aligned_alloc");
-		aligned_free_sysv = dlsym(libc, "free");
-		realloc_sysv = dlsym(libc, "realloc");
-		free_sysv = dlsym(libc, "free");
-		thrd_yield_sysv = dlsym(libc, "thrd_yield");
-		thrd_current_sysv = dlsym(libc, "thrd_current");
-		thrd_sleep_sysv = dlsym(libc, "thrd_sleep");
-		tss_create_sysv = dlsym(libc, "tss_create");
-		tss_delete_sysv = dlsym(libc, "tss_delete");
-		tss_get_sysv = dlsym(libc, "tss_get");
-		tss_set_sysv = dlsym(libc, "tss_set");
-		remove_sysv = dlsym(libc, "remove");
-		//cnd_init_ms = dlsym(libc, "cnd_init");
-		//cnd_broadcast_sysv = dlsym(libc, "cnd_broadcast");
-		//cnd_signal_sysv = dlsym(libc, "cnd_signal");
-		//cnd_wait_sysv = dlsym(libc, "cnd_wait");
-		//cnd_destroy_sysv = dlsym(libc, "cnd_destroy");
-		//cnd_timedwait_sysv = dlsym(libc, "cnd_timedwait");
-//		mtx_init_sysv = dlsym(libc, "mtx_init");
-//		mtx_lock_sysv = dlsym(libc, "mtx_lock");
-//		mtx_unlock_sysv = dlsym(libc, "mtx_unlock");
-//		mtx_trylock_sysv = dlsym(libc, "mtx_trylock");
-//		mtx_destroy_sysv = dlsym(libc, "mtx_destroy");
-		thrd_equal_sysv = dlsym(libc, "thrd_equal");
-		clock_gettime_sysv = dlsym(libc, "clock_gettime");
-		getentropy_sysv = dlsym(libc, "getentropy");
-		realpath_sysv = dlsym(libc, "realpath");
-		mkdir_sysv = dlsym(libc, "mkdir");
-		stat_sysv = dlsym(libc, "stat");
-		fstat_sysv = dlsym(libc, "fstat");
-		getcwd_sysv = dlsym(libc, "getcwd");
-		readdir_sysv = dlsym(libc, "readdir");
-		closedir_sysv = dlsym(libc, "closedir");
-		chdir_sysv = dlsym(libc, "chdir");
-		opendir_sysv = dlsym(libc, "opendir");
-		readlink_sysv = dlsym(libc, "readlink");
-		rename_sysv = dlsym(libc, "rename");
-		thrd_join_sysv = dlsym(libc, "thrd_join");
-		thrd_create_sysv = dlsym(libc, "thrd_create");
-		thrd_detach_sysv = dlsym(libc, "thrd_detach");
-		truncate_sysv = dlsym(libc, "truncate");
-		statvfs_sysv = dlsym(libc, "statvfs");
-		lstat_sysv = dlsym(libc, "lstat");
-		mmap_sysv = dlsym(libc, "mmap");
-		munmap_sysv = dlsym(libc, "munmap");
-		fchmod_sysv = dlsym(libc, "fchmod");
-		environ = *(void**)dlsym(libc, "__environ");
-		stdin = dlsym(libc, "_IO_2_1_stdin_");
-		stdout = dlsym(libc, "_IO_2_1_stdout_");
-		stderr = dlsym(libc, "_IO_2_1_stderr_");
+		vswprintf_sysv = zwolf_dlsym(libc, "vswprintf");
+		malloc_sysv = zwolf_dlsym(libc, "malloc");
+		calloc_sysv = zwolf_dlsym(libc, "calloc");
+		aligned_alloc_sysv = zwolf_dlsym(libc, "aligned_alloc");
+		aligned_free_sysv = zwolf_dlsym(libc, "free");
+		realloc_sysv = zwolf_dlsym(libc, "realloc");
+		free_sysv = zwolf_dlsym(libc, "free");
+		thrd_yield_sysv = zwolf_dlsym(libc, "thrd_yield");
+		thrd_current_sysv = zwolf_dlsym(libc, "thrd_current");
+		thrd_sleep_sysv = zwolf_dlsym(libc, "thrd_sleep");
+		tss_create_sysv = zwolf_dlsym(libc, "tss_create");
+		tss_delete_sysv = zwolf_dlsym(libc, "tss_delete");
+		tss_get_sysv = zwolf_dlsym(libc, "tss_get");
+		tss_set_sysv = zwolf_dlsym(libc, "tss_set");
+		remove_sysv = zwolf_dlsym(libc, "remove");
+		//cnd_init_ms = zwolf_dlsym(libc, "cnd_init");
+		//cnd_broadcast_sysv = zwolf_dlsym(libc, "cnd_broadcast");
+		//cnd_signal_sysv = zwolf_dlsym(libc, "cnd_signal");
+		//cnd_wait_sysv = zwolf_dlsym(libc, "cnd_wait");
+		//cnd_destroy_sysv = zwolf_dlsym(libc, "cnd_destroy");
+		//cnd_timedwait_sysv = zwolf_dlsym(libc, "cnd_timedwait");
+//		mtx_init_sysv = zwolf_dlsym(libc, "mtx_init");
+//		mtx_lock_sysv = zwolf_dlsym(libc, "mtx_lock");
+//		mtx_unlock_sysv = zwolf_dlsym(libc, "mtx_unlock");
+//		mtx_trylock_sysv = zwolf_dlsym(libc, "mtx_trylock");
+//		mtx_destroy_sysv = zwolf_dlsym(libc, "mtx_destroy");
+		thrd_equal_sysv = zwolf_dlsym(libc, "thrd_equal");
+		clock_gettime_sysv = zwolf_dlsym(libc, "clock_gettime");
+		getentropy_sysv = zwolf_dlsym(libc, "getentropy");
+		realpath_sysv = zwolf_dlsym(libc, "realpath");
+		mkdir_sysv = zwolf_dlsym(libc, "mkdir");
+		stat_sysv = zwolf_dlsym(libc, "stat");
+		fstat_sysv = zwolf_dlsym(libc, "fstat");
+		getcwd_sysv = zwolf_dlsym(libc, "getcwd");
+		readdir_sysv = zwolf_dlsym(libc, "readdir");
+		closedir_sysv = zwolf_dlsym(libc, "closedir");
+		chdir_sysv = zwolf_dlsym(libc, "chdir");
+		opendir_sysv = zwolf_dlsym(libc, "opendir");
+		readlink_sysv = zwolf_dlsym(libc, "readlink");
+		rename_sysv = zwolf_dlsym(libc, "rename");
+		thrd_join_sysv = zwolf_dlsym(libc, "thrd_join");
+		thrd_create_sysv = zwolf_dlsym(libc, "thrd_create");
+		thrd_detach_sysv = zwolf_dlsym(libc, "thrd_detach");
+		truncate_sysv = zwolf_dlsym(libc, "truncate");
+		statvfs_sysv = zwolf_dlsym(libc, "statvfs");
+		lstat_sysv = zwolf_dlsym(libc, "lstat");
+		mmap_sysv = zwolf_dlsym(libc, "mmap");
+		munmap_sysv = zwolf_dlsym(libc, "munmap");
+		fchmod_sysv = zwolf_dlsym(libc, "fchmod");
+		environ = *(void**)zwolf_dlsym(libc, "__environ");
+		stdin = zwolf_dlsym(libc, "_IO_2_1_stdin_");
+		stdout = zwolf_dlsym(libc, "_IO_2_1_stdout_");
+		stderr = zwolf_dlsym(libc, "_IO_2_1_stderr_");
 	}
-	stdin = &base_fs_stdin;
-	stdout = &base_fs_stdout;
-	stderr = &base_fs_stderr;
+	stdin->fd = base_fs_stdin;
+	stdout->fd = base_fs_stdout;
+	stderr->fd = base_fs_stderr;
 	//external_linux_c_dprintf(1, "setting stdin=%p, stdout=%p, stderr=%p\n", stdin, stdout, stderr);
 	//printf("setting stdin=%p, stdout=%p, stderr=%p\n", stdin, stdout, stderr);
 }
@@ -551,6 +552,9 @@ DLL_PUBLIC int remove(const char *pathname) {
 		return remove_sysv(pathname);
 	}
 }
+DLL_PUBLIC int rmdir(const char *pathname) {
+	return remove(pathname);
+}
 
 DLL_PUBLIC
 FILE *fopen(const char *filename, const char *mode) {
@@ -558,14 +562,15 @@ FILE *fopen(const char *filename, const char *mode) {
 
 	uint32_t error = SUCCESS;
 	char * basep = NULL;
-	FILE *fd = NULL;
+	FILE *file = NULL;
 
-	fd = malloc(sizeof(FILE));
-	if (!fd) {
+	file = malloc(sizeof(FILE));
+	if (!file) {
 		error = ENOMEM;
 		goto end;
 	}
-	*fd = -1;
+	file->fd = -1;
+	file->eof = false;
 	error = alloc_libc_to_base_path(filename, &basep);
 	if (error) { goto end; }
 
@@ -581,60 +586,48 @@ FILE *fopen(const char *filename, const char *mode) {
 	} else if (strcmp(mode, "w+") == 0) {
 		flags = BASE_FS_OPEN_READ | BASE_FS_OPEN_WRITE | BASE_FS_OPEN_APPEND | BASE_FS_OPEN_CREATE;
 	}
-	error = base_fs_open(basep, fd, flags);
+	error = base_fs_open(basep, &file->fd, flags);
 end:
 	if (basep) { free(basep); }
 	if (error) {
 		debug_printf("open failed with %d\n", error);
 		errno = error;
-		if (fd) { free(fd); }
+		if (file) { free(file); }
 		return 0;
 	}
-	debug_printf("fopen = %d\n", *fd);
-	return fd;
+	debug_printf("fopen = %d\n", file->fd);
+	return file;
 }
 
 DLL_PUBLIC
 FILE *fdopen(int fd, const char *mode) {
-	FILE* file = malloc(sizeof(FILE)); // we have a memory leak here
-	*file = fd;
+	FILE* file = malloc(sizeof(FILE)); // we might have a memory leak here
+	file->fd = fd;
+	file->eof = false;
 	return file;
 }
 
 DLL_PUBLIC
 int fclose(FILE *stream) {
-	int ret = base_fs_close(*stream);
+	int ret = base_fs_close(stream->fd);
 	free(stream);
 	return ret;
 }
 
 DLL_PUBLIC
-int64_t ftello64(FILE* stream) {
+off_t ftell(FILE* stream) {
 	int64_t newpos = 0;
-	int32_t error = base_fs_seek(*stream, 0, BASE_FS_SEEK_CUR, &newpos);
+	int32_t error = base_fs_seek(stream->fd, 0, BASE_FS_SEEK_CUR, &newpos);
 	if (error) {
 		errno = error;
 	}
 	return newpos;
-}
-DLL_PUBLIC
-long ftell(FILE* stream) {
-	return ftello64(stream);
 }
 
 DLL_PUBLIC
 int fseek(FILE *stream, long int offset, int whence) {
 	int64_t newpos = 0;
-	int32_t error = base_fs_seek(*stream, offset, whence, &newpos);
-	if (error) {
-		errno = error;
-	}
-	return newpos;
-}
-
-int fseeko64(FILE *stream, off64_t offset, int whence ) {
-	int64_t newpos = 0;
-	int32_t error = base_fs_seek(*stream, offset, whence, &newpos);
+	int32_t error = base_fs_seek(stream->fd, offset, whence, &newpos);
 	if (error) {
 		errno = error;
 	}
@@ -642,10 +635,13 @@ int fseeko64(FILE *stream, off64_t offset, int whence ) {
 }
 
 DLL_PUBLIC
-size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream) {
-	debug_printf("fread %lld\n", *stream);
+size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE * stream) {
+	debug_printf("fread %lld\n", stream->fd);
 	uint64_t read = 0;
-	int32_t error = base_fs_read(*stream, ptr, size * nmemb, &read);
+	int32_t error = base_fs_read(stream->fd, ptr, size * nmemb, &read);
+	if (error == BASE_FS_READ_EOF) {
+		stream->eof = true;
+	}
 	if (error) {
 		errno = error;
 	}
@@ -653,10 +649,10 @@ size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE *restrict strea
 }
 
 DLL_PUBLIC
-size_t fwrite(const void * ptr, size_t size, size_t nmemb, FILE *restrict stream) {
-	debug_printf("fwrite %lld\n", *stream);
+size_t fwrite(const void * ptr, size_t size, size_t nmemb, FILE * stream) {
+	debug_printf("fwrite %lld\n", stream->fd);
 	uint64_t written = 0;
-	int32_t error = base_fs_write(*stream, ptr, size * nmemb, &written);
+	int32_t error = base_fs_write(stream->fd, ptr, size * nmemb, &written);
 	if (error) {
 		errno = error;
 	}
@@ -664,7 +660,7 @@ size_t fwrite(const void * ptr, size_t size, size_t nmemb, FILE *restrict stream
 }
 
 DLL_PUBLIC int fileno(FILE *stream) {
-	return *stream;
+	return stream->fd;
 }
 DLL_PUBLIC int fputc(int c, FILE *stream) {
 	const int written = fwrite(&c, 1, 1, stream);
@@ -875,7 +871,6 @@ DLL_PUBLIC int tss_set(tss_t tss_id, void *val) {
 //	}
 //}
 
-DLL_PUBLIC int stat64(const char * p, struct stat64 * statbuf) { return stat(p, (struct stat*)statbuf); }
 DLL_PUBLIC int stat(const char * p, struct stat * statbuf) {
 	debug_printf("execute os stat on path %s buf %p\n", p, statbuf);
 
@@ -907,11 +902,12 @@ DLL_PUBLIC int stat(const char * p, struct stat * statbuf) {
 		statbuf->st_mtim = ls.st_mtim;
 		debug_printf("stat returned %d %p mode %lx\n", ret, statbuf, ls.st_mode);
 	}
+	statbuf->st_atim = statbuf->st_mtim;
+	statbuf->st_ctim = statbuf->st_mtim;
 	if (pathname) { free(pathname); }
 	return ret;
 }
 
-DLL_PUBLIC int fstat64(int fd, struct stat64 * statbuf) { return fstat(fd, (struct stat64*)statbuf); }
 DLL_PUBLIC int fstat(int fd, struct stat * statbuf) {
 	debug_printf("execute os fstat on fd %d buf %p\n", fd, statbuf);
 	if (isWin) {
@@ -994,7 +990,11 @@ error:
 
 	} else {
 		char* ret = realpath_sysv(path, resolved_path);
-		debug_printf("%s\n", ret);
+		if (ret) {
+			debug_printf("%s\n", ret);
+		} else {
+			debug_printf("(null)\n", ret);
+		}
 		return ret;
 	}
 }
@@ -1232,6 +1232,16 @@ int ftruncate(int fd, uint64_t length) {
 //		return mtx_unlock_sysv((mtx_t*)*mutex);
 //	}
 //}
+
+DLL_PUBLIC
+int wcscmp(const wchar_t *s1, const wchar_t *s2) {
+    while (*s1 != L'\0' && *s1 == *s2) {
+        ++s1;
+        ++s2;
+    }
+
+    return *s1 - *s2;
+}
 
 DLL_PUBLIC
 wchar_t* wcschr(const wchar_t* str, wchar_t wc) {
@@ -2541,6 +2551,11 @@ DLL_PUBLIC struct tm *gmtime(const time_t *timer) NO_IMPL(gmtime)
 DLL_PUBLIC char *asctime(const struct tm *timeptr) NO_IMPL(asctime)
 DLL_PUBLIC struct tm *localtime(const time_t *timep) NO_IMPL(localtime)
 DLL_PUBLIC int dladdr(const void *addr, Dl_info *info) NO_IMPL(dladdr)
+DLL_PUBLIC void *dlsym(void * handle, const char * symbol) NO_IMPL(dlsym)
+DLL_PUBLIC void *dlopen(const char *filename, int flags) NO_IMPL(dlopen)
+DLL_PUBLIC int dlclose(void *handle) NO_IMPL(dlclose)
+DLL_PUBLIC char* dlerror(void) { return "dlerror"; }
+
 
 //DLL_PUBLIC  NO_IMPL()
 
@@ -2602,3 +2617,34 @@ int ferror(FILE *stream) {
 	return 0;
 }
 
+DLL_PUBLIC
+int feof(FILE *stream) {
+	return stream->eof;
+}
+
+DLL_PUBLIC
+void *bsearch(const void *key, const void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *)) {
+    size_t left = 0;
+    size_t right = nmemb - 1;
+
+    while (left <= right) {
+        size_t mid = left + (right - left) / 2;
+        const void *mid_ptr = (const char *)base + mid * size;
+
+        int cmp_result = compar(key, mid_ptr);
+
+        if (cmp_result == 0) {
+            // Key found
+            return (void *)mid_ptr;
+        } else if (cmp_result < 0) {
+            // Key is in the left half
+            right = mid - 1;
+        } else {
+            // Key is in the right half
+            left = mid + 1;
+        }
+    }
+
+    // Key not found
+    return NULL;
+}

@@ -112,6 +112,7 @@ void *memmove(void *dest, const void *src, size_t n) {
     char *dst_ptr = (char*) dest;
     const char *src_ptr = (const char*) src;
 
+
     // If source and destination regions overlap, use a temporary buffer
     if (src_ptr < dst_ptr && dst_ptr < src_ptr + n) {
         char *tmp = (char*) malloc(n);
@@ -120,21 +121,18 @@ void *memmove(void *dest, const void *src, size_t n) {
         }
 
         // Copy source to tmp buffer
-        for (size_t i = 0; i < n; i++) {
-            *(tmp + i) = *(src_ptr + i);
-        }
+	memcpy(tmp, src, n);
+
+	// this line does nothing. But if we don't have it the compiler will realize it's memmove and replace the inner part with a call to memmove causing an infinite recursion.
+	if (n != 0) { dst_ptr[0] = 0xdd; }
 
         // Copy tmp buffer to destination
-        for (size_t i = 0; i < n; i++) {
-            *(dst_ptr + i) = *(tmp + i);
-        }
+	memcpy(dest, tmp, n);
 
         free(tmp);
     } else {
         // No overlap, copy directly from source to destination
-        for (size_t i = 0; i < n; i++) {
-            *(dst_ptr + i) = *(src_ptr + i);
-        }
+	memcpy(dest, src, n);
     }
 
     return dest;

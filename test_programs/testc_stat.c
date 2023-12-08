@@ -18,6 +18,7 @@ int main(int argc, char *argv[]) {
     }
 
     printf("File: %s\n", file_path);
+    printf("Mode: %x\n", file_stat.st_mode);
     printf("Size: %ld bytes\n", (long long) file_stat.st_size);
     printf("Owner: %d\n", file_stat.st_uid);
     printf("Group: %d\n", file_stat.st_gid);

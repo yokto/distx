@@ -170,6 +170,10 @@ int32_t base_fs_read(uintptr_t fd, void *buf, uintptr_t count, uintptr_t* read) 
 	debug_printf("read %d\n", fd);
 	if (isWin) {
 		int ret = win_read(fd, buf, count);
+		if (count != 0 && ret == 0 && zwolf_errno() == 0) {
+			*read = 0;
+			return BASE_FS_READ_EOF;
+		}
 		if (ret >= 0) {
 			*read = ret;
 //			char* b = buf;
@@ -183,7 +187,7 @@ int32_t base_fs_read(uintptr_t fd, void *buf, uintptr_t count, uintptr_t* read) 
 		}
 	} else {
 		int ret = linux_read(fd, buf, count);
-		if (ret == 0) {
+		if (count != 0 && ret == 0 && zwolf_errno() == 0) {
 			*read = 0;
 			return BASE_FS_READ_EOF;
 		}
@@ -197,7 +201,7 @@ int32_t base_fs_read(uintptr_t fd, void *buf, uintptr_t count, uintptr_t* read) 
 }
 
 int32_t base_fs_close(uintptr_t fd) {
-	debug_printf("close %d", fd);
+	debug_printf("close %d\n", fd);
 	if (isWin) {
 		int ret = win_close(fd);
 		if (ret == 0) {
