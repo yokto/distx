@@ -55,6 +55,7 @@ char ** environ = 0;
 
 DLL_PUBLIC
 void abort() {
+    exit(-1);
     __builtin_trap();
 }
 
@@ -191,6 +192,7 @@ int thrd_sleep(const struct timespec* duration, struct timespec* remaining);
 static int (*thrd_sleep_sysv)(const struct timespec* duration, struct timespec* remaining);
 static uint32_t (*thrd_sleep_ms)(uint32_t dwMilliseconds, bool bAlertable) __attribute((ms_abi));
 
+
 int thrd_create(thrd_t *thr, thrd_start_t func, void *arg);
 static int (*thrd_create_sysv)(thrd_t *thr, thrd_start_t func, void *arg);
 static uint64_t (*thrd_create_ms)(
@@ -224,12 +226,12 @@ __attribute__((constructor)) void init() {
 	void* libc = 0;
 	void* kernel32 = 0;
 	if (!libc) {
-		libc = zwolf_open("msvcrt.dll");
-		kernel32 = zwolf_open("KERNEL32.DLL");
+		libc = zwolf_open("msvcrt.dll", ZWOLF_OPEN_EXTERNAL);
+		kernel32 = zwolf_open("KERNEL32.DLL", ZWOLF_OPEN_EXTERNAL);
 		isWin = true;
 	}
 	if (!libc) {
-		libc = zwolf_open("libc.so.6");
+		libc = zwolf_open("libc.so.6", ZWOLF_OPEN_EXTERNAL);
 		isWin = false;
 	}
 	if (!libc) {
@@ -690,6 +692,7 @@ DLL_PUBLIC int thrd_equal(thrd_t lhs, thrd_t rhs ) {
 DLL_PUBLIC thrd_t thrd_current(void) IMPLEMENT(thrd_current)
 
 DLL_PUBLIC int thrd_sleep(const struct timespec* duration, struct timespec* remaining ) {
+	__builtin_trap();
 	debug_printf("execute os thrd_sleep\n");
 	if (isWin) {
 		// long milliseconds = duration->tv_sec * 1000 + duration->tv_nsec / 1000000;
@@ -2551,9 +2554,22 @@ DLL_PUBLIC struct tm *gmtime(const time_t *timer) NO_IMPL(gmtime)
 DLL_PUBLIC char *asctime(const struct tm *timeptr) NO_IMPL(asctime)
 DLL_PUBLIC struct tm *localtime(const time_t *timep) NO_IMPL(localtime)
 DLL_PUBLIC int dladdr(const void *addr, Dl_info *info) NO_IMPL(dladdr)
-DLL_PUBLIC void *dlsym(void * handle, const char * symbol) NO_IMPL(dlsym)
-DLL_PUBLIC void *dlopen(const char *filename, int flags) NO_IMPL(dlopen)
-DLL_PUBLIC int dlclose(void *handle) NO_IMPL(dlclose)
+DLL_PUBLIC void *dlsym(void * handle, const char * symbol) {
+	return zwolf_sym(handle, symbol);
+}
+DLL_PUBLIC void *dlopen(const char *filename, int flags) {
+	debug_printf("dlopen %s = ", filename);
+	char * basep = NULL;
+	int32_t error = alloc_libc_to_base_path(filename, &basep);
+	if (error != SUCCESS) { return 0; }
+	void* ret = zwolf_open(basep, 0);
+	debug_printf("%p\n", ret);
+	return ret;
+}
+DLL_PUBLIC int dlclose(void *handle) {
+	free(handle);
+	return 0;
+}
 DLL_PUBLIC char* dlerror(void) { return "dlerror"; }
 
 
@@ -2648,3 +2664,9 @@ void *bsearch(const void *key, const void *base, size_t nmemb, size_t size, int 
     // Key not found
     return NULL;
 }
+
+DLL_PUBLIC
+int nanosleep(const struct timespec *req, struct timespec *rem) {
+	return thrd_sleep(req, rem);
+}
+

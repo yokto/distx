@@ -46,6 +46,8 @@ time_t mktime(struct tm *timeptr);
 size_t strftime(char *str, size_t maxsize, const char *format, const struct tm *timeptr);
 #define strftime_l(s, m, f, t, l) strftime(s, m ,f ,t)
 time_t time(time_t *timer);
+int nanosleep(const struct timespec *req, struct timespec *rem);
+
 
 struct timeval {
                   time_t      tv_sec;  /* Seconds */

@@ -28,7 +28,7 @@ static bool isWin = false;
 void base_futex_p_init(bool iswin, void* lib) {
 	isWin = iswin;
 	if (isWin) {
-		void* sync = zwolf_open("api-ms-win-core-synch-l1-2-0.dll");
+		void* sync = zwolf_open("api-ms-win-core-synch-l1-2-0.dll", ZWOLF_OPEN_EXTERNAL);
 		WaitOnAddress = zwolf_sym(sync, "WaitOnAddress");
 		WakeByAddressAll = zwolf_sym(sync, "WakeByAddressAll");
 		WakeByAddressSingle = zwolf_sym(sync, "WakeByAddressSingle");

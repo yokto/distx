@@ -79,12 +79,14 @@ typedef struct loaded_lib {
 	size_t gotsz;
 	Elf64_Word* hash;
 	size_t symtab_count;
-	char* path;
+	char* abs_path;
+	char* zwolf_path;
 	size_t init_arraysz;
 	size_t* init_array;
 	size_t fini_arraysz;
 	size_t* fini_array;
 	bool init_started;
+	bool linked;
 } loaded_lib;
 
 typedef struct loaded_libs {
@@ -122,6 +124,7 @@ __attribute__((sysv_abi)) uint32_t get_os() {
 }
 
 void fini_libs(loaded_libs* libs);
+void link(loaded_lib* lib, loaded_libs* libs);
 
 int alloc_loaded_libs(loaded_libs* libs) {
 	libs->libs = calloc(8, sizeof(loaded_lib));
@@ -143,7 +146,7 @@ int free_loaded_libs(loaded_libs* libs) {
 	}
 }
 
-loaded_lib* add_loaded_lib(loaded_libs* libs) {
+size_t add_loaded_lib(loaded_libs* libs) {
 	if (libs->libs_count >= libs->vec_length) {
 		int new_vec_length = libs->vec_length * 2;
 		loaded_lib* new_libs = calloc(new_vec_length, sizeof(loaded_lib));
@@ -153,7 +156,7 @@ loaded_lib* add_loaded_lib(loaded_libs* libs) {
 		libs->vec_length = new_vec_length;
 	}
 	libs->libs_count++;
-	return &libs->libs[libs->libs_count-1];
+	return libs->libs_count-1;
 }
 
 void * reserve_memory(size_t size) {
@@ -257,10 +260,11 @@ void fromUnix(char* path) {
 	}
 }
 
-void set_basedir(loaded_libs * libs, char * path, char * soname) {
+void set_basedir(loaded_libs * libs, const char * path, char * soname) {
 	if (libs->basedir) {
 		ERR("only call when basedir is not set")
 	}
+	DEBUG("basedir %s %s\n", path, soname);
 #ifndef WIN32
 	char * realp = realpath(path, 0);
 #else
@@ -277,9 +281,8 @@ void set_basedir(loaded_libs * libs, char * path, char * soname) {
 	}
 #ifdef WIN32
 	libs->basedir = malloc(base_len + 2);
-	libs->basedir[0] = '/';
-	libs->basedir[base_len + 1] = '\0';
-	memcpy(libs->basedir + 1, realp, base_len);
+	strcpy(libs->basedir, "/");
+	strncat(libs->basedir, realp, base_len);
 
 	// set env
 	const char * var = "ZWOLF_RUNDIR=";
@@ -290,51 +293,80 @@ void set_basedir(loaded_libs * libs, char * path, char * soname) {
 	_putenv(env);
 #else
 	libs->basedir = malloc(base_len + 1);
-	libs->basedir[base_len] = '\0';
-	memcpy(libs->basedir, realp, base_len);
+	strncpy(libs->basedir, realp, base_len);
 	setenv("ZWOLF_RUNDIR", libs->basedir, true);
 #endif
 	DEBUG("basedir %s\n", libs->basedir);
 	free(realp);
 }
 
-// for main lib_path is the argument to this program
-// for all others it's NEEDED of some library
-loaded_lib* load(char* lib_path, loaded_libs* libs) {
+loaded_lib* load_absolute(const char* lib_path, loaded_libs* libs);
+
+// load from inside the program with unix like path
+loaded_lib* load_unix(const char* lib_path, loaded_libs* libs) {
+    char* path = malloc(strlen(lib_path) + 1);
+
+    if (!path) {
+	    ERR("Memory allocation failed");
+    }
+
+    strcpy(path, lib_path);
+#ifndef WIN32
+    loaded_lib * res = load_absolute(path, libs);
+#else
+    fromUnix(path);
+    loaded_lib * res = load_absolute(path + 1, libs);
+#endif
+    free(path);
+
+    return res;
+}
+
+// load from NEEDED in dynamic library
+loaded_lib* load(const char* lib_path, loaded_libs* libs) {
+    if (!libs->basedir) {
+	    ERR("No basedir");
+    }
+
+    int base_len = strlen(libs->basedir);
+    int path_len = strlen(lib_path);
+    char* real_path = malloc(base_len + path_len + 1);
+
+    if (!real_path) {
+	    ERR("Memory allocation failed");
+    }
+
+#ifdef WIN32
+    strcpy(real_path, libs->basedir + 1);
+    strcat(real_path, lib_path);
+    fromUnix(real_path);
+#else
+    strcpy(real_path, libs->basedir);
+    strcat(real_path, lib_path);
+#endif
+    DEBUG("\topening %s\n", real_path);
+    load_absolute(real_path, libs);
+    free(real_path);
+}
+
+// load from absolute path
+loaded_lib* load_absolute(const char* lib_path, loaded_libs* libs) {
 	for (int i = 0 ; i < libs->libs_count ; i++) {
-		if (libs->libs[i].path && strcmp(libs->libs[i].path, lib_path) == 0) {
+		if (libs->libs[i].abs_path && strcmp(libs->libs[i].abs_path, lib_path) == 0) {
 			DEBUG("already loaded library %s\n", lib_path)
 			return &libs->libs[i];
 		}
 	}
-	loaded_lib* lib = add_loaded_lib(libs);
+	size_t lib_idx = add_loaded_lib(libs);
+	loaded_lib* lib = &libs->libs[lib_idx];
 	memset(lib, 0, sizeof(loaded_lib));
 	DEBUG("\tloading library %s\n", lib_path)
 
 	// needs to happen before recursive call to load
-	lib->path = malloc(strlen(lib_path) + 1);
-	strcpy(lib->path, lib_path);
+	lib->abs_path = malloc(strlen(lib_path) + 1);
+	strcpy(lib->abs_path, lib_path);
 
-
-	FILE* fd;
-	if (libs->basedir) {
-		int base_len = strlen(libs->basedir);
-		int path_len = strlen(lib_path);
-		char* real_path = malloc(base_len + path_len + 1);
-#ifdef WIN32
-		memcpy(real_path, libs->basedir + 1, base_len - 1);
-		memcpy(real_path + base_len - 1, lib_path, path_len + 1);
-		fromUnix(real_path);
-#else
-		memcpy(real_path, libs->basedir, base_len);
-		memcpy(real_path + base_len, lib_path, path_len + 1);
-#endif
-		DEBUG("\topening %s\n", real_path);
-		fd = fopen(real_path, "rb");
-		free(real_path);
-	} else {
-		fd = fopen(lib_path, "rb");
-	}
+	FILE* fd = fopen(lib_path, "rb");
 	if (fd == 0) {
 		ERR("can't open %s", lib_path);
 	}
@@ -435,10 +467,9 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 			for (dynamic = lib->dynamic; dynamic->d_tag != DT_NULL; dynamic++) {
 				if (dynamic->d_tag == DT_SONAME) {
 					char * soname = lib->strtab + dynamic->d_un.d_ptr;
+					lib->zwolf_path = malloc(strlen(soname) + 1);
+					strcpy(lib->zwolf_path, soname);
 					if (!libs->basedir) { // for main program
-						free(lib->path);
-						lib->path = malloc(strlen(soname) + 1);
-						strcpy(lib->path, soname);
 						set_basedir(libs, lib_path, soname);
 					}
 				}
@@ -477,7 +508,8 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 				if (dynamic->d_tag == DT_NEEDED) {
 					char* needed = lib->strtab + dynamic->d_un.d_ptr;
 					if (strcmp(needed, "_zwolf") != 0) {
-						loaded_lib * lib = load(needed, libs);
+						loaded_lib * ignore = load(needed, libs);
+						lib = &libs->libs[lib_idx];
 					}
 				}
 				if (dynamic->d_tag == DT_VERSYM) {
@@ -505,7 +537,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 		}
 	}
 
-	if (!lib->path) {
+	if (!lib->abs_path) {
 		ERR("library %s has no soname", lib_path);
 	}
 
@@ -513,18 +545,19 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 #ifndef WIN32
 	struct link_map* new_map = malloc(sizeof(struct link_map));
 	memset(new_map, 0, sizeof(struct link_map));
-	const char * pwd = libs->basedir;
-	if (!libs->basedir) {
-		ERR("main executable has no soname\n");
-	}
-	const int pwd_len = strlen(pwd);
-	const int lib_len = strlen(lib->path);
-	DEBUG("\tlib-path %s\n", lib->path);
-	char * full_path = malloc(pwd_len + lib_len + 1);
-	memcpy(full_path, pwd, pwd_len);
-	memcpy(full_path + pwd_len, lib->path, lib_len);
-	full_path[lib_len + pwd_len] = '\0';
-	new_map->l_name = full_path;
+//	const char * pwd = libs->basedir;
+//	if (!libs->basedir) {
+//		ERR("main executable has no soname\n");
+//	}
+//	const int pwd_len = strlen(pwd);
+//	const int lib_len = strlen(lib->path);
+//	DEBUG("\tlib-path %s\n", lib->path);
+//	char * full_path = malloc(pwd_len + lib_len + 1);
+//	memcpy(full_path, pwd, pwd_len);
+//	memcpy(full_path + pwd_len, lib->path, lib_len);
+//	full_path[lib_len + pwd_len] = '\0';
+	new_map->l_name = malloc(strlen(lib->abs_path) + 1);
+	strcpy(new_map->l_name, lib->abs_path);
 	new_map->l_addr = lib->base;
 	//new_map->l_ld = lib->dynamic;
 	new_map->l_ld = (void*)lib->dynamic;
@@ -549,7 +582,7 @@ loaded_lib* load(char* lib_path, loaded_libs* libs) {
 // find the version string of symbol
 // this are some truely ugly structures
 char * verdefstr(size_t sym_idx, loaded_lib* lib) {
-	return lib->path;
+	return lib->zwolf_path;
 //	Elf64_Verdef * v = lib->verdef;
 //	for(int i = 1 ; i < lib->versym[sym_idx] ; i++) {
 //		v = (void*)v + v->vd_next;
@@ -567,7 +600,7 @@ char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 	Elf64_Verneed * v = lib->verneed;
 	if (!lib->verneed) {
 		DEBUG("could not find version for symbol %s in library %s\n",
-			lib->strtab + lib->symtab[sym_idx].st_name, lib->path);
+			lib->strtab + lib->symtab[sym_idx].st_name, lib->abs_path);
 		return 0;
 	}
 	DEBUG("\t\t\tneeded index %zd residex %d \n", sym_idx, lib->versym[sym_idx])
@@ -586,13 +619,13 @@ char * verneedstr(size_t sym_idx, loaded_lib* lib) {
 		if (v->vn_next == 0) { break; }
 		v = (void*)v + v->vn_next;
 	}
-	DEBUG("could not find version for symbol %s in library %s\n", lib->strtab + lib->symtab[sym_idx].st_name, lib->path);
+	DEBUG("could not find version for symbol %s in library %s\n", lib->strtab + lib->symtab[sym_idx].st_name, lib->abs_path);
 	return 0;
 }
 
 Elf64_Half lookup(char* name, loaded_lib* lib) {
 	if (!lib->hash) {
-		ERR("no hash table in %s\n", lib->path);
+		ERR("no hash table in %s\n", lib->abs_path);
 	}
 	const uint32_t nbucket = ((uint32_t*)lib->hash)[0];
 	const uint32_t nchain = ((uint32_t*)lib->hash)[1];
@@ -600,7 +633,7 @@ Elf64_Half lookup(char* name, loaded_lib* lib) {
 	const unsigned long hash = elf_Hash(name);
 
 	Elf64_Half idx = lib->hash[2 + (hash % nbucket)];
-	DEBUG("\t\t\tlooking for %s in library %s\n",name, lib->path)
+	DEBUG("\t\t\tlooking for %s in library %s\n",name, lib->abs_path)
 	while (idx != 0) {
 		DEBUG("\t\t\tname %s, foundname %s\n", name, lib->strtab + lib->symtab[idx].st_name)
 		if (strcmp(name, lib->strtab + lib->symtab[idx].st_name) == 0) {
@@ -679,40 +712,91 @@ int errno2() {
 //	*offset = 0;
 //}
 
-__attribute__((sysv_abi))
-void* dlopen2(char* name) {
-	DEBUG("dlopening %s\n", name)
-#if defined(WIN32)
-	if (strcmp("KERNEL32.DLL", name) == 0) {
-		DEBUG("\t\tgetting lib %s\n", name)
-	        return GetModuleHandle("KERNEL32.DLL");
-	}
+#define ZWOLF_OPEN_INTERNAL 0
+#define ZWOLF_OPEN_EXTERNAL 1
 
-	DEBUG("\t\tgetting lib %s\n", name)
-	//return LoadLibrary("msvcrt.dll");
-	return LoadLibrary(name);
+struct dllib {
+	uint32_t type;
+	void* lib;
+};
+
+__attribute__((sysv_abi))
+void* dlopen2(char* name, uint32_t flags) {
+	DEBUG("dlopening %s\n", name)
+	struct dllib* res = 0;
+	if (flags & ~ZWOLF_OPEN_EXTERNAL) {
+		ERR("invalid zwolf_open flag");
+	}
+	if (flags & ZWOLF_OPEN_EXTERNAL) {
+		void * lib = 0;
+#if defined(WIN32)
+		if (strcmp("KERNEL32.DLL", name) == 0) {
+			DEBUG("\t\tgetting lib %s\n", name)
+			lib = GetModuleHandle("KERNEL32.DLL");
+		} else {
+			DEBUG("\t\tgetting lib %s\n", name)
+			lib = LoadLibrary(name);
+		}
+
+		if (lib != 0) {
+			res = malloc(sizeof(res));
+			res->lib = lib;
+			res->type = flags;
+		}
 #else
-	remove_local_libs();
-	void* res = dlopen(name, RTLD_NOW);
-	add_local_libs();
-	return res;
+		remove_local_libs();
+		lib = dlopen(name, RTLD_NOW);
+		if (lib != 0) {
+			res = malloc(sizeof(res));
+			res->lib = lib;
+			res->type = flags;
+		}
+		add_local_libs();
 #endif
+		return res;
+	} else {
+#ifndef WIN32
+		remove_local_libs();
+#endif
+		loaded_lib* lib = load_unix(name, &zwolf_global_libs);
+		if (lib != 0) {
+			res = malloc(sizeof(res));
+			loaded_libs* libs = &zwolf_global_libs;
+			for (size_t i = 0 ; i < libs->libs_count ; i++) {
+				link(&libs->libs[i], libs);
+			}
+			res->type = flags;
+			res->lib = lib;
+		}
+#ifndef WIN32
+		add_local_libs();
+#endif
+		return res;
+	}
 }
 
 __attribute__((sysv_abi))
 void* dlsym2(void* lib, char* name) {
+	struct dllib * dllib = (struct dllib*)lib;
 	DEBUG("dlsyming %s\n", name)
+	if (dllib->type & ZWOLF_OPEN_EXTERNAL) {
 #if defined(WIN32)
-	DEBUG("\t\tgetting sym %s from lib %p\n", name, lib)
-	void* sym = GetProcAddress(lib, name);
+		DEBUG("\t\tgetting sym %s from lib %p\n", name, lib)
+			void* sym = GetProcAddress(dllib->lib, name);
 #else
-	void* sym = dlsym(lib, name);
+		void* sym = dlsym(dllib->lib, name);
 #endif
-	if (sym == 0) {
-		WARN("\t\t sym %s is zero\n", name)
+		if (sym == 0) {
+			WARN("\t\t sym %s is zero\n", name)
+		}
+		DEBUG("\t\tgot sym %s = %p\n", name, sym);
+		return sym;
+	} else {
+		loaded_lib* l = (loaded_lib*)dllib->lib;
+		Elf64_Half main_idx = lookup(name, l);
+		void * ret = l->base + l->symtab[main_idx].st_value;
+		return ret;
 	}
-	DEBUG("\t\tgot sym %s = %p\n", name, sym);
-	return sym;
 }
 
 void dlclose2(void* lib) {
@@ -764,11 +848,12 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 			} else {
 				for (size_t i = 0; i < libs->libs_count; i++) {
 					loaded_lib* l = &libs->libs[i];
-					if (strcmp(file, l->path) == 0) {
+					if (!l->zwolf_path) { ERR("%s has no soname", lib->abs_path) }
+					if (strcmp(file, l->zwolf_path) == 0) {
 						Elf64_Half f = lookup(sym_name, l);
 						void * f_addr = l->base + l->symtab[f].st_value;
 						//DEBUG("setting name %s, at %x from base %x to %x\n", sym_name, rela->r_offset, lib->base, f_addr)
-						DEBUG("\t\t\tfound symbol in %s\n", l->path)
+						DEBUG("\t\t\tfound symbol in %s\n", l->abs_path)
 						ret = f_addr;
 					}
 				}
@@ -793,7 +878,8 @@ void setSymbol(Elf64_Rela * rela, void* sym, loaded_lib* lib) {
 }
 
 void link(loaded_lib* lib, loaded_libs* libs) {
-	DEBUG("\tlinking library %s\n", lib->path)
+	if (lib->linked) { return; }
+	DEBUG("\tlinking library %s\n", lib->abs_path)
 	DEBUG("\trela count %lld\n", lib->rela_count)
 	DEBUG("\trela plt count %lld\n", lib->rela_plt_count)
 	for (int i = 0 ; i < lib->rela_count ; i++) {
@@ -808,9 +894,7 @@ void link(loaded_lib* lib, loaded_libs* libs) {
 		void * sym = findSymbol(rela, lib, libs);
 		setSymbol(rela, sym, lib);
 	}
-
-
-
+	lib->linked = true;
 }
 
 void init_lib(loaded_lib* lib, loaded_libs* libs) {
@@ -824,7 +908,7 @@ void init_lib(loaded_lib* lib, loaded_libs* libs) {
 			char* needed = lib->strtab + dynamic->d_un.d_ptr;
 			for (int j = 0; j < libs->libs_count; j++) {
 				loaded_lib* lib2 = &libs->libs[j];
-				if (strcmp(lib2->path,  needed) == 0) {
+				if (strcmp(lib2->zwolf_path,  needed) == 0) {
 					init_lib(lib2, libs);
 				}
 			}
@@ -832,13 +916,12 @@ void init_lib(loaded_lib* lib, loaded_libs* libs) {
 	}
 
 	// init self
-	DEBUG("\t\tinit %s\n", lib->path)
+	DEBUG("\t\tinit %s\n", lib->abs_path)
 	if (lib->init_array) {
 		for (int j = 0; j * sizeof(void*) < lib->init_arraysz ; j++) {
 			// this is already absolute because of relocation
 			size_t rel_f = lib->init_array[j];
-			DEBUG("\t\tinit %d from library %s with pointer %p\n", j, lib->path, (void*)((void*)rel_f - lib->base))
-			//DEBUG("exec init at %llx for lib %s\n", rel_f, lib->path)
+			DEBUG("\t\tinit %d from library %s with pointer %p\n", j, lib->abs_path, (void*)((void*)rel_f - lib->base))
 			((void (*)())(rel_f))();
 		}
 	}
@@ -847,9 +930,9 @@ void init_lib(loaded_lib* lib, loaded_libs* libs) {
 void init_libs(loaded_libs* libs) {
 	for (int i = 0; i < libs->libs_count; i++) {
 		loaded_lib* lib = &libs->libs[i];
-		DEBUG("\tstart init %s\n", lib->path)
+		DEBUG("\tstart init %s\n", lib->abs_path)
 		init_lib(lib, libs);
-		DEBUG("\tend init %s\n", lib->path)
+		DEBUG("\tend init %s\n", lib->abs_path)
 	}
 }
 
@@ -860,7 +943,7 @@ void fini_libs(loaded_libs* libs) {
 			for (int j = 0; j * sizeof(void*) < lib->fini_arraysz ; j++) {
 				// this is already absolute because of relocation
 				size_t rel_f = lib->fini_array[j];
-				DEBUG("\t\tfini %d from library %s with pointer %p\n", j, lib->path, (void*)((void*)rel_f - lib->base))
+				DEBUG("\t\tfini %d from library %s with pointer %p\n", j, lib->abs_path, (void*)((void*)rel_f - lib->base))
 				((void (*)())(rel_f))();
 			}
 		}
@@ -904,7 +987,7 @@ int main(int argc, char ** argv) {
 #endif
 	const char * exec_env = "ZWOLF_EXECUTABLE";
 #ifdef WIN32
-	const char * path = _fullpath(0, argv[0], 0);
+	char * path = _fullpath(0, argv[0], 0);
 	char* path2 = calloc(strlen(path) + strlen(exec_env) + 2, 1);
 	strcat(path2, exec_env);
 	strcat(path2, "=");
@@ -940,8 +1023,14 @@ int main(int argc, char ** argv) {
 	loaded_libs* libs = &zwolf_global_libs;
 	alloc_loaded_libs(libs);
 
-	DEBUG("loading\n")
-	loaded_lib* lib = load(argv[1], libs);
+#ifndef WIN32
+	char * realp = realpath(argv[1], 0);
+#else
+	char * realp = _fullpath(0, argv[1], 0);
+#endif
+	DEBUG("loading %s\n", realp)
+	loaded_lib* lib = load_absolute(realp, libs);
+	free(realp);
 
 	DEBUG("linking\n")
 	for (size_t i = 0 ; i < libs->libs_count ; i++) {

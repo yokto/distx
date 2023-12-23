@@ -13,24 +13,33 @@ CONSTANTS := $(BUILDDIR)/bin/constants
 
 TESTCPP_SOURCES := $(wildcard testcpp_*.cpp)
 TESTCPP_EXECS := $(patsubst %.cpp, $(BUILDDIR)/x86_64/bin/%, $(TESTCPP_SOURCES))
-TESTCPP_EXECS := $(patsubst %.cpp, $(BUILDDIR)/aarch64/bin/%, $(TESTCPP_SOURCES))
+TESTCPP_EXECS += $(patsubst %.cpp, $(BUILDDIR)/aarch64/bin/%, $(TESTCPP_SOURCES))
 
 TESTC_SOURCEST := $(wildcard testc_*.c)
 TESTC_SOURCES = $(filter-out testc_zlib.c, $(TESTC_SOURCEST))
 TESTC_EXECS := $(patsubst %.c, $(BUILDDIR)/x86_64/bin/%, $(TESTC_SOURCES))
 TESTC_EXECS += $(patsubst %.c, $(BUILDDIR)/aarch64/bin/%, $(TESTC_SOURCES))
 
+TESTCLIB_SOURCES := $(wildcard testclib_*.c)
+TESTCLIB_EXECS := $(patsubst testclib_%.c, $(BUILDDIR)/x86_64/lib/libclib_%.so, $(TESTCLIB_SOURCES))
+TESTCLIB_EXECS += $(patsubst testclib_%.c, $(BUILDDIR)/aarch64/lib/libclib_%.so, $(TESTCLIB_SOURCES))
+
 TESTCGUI_SOURCES := $(wildcard testcgui_*.c)
 TESTCGUI_EXECS := $(patsubst %.c, $(BUILDDIR)/x86_64/bin/%, $(TESTCGUI_SOURCES))
 #TESTCGUI_EXECS := $(patsubst %.cpp, $(BUILDDIR)/aarch64/bin/%, $(TESTCGUI_SOURCES))
 
-all: $(HELLORUST) \
-	$(CONSTANTS) \
+TESTQT_SOURCES := $(wildcard testqt_*.cpp)
+TESTQT_EXECS := $(patsubst %.cpp, $(BUILDDIR)/x86_64/bin/%, $(TESTQT_SOURCES))
+
+qt: $(TESTQT_EXECS)
+
+all: \
 	$(TESTCPP_EXECS) \
-	$(TESTC_EXECS)
+	$(TESTC_EXECS) \
+	$(TESTCLIB_EXECS)
 	#$(TESTCGUI_EXECS)
 
-test: test 
+test:
 	../build/load_elf _zwolf/test_programs/bin/testc_empty
 	../build/load_elf _zwolf/test_programs/bin/testc_exit
 	../build/load_elf _zwolf/test_programs/bin/testcpp_vector
@@ -105,6 +114,32 @@ $(BUILDDIR)/x86_64/bin/testc_%: testc_%.c
 		"-Wl,-soname,/test_programs/x86_64/bin/testc_$*" \
 		-o "$@" "$<"
 
+$(BUILDDIR)/aarch64/bin/testc_%: testc_%.c
+	mkdir -p "$(BUILDDIR)/aarch64/bin"
+	${CC} -femulated-tls -g \
+		-lm \
+		-target aarch64-unknown-linux-zwolf \
+		"-Wl,-soname,/test_programs/aarch64/bin/testc_$*" \
+		-o "$@" "$<"
+
+$(BUILDDIR)/x86_64/lib/libclib_%.so: testclib_%.c
+	mkdir -p "$(BUILDDIR)/x86_64/lib"
+	${CC} -femulated-tls -g \
+		-lm \
+		-shared \
+		-target x86_64-unknown-linux-zwolf \
+		"-Wl,-soname,/test_programs/x86_64/lib/libclib_$*.so" \
+		-o "$@" "$<"
+
+$(BUILDDIR)/aarch64/lib/libclib_%.so: testclib_%.c
+	mkdir -p "$(BUILDDIR)/aarch64/lib"
+	${CC} -femulated-tls -g \
+		-lm \
+		-shared \
+		-target aarch64-unknown-linux-zwolf \
+		"-Wl,-soname,/test_programs/aarch64/lib/libclib_$*.so" \
+		-o "$@" "$<"
+
 $(BUILDDIR)/x86_64/bin/testcgui_%: testcgui_%.c
 	mkdir -p "$(BUILDDIR)/x86_64/bin"
 	${CC} -femulated-tls -g \
@@ -113,14 +148,6 @@ $(BUILDDIR)/x86_64/bin/testcgui_%: testcgui_%.c
 		-L$(DEPDIR)/xgui/x86_64/lib \
 		-target x86_64-unknown-linux-zwolf \
 		"-Wl,-soname,/test_programs/x86_64/bin/testcgui_$*" \
-		-o "$@" "$<"
-
-$(BUILDDIR)/aarch64/bin/testc_%: testc_%.c
-	mkdir -p "$(BUILDDIR)/aarch64/bin"
-	${CC} -femulated-tls -g \
-		-lm \
-		-target aarch64-unknown-linux-zwolf \
-		"-Wl,-soname,/test_programs/aarch64/bin/testc_$*" \
 		-o "$@" "$<"
 
 $(BUILDDIR)/x86_64/bin/testcpp_%: testcpp_%.cpp
@@ -142,3 +169,17 @@ $(BUILDDIR)/aarch64/bin/testcpp_%: testcpp_%.cpp
 $(CONSTANTS): constants.c
 	mkdir -p "$(BUILDDIR)/bin"
 	gcc -o $(CONSTANTS) constants.c
+
+$(BUILDDIR)/x86_64/bin/testqt_%: testqt_%.cpp
+	mkdir -p "$(BUILDDIR)/x86_64/bin"
+	${CXX} -g \
+		"-I${ZWOLF}/qtbase/common/include" \
+		"-I${ZWOLF}/qtbase/common/include/QtCore" \
+		"-lQt6Core" \
+		"-lQt6Gui" \
+		"-lQt6Widgets" \
+		"-L${ZWOLF}/qtbase/x86_64/lib" \
+		"-Wl,--no-undefined" \
+		-target x86_64-unknown-linux-zwolf \
+		"-Wl,-soname,/test_programs/x86_64/bin/testqt_$*" \
+		-o "$@" "$<"

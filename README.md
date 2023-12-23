@@ -450,6 +450,12 @@ Copy all the libraries from stage1 or build them again.
 When developing normal programs you don't need _zwolf_install.
 This is just so we can build things in our toolchain without immediately overwriting the toolchain.
 
+# FAQ
+
+*Q: Why does ninja on linux always rebuild everything.
+
+A: because clangs writes the dependency files to /_zwolf which exists for a clang running on zwolf but not for ninja running on linux. You can link /_zwolf to your zwolf root dir.
+
 # REFERENCES
 
 ### Thread local Storage
