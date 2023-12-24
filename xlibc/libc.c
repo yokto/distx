@@ -141,8 +141,19 @@ int (*_rmdir_ms)(const char *pathname) __attribute((ms_abi));
 //DECLARE(int, mtx_lock, mtx_t* mutex)
 //DECLARE(int, mtx_trylock, mtx_t *mutex );
 //DECLARE(void, mtx_destroy, mtx_t *mutex );
-DECLARE(int, clock_gettime, clockid_t clockid, struct timespec *tp);
-DECLARE(int, getentropy, void *buffer, size_t length);
+int clock_gettime(clockid_t clockid, struct timespec *tp);
+int (*clock_gettime_sysv)(clockid_t clockid, struct timespec *tp);
+bool (*QueryPerformanceCounter_ms)(int64_t * now) __attribute((ms_abi));
+bool (*QueryPerformanceFrequency_ms)(int64_t * now) __attribute((ms_abi));
+
+int (*getentropy_native)(void *buffer, size_t length);
+DLL_PUBLIC int getentropy(void *buffer, size_t length) {
+	debug_printf("getentropy");
+	return getentropy_native(buffer, length);
+}
+int getentropy_ms(void *buf, size_t buflen);
+bool (*BCryptGenRandom_ms)(uint32_t hAlgorithm, void* pbBuffer, unsigned long cbBuffer, unsigned long dwFlags) __attribute((ms_abi));
+
 DECLARE(char*, realpath, const char * path, char * resolved_path);
 uint16_t * (*_wfullpath_ms)(uint16_t *absPath, const uint16_t *relPath, size_t maxLength) __attribute((ms_abi));
 DECLARE(int, mkdir, const char *pathname, mode_t mode);
@@ -225,9 +236,11 @@ __attribute__((constructor)) void init() {
 	debug_printf("init inside %s\n", "xlibc");
 	void* libc = 0;
 	void* kernel32 = 0;
+	void* bcrypt = 0;
 	if (!libc) {
 		libc = zwolf_open("msvcrt.dll", ZWOLF_OPEN_EXTERNAL);
 		kernel32 = zwolf_open("KERNEL32.DLL", ZWOLF_OPEN_EXTERNAL);
+		bcrypt = zwolf_open("Bcrypt.DLL", ZWOLF_OPEN_EXTERNAL);
 		isWin = true;
 	}
 	if (!libc) {
@@ -276,8 +289,10 @@ __attribute__((constructor)) void init() {
 //		mtx_destroy_ms = zwolf_dlsym(kernel32, "DeleteCriticalSection");
 		thrd_equal_ms = 0;
 		GetThreadId_ms = zwolf_dlsym(kernel32, "GetThreadId");
-		clock_gettime_ms = 0; //zwolf_dlsym(libc, "clock_gettime");
-		getentropy_ms = 0; //zwolf_dlsym(libc, "getentropy");
+		QueryPerformanceCounter_ms = zwolf_dlsym(kernel32, "QueryPerformanceCounter");
+		QueryPerformanceFrequency_ms = zwolf_dlsym(kernel32, "QueryPerformanceFrequency");
+		BCryptGenRandom_ms = zwolf_dlsym(bcrypt, "BCryptGenRandom");
+		getentropy_native = &getentropy_ms;
 		realpath_ms = 0; //zwolf_dlsym(libc, "realpath");
 		_wfullpath_ms = zwolf_dlsym(libc, "_wfullpath");
 		mkdir_ms = 0;
@@ -331,7 +346,7 @@ __attribute__((constructor)) void init() {
 //		mtx_destroy_sysv = zwolf_dlsym(libc, "mtx_destroy");
 		thrd_equal_sysv = zwolf_dlsym(libc, "thrd_equal");
 		clock_gettime_sysv = zwolf_dlsym(libc, "clock_gettime");
-		getentropy_sysv = zwolf_dlsym(libc, "getentropy");
+		getentropy_native = zwolf_dlsym(libc, "getentropy");
 		realpath_sysv = zwolf_dlsym(libc, "realpath");
 		mkdir_sysv = zwolf_dlsym(libc, "mkdir");
 		stat_sysv = zwolf_dlsym(libc, "stat");
@@ -692,7 +707,6 @@ DLL_PUBLIC int thrd_equal(thrd_t lhs, thrd_t rhs ) {
 DLL_PUBLIC thrd_t thrd_current(void) IMPLEMENT(thrd_current)
 
 DLL_PUBLIC int thrd_sleep(const struct timespec* duration, struct timespec* remaining ) {
-	__builtin_trap();
 	debug_printf("execute os thrd_sleep\n");
 	if (isWin) {
 		// long milliseconds = duration->tv_sec * 1000 + duration->tv_nsec / 1000000;
@@ -940,6 +954,29 @@ DLL_PUBLIC int fstat(int fd, struct stat * statbuf) {
 		return ret;
 	}
 }
+
+
+int clock_gettime_ms(int /*clk_id*/, struct timespec *ts) {
+    int64_t frequency = 0;
+    static bool no_freq_info = false;
+    int64_t now;
+
+    if (!frequency && !no_freq_info) {
+        if (!QueryPerformanceFrequency_ms(&frequency)) {
+            // The platform does not support high-resolution performance counter
+            no_freq_info = true;
+            return -1;
+        }
+    }
+
+    if (QueryPerformanceCounter_ms(&now)) {
+        ts->tv_sec = now / frequency;
+        ts->tv_nsec = ((now % frequency) * 1000000000L) / frequency;
+        return 0;
+    } else {
+        return -1;
+    }
+}
 DLL_PUBLIC int clock_gettime(clockid_t clockid, struct timespec *tp) IMPLEMENT(clock_gettime, clockid, tp)
 int gettimeofday(struct timeval *tv, struct timezone *tz) {
     // Check if the pointers are valid
@@ -962,7 +999,20 @@ int gettimeofday(struct timeval *tv, struct timezone *tz) {
     return 0;
 }
 
-DLL_PUBLIC int getentropy(void *buffer, size_t length) IMPLEMENT(getentropy, buffer, length)
+
+int getentropy_ms(void *buf, size_t buflen) {
+    if (buf == NULL || buflen == 0) {
+        return -1;
+    }
+
+    if (BCryptGenRandom_ms(NULL, buf, buflen, 0)) {
+        return 0;
+    } else {
+        // CryptGenRandom failed, check GetLastError() for details
+        return -1;
+    }
+}
+
 DLL_PUBLIC char* realpath(const char * path, char * resolved_path) {
 	debug_printf("execute os realpath %s = ", path);
 	if (isWin) {
@@ -1118,7 +1168,14 @@ DLL_PUBLIC DIR* opendir(const char * path) {
 	if (pathname) { free(pathname); }
 	return ret;
 }
-DLL_PUBLIC ssize_t readlink(const char * pathname, char * buf, size_t bufsiz) IMPLEMENT(readlink, pathname, buf, bufsiz)
+DLL_PUBLIC ssize_t readlink(const char * pathname, char * buf, size_t bufsiz) {
+	debug_printf("readlink %s", pathname);
+	if (isWin) {
+		__builtin_trap();
+	} else {
+		return readlink_sysv(pathname, buf, bufsiz);
+	}
+}
 DLL_PUBLIC int rename(const char *oldpath, const char *newpath) IMPLEMENT(rename, oldpath, newpath)
 DLL_PUBLIC int thrd_detach( thrd_t thr ) IMPLEMENT(thrd_detach, thr)
 DLL_PUBLIC int truncate(const char *path, off_t length) IMPLEMENT(truncate, path, length)
