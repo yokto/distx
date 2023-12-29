@@ -667,7 +667,6 @@ size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE * stream) {
 
 DLL_PUBLIC
 size_t fwrite(const void * ptr, size_t size, size_t nmemb, FILE * stream) {
-	debug_printf("fwrite %lld\n", stream->fd);
 	uint64_t written = 0;
 	int32_t error = base_fs_write(stream->fd, ptr, size * nmemb, &written);
 	if (error) {

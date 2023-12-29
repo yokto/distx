@@ -146,7 +146,7 @@ int32_t base_fs_seek(uintptr_t fd, int64_t offset, uint32_t flags, int64_t* new_
 }
 
 int32_t base_fs_write(uintptr_t fd, const void *buf, uintptr_t count, uintptr_t* written) {
-	debug_printf("write %d\n", fd);
+	// debug_printf("write %d\n", fd);
 	if (isWin) {
 		int ret = win_write(fd, buf, count);
 		if (ret >= 0) {

@@ -357,8 +357,6 @@ DLL_PUBLIC
 int printf(const char *restrict format, ...) {
 	va_list args;
 	va_start(args, format);
-	debug_printf("stdout %lld\n", *stdout);
-	debug_printf("bas %lld\n", base_fs_stdout);
 	int ret = vfprintf(stdout, format, args);
 	va_end(args);
 	return ret;

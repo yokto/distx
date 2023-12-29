@@ -36,8 +36,8 @@ qt: $(TESTQT_EXECS)
 all: \
 	$(TESTCPP_EXECS) \
 	$(TESTC_EXECS) \
-	$(TESTCLIB_EXECS)
-	#$(TESTCGUI_EXECS)
+	$(TESTCLIB_EXECS) \
+	$(TESTCGUI_EXECS)
 
 test:
 	../build/load_elf _zwolf/test_programs/bin/testc_empty
