@@ -7,7 +7,7 @@ HEADERS = $(addprefix $(INSTALL)common/,$(wildcard include/*.h)) $(addprefix $(I
 
 all: $(XGUI) $(HEADERS)
 
-$(INSTALL)/%/lib/libxgui.so: xgui.c xgui_windows.c
+$(INSTALL)/%/lib/libxgui.so: xgui.c windows/xgui_windows.c wayland/xgui_wayland.c wayland/shm.c wayland/xdg-shell-client-protocol.c wayland/wayland_wrapper.c
 	mkdir -p $(INSTALL)/$*/lib
 	echo ${CC}
 	${CC} \
@@ -27,7 +27,12 @@ $(INSTALL)/%/lib/libxgui.so: xgui.c xgui_windows.c
 		-Iinclude \
 		-o $@ \
 		xgui.c \
-		xgui_windows.c
+		windows/xgui_windows.c \
+		wayland/xgui_wayland.c \
+		wayland/shm.c \
+		wayland/xdg-shell-client-protocol.c \
+		wayland/wayland_wrapper.c
+
 
 # copy headers
 $(INSTALL)common/include/%.h: include/%.h

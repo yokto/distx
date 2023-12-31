@@ -185,7 +185,6 @@ int CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
             bmi.bmiHeader.biPlanes = 1;
             bmi.bmiHeader.biBitCount = 32;     // 32 bits per pixel (ARGB)
 
-	    printf("f %p, hdc %p, p0 %x, s1 = %x, s2 = %x, s3 = %x\n", SetDIBitsToDevice, hdc, pixels[0], sizeof(BITMAPINFO), sizeof(BITMAPINFOHEADER), sizeof(WNDCLASSA));
             SetDIBitsToDevice(hdc, 0, 0, width, height, 0, 0, 0, height, pixels, &bmi, DIB_RGB_COLORS);
 
             EndPaint(hwnd, &ps);
@@ -207,10 +206,11 @@ int CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 void UpdatePixels() {
     // Set all pixels to red (ARGB format)
     for (int i = 0; i < width * height; ++i) {
-        pixels[i] = 0xFFFF0000;  // Red
-	if (i < 12000) {
-        pixels[i] = 0xFF00FF00;  // Red
-	}
+      pixels[i] = 0xFFFF0000; // Red
+      if (i < 12000)
+      {
+        pixels[i] = 0xFF00FF00; // Red
+      }
     }
 
     // Force window to repaint

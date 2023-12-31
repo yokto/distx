@@ -1,5 +1,6 @@
 #include <zwolf.h>
-#include "xgui_windows.h"
+#include "windows/xgui_windows.h"
+#include "wayland/xgui_wayland.h"
 
 
 __attribute__((constructor)) void init() {
@@ -7,6 +8,7 @@ __attribute__((constructor)) void init() {
         void* kernel32 = 0;
         void* user32 = 0;
         void* gdi32 = 0;
+        void* wayland_client = 0;
         if (!libc) {
                 libc = zwolf_open("msvcrt.dll", ZWOLF_OPEN_EXTERNAL);
                 kernel32 = zwolf_open("KERNEL32.DLL", ZWOLF_OPEN_EXTERNAL);
@@ -20,6 +22,12 @@ __attribute__((constructor)) void init() {
         }
         if (!libc) {
                 libc = zwolf_open("libc.so.6", ZWOLF_OPEN_EXTERNAL);
+                wayland_client = zwolf_open("libwayland-client.so", ZWOLF_OPEN_EXTERNAL);
+		if (libc && wayland_client) {
+			init_wayland(libc, wayland_client);
+		} else if (libc) {
+			zwolf_write("could not open wayland-client.so");
+		}
         }
         if (!libc) {
                 __builtin_trap();
