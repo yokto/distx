@@ -8,13 +8,9 @@
 #define BASE_FS_H
 
 #include <base/types.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+typedef uintptr_t base_loop;
 
 #define BASE_FS_READ_EOF (-1)
-
 
 // standard file handles
 extern uintptr_t base_fs_stdout;
@@ -46,6 +42,13 @@ int32_t base_fs_read(uintptr_t fd, void *buf, uintptr_t count, uintptr_t* read);
  */
 int32_t base_fs_write(uintptr_t fd, const void *buf, uintptr_t count, uintptr_t* written);
 
+#define BASE_FS_WRITE_END 1
+int32_t base_fs_write_async(
+    base_loop loop, void (*on_write)(uint64_t written, void* data), void* data,
+    uintptr_t fd, const void *buf, uintptr_t count, int64_t offset,
+    int32_t flags
+    );
+
 /** 
  * returns 0 on success.
  * returns a positive error number otherwise.
@@ -61,7 +64,4 @@ int32_t base_fs_truncate(uintptr_t fd, int64_t length);
 
 int32_t base_fs_tell(uintptr_t fd, int64_t * pos);
 
-#ifdef __cplusplus
-}
-#endif
 #endif // BASE_FS_H

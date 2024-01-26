@@ -32,6 +32,8 @@ typedef uint16_t ATOM;
 
 #define WM_PAINT 0xf
 #define WM_DESTROY 0x2
+#define WM_SIZE 0x5
+#define WM_DISPLAYCHANGE 0x007E
 
 #if defined __x86_64__
 #define CALLBACK __attribute((ms_abi))
@@ -170,25 +172,34 @@ void UpdatePixels();
 
 // Window procedure
 int CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-    printf("message %x\n", message);
+    printf("message 0x%x\n", message);
     switch (message) {
+        case WM_SIZE:
+          width = lParam & 0xffff;
+          height = lParam >> 16;
+          printf("size %x %x\n", width, height);
+          InvalidateRect(hWnd, NULL, true);
+          break;
         case WM_PAINT: {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
+          printf("paint\n");
+          PAINTSTRUCT ps;
+          HDC hdc = BeginPaint(hwnd, &ps);
 
-            // Draw pixels from the buffer
-            BITMAPINFO bmi;
-            memset(&bmi, 0, sizeof(BITMAPINFO));
-            bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-            bmi.bmiHeader.biWidth = width;
-            bmi.bmiHeader.biHeight = -height;  // Negative height for top-down DIB
-            bmi.bmiHeader.biPlanes = 1;
-            bmi.bmiHeader.biBitCount = 32;     // 32 bits per pixel (ARGB)
+          // Draw pixels from the buffer
+          BITMAPINFO bmi;
+          memset(&bmi, 0, sizeof(BITMAPINFO));
+          bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+          bmi.bmiHeader.biWidth = width;
+          bmi.bmiHeader.biHeight = -height; // Negative height for top-down DIB
+          bmi.bmiHeader.biPlanes = 1;
+          bmi.bmiHeader.biBitCount = 32; // 32 bits per pixel (ARGB)
 
-            SetDIBitsToDevice(hdc, 0, 0, width, height, 0, 0, 0, height, pixels, &bmi, DIB_RGB_COLORS);
+          UpdatePixels();
 
-            EndPaint(hwnd, &ps);
-            break;
+          SetDIBitsToDevice(hdc, 0, 0, width, height, 0, 0, 0, height, pixels, &bmi, DIB_RGB_COLORS);
+
+          EndPaint(hwnd, &ps);
+          break;
         }
 
         case WM_DESTROY:
@@ -204,17 +215,18 @@ int CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
 // Function to update pixel buffer
 void UpdatePixels() {
+    if (pixels) { free(pixels); }
+    pixels = (unsigned int*)malloc(width * height * sizeof(unsigned int));
     // Set all pixels to red (ARGB format)
     for (int i = 0; i < width * height; ++i) {
       pixels[i] = 0xFFFF0000; // Red
-      if (i < 12000)
+      if (i < 72000)
       {
         pixels[i] = 0xFF00FF00; // Red
       }
     }
 
     // Force window to repaint
-    InvalidateRect(hWnd, NULL, true);
 }
 
 void init_win(void* libc, void* kernel32, void* user32, void* gdi32) {
@@ -236,7 +248,6 @@ void init_win(void* libc, void* kernel32, void* user32, void* gdi32) {
     printf("hInst %p\n", hInst);
 
     // Allocate memory for pixel buffer
-    pixels = (unsigned int*)malloc(width * height * sizeof(unsigned int));
     UpdatePixels();
 
     // Initialize the window class

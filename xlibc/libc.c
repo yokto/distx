@@ -26,6 +26,7 @@
 #include <sys/time.h>
 #include <fs.h>
 #include <base/futex_p.h>
+#include <base/loop_impl.h>
 #include <unistd.h>
 
 //#define FENCE 1
@@ -377,6 +378,7 @@ __attribute__((constructor)) void init() {
 	stderr->fd = base_fs_stderr;
 	//external_linux_c_dprintf(1, "setting stdin=%p, stdout=%p, stderr=%p\n", stdin, stdout, stderr);
 	//printf("setting stdin=%p, stdout=%p, stderr=%p\n", stdin, stdout, stderr);
+	base_loop_p_init(isWin, libc);
 }
 
 DLL_PUBLIC
@@ -955,7 +957,7 @@ DLL_PUBLIC int fstat(int fd, struct stat * statbuf) {
 }
 
 
-int clock_gettime_ms(int /*clk_id*/, struct timespec *ts) {
+int clock_gettime_ms(int clk_id, struct timespec *ts) {
     int64_t frequency = 0;
     static bool no_freq_info = false;
     int64_t now;

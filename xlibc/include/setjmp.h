@@ -15,7 +15,6 @@ typedef struct {
   __UINTPTR_TYPE__ rsp;
   __UINTPTR_TYPE__ rip;
 #else
-#warning "__jmp_buf not available for your target architecture."
   int rbx;
 #endif
 } __jmp_buf;

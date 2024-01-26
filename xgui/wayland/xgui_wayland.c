@@ -10,6 +10,8 @@
 #include "xdg-shell-client-protocol.h"
 #include "wayland_wrapper.h"
 
+#include "xgui/xgui.h"
+
 
 #include "shm.h"
 
@@ -33,25 +35,9 @@ struct client_state {
     struct wl_surface *wl_surface;
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
+    uint32_t width;
+    uint32_t height;
 };
-
-static int width = 800;
-static int height = 600;
-static unsigned int* pixels = 0;
-
-
-// Function to update pixel buffer
-static void UpdatePixels() {
-    // Set all pixels to red (ARGB format)
-    for (int i = 0; i < width * height; ++i)
-    {
-        pixels[i] = 0xFFFF0000; // Red
-        if (i < 12000)
-        {
-            pixels[i] = 0xFF00FF00; // Red
-        }
-    }
-}
 
 static void
 xdg_wm_base_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t serial)
@@ -61,6 +47,26 @@ xdg_wm_base_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t serial)
 
 static const struct xdg_wm_base_listener xdg_wm_base_listener = {
     .ping = xdg_wm_base_ping,
+};
+
+void xdg_toplevel_configure(void *data,
+			  struct xdg_toplevel *xdg_toplevel,
+			  int32_t width,
+			  int32_t height,
+			  struct wl_array *states) {
+    struct client_state *state = data;
+    if (width != 0 && height != 0) {
+        state->width = width;
+        state->height = height;
+    }
+    printf("configure %d, %d\n", width, height);
+}
+
+static const struct xdg_toplevel_listener xdg_toplevel_listener = {
+	.configure = xdg_toplevel_configure,
+	.close = 0,
+    .configure_bounds = 0,
+	.wm_capabilities = 0
 };
 
 static void
@@ -111,7 +117,7 @@ static const struct wl_buffer_listener wl_buffer_listener = {
 static struct wl_buffer *
 draw_frame(struct client_state *state)
 {
-    const int width = 640, height = 480;
+    const int width = state->width, height = state->height;
     int stride = width * 4;
     int size = stride * height;
 
@@ -135,10 +141,10 @@ draw_frame(struct client_state *state)
     /* Draw checkerboxed background */
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
-            if ((x + y / 8 * 8) % 16 < 8)
-                data[y * width + x] = 0xFF666666;
+            if ((x + y / 40 * 40) % 80 < 40)
+                data[y * width + x] = 0xFFFF0066;
             else
-                data[y * width + x] = 0xFFEEEEEE;
+                data[y * width + x] = 0xFF00EE00;
         }
     }
 
@@ -177,6 +183,37 @@ void init_wayland(void* libc, void* wayland_client) {
     //xdg_shell_types[7]
     init_shm(libc);
 
+}
+
+void wayland_xgui_create_instance(
+    void (*on_instance)(
+        struct xgui_instance *instance,
+        struct xgui_error *error,
+        void *data
+        ),
+    void *loop,
+    void *data) {
+
+    struct xgui_interface_base interface_base = {
+        .create_window = 0,
+        .destroy_window = 0
+    };
+    struct xgui_interface interfaces[1] = {
+        {
+        .type = &xgui_interface_base_type,
+        .interface = &interface_base
+        }
+    };
+    struct xgui_instance instance = {
+        .interfaces = {
+            .size = 1,
+            .data = interfaces
+        },
+        .state = 0
+    };
+
+    on_instance(&instance, 0, data);
+
     struct client_state state = { 0 };
     state.wl_display = wl_display_connect(NULL);
     state.wl_registry = wl_display_get_registry(state.wl_display);
@@ -188,6 +225,8 @@ void init_wayland(void* libc, void* wayland_client) {
     xdg_surface_add_listener(state.xdg_surface, &xdg_surface_listener, &state);
     state.xdg_toplevel = xdg_surface_get_toplevel(state.xdg_surface);
     xdg_toplevel_set_title(state.xdg_toplevel, "Example client");
+    xdg_toplevel_set_maximized(state.xdg_toplevel);
+    xdg_toplevel_add_listener(state.xdg_toplevel, &xdg_toplevel_listener, &state);
     wl_surface_commit(state.wl_surface);
 
     while (wl_display_dispatch(state.wl_display)) {

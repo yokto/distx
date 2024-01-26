@@ -5,11 +5,14 @@ INSTALL := ${ZWOLF_INSTALL}/xlibc/
 LIBC := $(INSTALL)x86_64/lib/libc.so $(INSTALL)aarch64/lib/libc.so
 LIBZWOLF := $(INSTALL)x86_64/lib/libzwolf.so $(INSTALL)aarch64/lib/libzwolf.so
 
+SRC := libc.c printf.c string.c time.c unicode.c fs.c qsort.c proc.c thread_impl.c emutls.c longjmp.c setjmp.c base/futex.c base/loop_impl.c
+
+
 HEADERS = $(addprefix $(INSTALL)common/,$(wildcard include/*.h)) $(addprefix $(INSTALL)common/,$(wildcard include/*/*.h))
 
 all: $(LIBC) $(HEADERS) $(LIBZWOLF)
 
-$(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so libc.c printf.c string.c time.c unicode.c fs.c qsort.c proc.c thread_impl.c emutls.c Makefile longjmp.c setjmp.c base/futex.c
+$(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so $(SRC) Makefile
 	mkdir -p $(INSTALL)$*/lib
 	echo ${CC}
 	${CC} \
@@ -21,6 +24,8 @@ $(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so libc.c printf.c string.c ti
 		-Wl,--no-undefined \
 		--target=$*-unknown-linux-zwolf \
 		-Wno-unused-parameter \
+		-Werror \
+		-Wno-error=fuse-ld-path \
 		-nolibc -shared \
 		-femulated-tls \
 		--unwindlib=none \
@@ -31,19 +36,7 @@ $(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so libc.c printf.c string.c ti
 		-fPIC \
 		-Iinclude \
 		-o $@ \
-		emutls.c \
-		libc.c \
-		setjmp.c \
-		longjmp.c \
-		printf.c \
-		string.c \
-		proc.c \
-		unicode.c \
-		time.c \
-		fs.c \
-		endian.c \
-		base/futex.c \
-		qsort.c thread_impl.c
+		$(SRC)
 
 $(INSTALL)%/lib/libzwolf.so: libzwolf/libzwolf.c
 	mkdir -p $(INSTALL)$*/lib

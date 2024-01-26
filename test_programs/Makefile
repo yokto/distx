@@ -31,18 +31,22 @@ TESTCGUI_EXECS := $(patsubst %.c, $(BUILDDIR)/x86_64/bin/%, $(TESTCGUI_SOURCES))
 TESTQT_SOURCES := $(wildcard testqt_*.cpp)
 TESTQT_EXECS := $(patsubst %.cpp, $(BUILDDIR)/x86_64/bin/%, $(TESTQT_SOURCES))
 
-qt: $(TESTQT_EXECS)
-
 all: \
 	$(TESTCPP_EXECS) \
 	$(TESTC_EXECS) \
 	$(TESTCLIB_EXECS) \
 	$(TESTCGUI_EXECS)
 
+qt: $(TESTQT_EXECS)
+
+.PHONY: test test_%
 test:
-	../build/load_elf _zwolf/test_programs/bin/testc_empty
-	../build/load_elf _zwolf/test_programs/bin/testc_exit
-	../build/load_elf _zwolf/test_programs/bin/testcpp_vector
+	$(ZWOLF)/zwolf/x86_64/bin/load_elf_linux _zwolf/test_programs/x86_64/bin/testc_empty
+	$(ZWOLF)/zwolf/x86_64/bin/load_elf_linux _zwolf/test_programs/x86_64/bin/testc_exit
+	$(ZWOLF)/zwolf/x86_64/bin/load_elf_linux _zwolf/test_programs/x86_64/bin/testcpp_vector
+
+test_%:
+	$(ZWOLF)/zwolf/x86_64/bin/load_elf_linux _zwolf/test_programs/x86_64/bin/test$*
 
 #nolibc: foobar.so nolibc.c ../lib/* Makefile
 #	gcc -shared -nostdlib '-Wl,--dynamic-linker=/home/silvio/stuff/sources/elf/executables/load_elf.so' -fvisibility=hidden -fPIC -o nolibc -lfoobar -L. nolibc.c
@@ -145,8 +149,10 @@ $(BUILDDIR)/x86_64/bin/testcgui_%: testcgui_%.c
 	${CC} -femulated-tls -g \
 		-lm \
 		-lxgui \
+		-I$(DEPDIR)/xgui/common/include \
 		-L$(DEPDIR)/xgui/x86_64/lib \
 		-target x86_64-unknown-linux-zwolf \
+		-Wl,--no-undefined \
 		"-Wl,-soname,/test_programs/x86_64/bin/testcgui_$*" \
 		-o "$@" "$<"
 

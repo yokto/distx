@@ -1,7 +1,34 @@
 #include <zwolf.h>
 #include "windows/xgui_windows.h"
 #include "wayland/xgui_wayland.h"
+#include "xgui/xgui.h"
 
+struct xgui_interface_type {};
+
+struct xgui_interface_type xgui_interface_base_type;
+
+void (*xgui_create_instance_p)(
+    void (*on_instance)(
+        struct xgui_instance *instance,
+        struct xgui_error *error,
+        void *data
+        ),
+    void *loop,
+    void *data) = 0;
+
+void xgui_create_instance(
+    void (*on_instance)(
+        struct xgui_instance *instance,
+        struct xgui_error *error,
+        void *data
+        ),
+    void *loop,
+    void *data) {
+    if (!xgui_create_instance_p) { return; }
+    return xgui_create_instance_p(on_instance, loop, data);
+}
+
+void xgui_destroy_instance(struct xgui_instance *instance) {}
 
 __attribute__((constructor)) void init() {
         void* libc = 0;
@@ -25,7 +52,8 @@ __attribute__((constructor)) void init() {
                 wayland_client = zwolf_open("libwayland-client.so", ZWOLF_OPEN_EXTERNAL);
 		if (libc && wayland_client) {
 			init_wayland(libc, wayland_client);
-		} else if (libc) {
+                        xgui_create_instance_p = &wayland_xgui_create_instance;
+                } else if (libc) {
 			zwolf_write("could not open wayland-client.so");
 		}
         }

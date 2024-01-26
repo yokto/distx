@@ -50,7 +50,8 @@ int setjmp(__jmp_buf * buf) {
              sizeof(__UINTPTR_TYPE__) * 2;
   buf->rip = (__UINTPTR_TYPE__)(__builtin_return_address(0));
 #else // LLVM_LIBC_ARCH_X86_64
-#warning "setjmp implementation not available for the target architecture."
+  debug_printf("setjmp not implemented");
+  __builtin_trap();
 #endif
 
   return 0;

@@ -3,7 +3,7 @@ CC := $(ZWOLF)/llvm/x86_64/bin/clang
 INSTALL := $(ZWOLF)/xgui
 XGUI := $(INSTALL)/x86_64/lib/libxgui.so $(INSTALL)/aarch64/lib/libxgui.so
 
-HEADERS = $(addprefix $(INSTALL)common/,$(wildcard include/*.h)) $(addprefix $(INSTALL)common/,$(wildcard include/*/*.h))
+HEADERS = $(addprefix $(INSTALL)/common/,$(wildcard include/*.h)) $(addprefix $(INSTALL)/common/,$(wildcard include/*/*.h))
 
 all: $(XGUI) $(HEADERS)
 
@@ -35,7 +35,7 @@ $(INSTALL)/%/lib/libxgui.so: xgui.c windows/xgui_windows.c wayland/xgui_wayland.
 
 
 # copy headers
-$(INSTALL)common/include/%.h: include/%.h
-	mkdir -p $(dir $(INSTALL)common/include/$*h)
-	@echo '#include "$*.h"' | ${CC} -x c --analyze -Iinclude -nostdinc -
+$(INSTALL)/common/include/%.h: include/%.h
+	mkdir -p $(dir $(INSTALL)/common/include/$*h)
+	@echo '#include "$*.h"' | ${CC} -x c --analyze -Iinclude -
 	cp $< $@

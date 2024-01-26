@@ -1,0 +1,15 @@
+The headers in this directory are supposed to have as few dependencies as possible.
+They should represent all interaction an average non-gui application should have with the operating system.
+
+This should include:
+
+- Filesystem
+- Networking
+- Threading
+- An event loop
+
+This should not include:
+
+- Atomic operations
+- Mathematic operations
+- String processing

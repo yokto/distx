@@ -13,6 +13,7 @@
 
 #define LIBC_INLINE_ASM __asm__
 
+#pragma clang diagnostic ignored "-Winvalid-noreturn"
 void longjmp(__jmp_buf * buf, int val) {
 #ifdef __x86_64__
   register __UINT64_TYPE__ rbx __asm__("rbx");
@@ -38,6 +39,5 @@ void longjmp(__jmp_buf * buf, int val) {
   LIBC_INLINE_ASM("mov %1, %0\n\t" : "=r"(rsp) : "m"(buf->rsp) :);
   LIBC_INLINE_ASM("jmp *%0\n\t" : : "m"(buf->rip));
 #else // LLVM_LIBC_ARCH_X86_64
-#warning "longjmp implementation not available for the target architecture."
 #endif
 }
