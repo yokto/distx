@@ -15,3 +15,8 @@ jobs:
     - uses: actions/checkout@v3
     - name: configure
       run: ls
+    - name: Archive artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: headers
+        path: xlibc/include
