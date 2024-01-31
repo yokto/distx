@@ -1,5 +1,4 @@
-name: C/C++ CI
-
+name: Build Headers
 on:
   push:
     branches: [ "master" ]
