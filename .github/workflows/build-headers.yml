@@ -16,8 +16,6 @@ jobs:
       run: ls
     - name: Archive Release
       run: tar cf headers.tar.xz xlibc/headers
-    - name: upload
-      uses: actions/upload-release-asset@1
 
     - name: Create Release
       id: create_release
