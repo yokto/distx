@@ -23,9 +23,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: 2024
-        release_name: Release 2024
-        draft: true
+        tag_name: 2024.${{ github.run_number }}
+        release_name: Release 2024.${{ github.run_number }}
+        draft: false
         prerelease: false
     - name: Upload Release Asset
       id: upload-release-asset 
