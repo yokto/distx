@@ -27,7 +27,7 @@ jobs:
         sudo mkdir /_zwolf
         sudo chown ${USER}: /_zwolf
         cd llvm-src
-        ../llvm-src/build-linux.sh
+        ../llvm/build-linux.sh
       
 #    - name: Create Release
 #      id: create_release
