@@ -1,7 +1,9 @@
 if [ $STAGE1 == "" ]
 then
-	"set STAGE1"
+	STAGE1="/_zwolf"
 fi
+
+HOST_PREFIX="github.com+2024+"
 
 mkdir -p build_linux
 (
@@ -9,12 +11,23 @@ mkdir -p build_linux
 	cmake ../llvm \
 		"-DLLVM_ENABLE_PROJECTS=clang;lld" \
 		"-DCMAKE_BUILD_TYPE=Release" \
+		"-DLLVM_BUILD_LLVM_DYLIB=ON" \
+                "-DLLVM_LINK_LLVM_DYLIB=ON" \
+		"-DCLANG_LINK_CLANG_DYLIB=ON" \
 		"-DCMAKE_C_COMPILER=clang" \
 		"-DDEFAULT_SYSROOT=${STAGE1}" \
-		"-DCMAKE_INSTALL_PREFIX=${STAGE1}/llvm" \
-		"-DCMAKE_INSTALL_BINDIR=x86_64/bin" \
-		"-DLLVM_TOOLS_INSTALL_DIR=x86_64/bin" \
-		"-DCMAKE_INSTALL_INCLUDEDIR=common/include" \
+		"-DCMAKE_INSTALL_PREFIX=${STAGE1}" \
+		"-DCMAKE_INSTALL_BINDIR=${HOST_PREFIX}llvm-x86_64/bin" \
+		"-DCMAKE_INSTALL_LIBDIR=${HOST_PREFIX}llvm-x86_64/lib" \
+		"-DCMAKE_INSTALL_LIBEXECDIR=${HOST_PREFIX}llvm-x86_64/libexec" \
+		"-DCMAKE_INSTALL_MANDIR=${HOST_PREFIX}llvm-doc-common/share/man" \
+		"-DCMAKE_INSTALL_DATADIR=${HOST_PREFIX}llvm-dev-common/share" \
+		"-DCMAKE_INSTALL_INCLUDEDIR=${HOST_PREFIX}llvm-dev-common/include" \
+		"-DCMAKE_INSTALL_PACKAGEDIR=${HOST_PREFIX}llvm-dev-x86_64/lib/cmake" \
+		"-DLLVM_TOOLS_INSTALL_DIR=${HOST_PREFIX}llvm-x86_64/bin" \
+		"-DCLANG_TOOLS_INSTALL_DIR=${HOST_PREFIX}llvm-x86_64/bin" \
+		"-DLLVM_UTILS_INSTALL_DIR=${HOST_PREFIX}llvm-utils-x86_64/bin" \
+		"-DCPACK_PACKAGE_INSTALL_DIRECTORY=${HOST_PREFIX}llvm-cpack-x86_64/include" \
 		"-DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-linux-zwolf" \
 		"-DLLVM_TARGETS_TO_BUILD=X86;AArch64" \
 		"-DLLVM_INCLUDE_BENCHMARKS=OFF" \
@@ -30,7 +43,12 @@ mkdir -p build_linux
 		"-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON" \
 		"-DCLANG_DEFAULT_CXX_STDLIB=libc++" \
 		"-DLIBCXX_ENABLE_DEBUG_MODE=ON" \
+		"-DLIBCXX_PREFIX=/${HOST_PREFIX}llvm-libcxx-" \
+		"-DRT_PREFIX=/${HOST_PREFIX}llvm-rt-" \
+		"-DLLVM_PREFIX=/${HOST_PREFIX}llvm-" \
+		"-DXLIBC_PREFIX=/${HOST_PREFIX}xlibc-" \
 		"-G" "Ninja"
 	ninja
 	ninja install
+	rm ${STAGE1}/${HOST_PREFIX}llvm-x86_64/lib/lib*.a
 )
