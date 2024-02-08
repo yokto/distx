@@ -1,7 +1,7 @@
 ZWOLF ?= ${PWD}/_zwolf
 ZWOLF_INSTALL ?= ${PWD}/_zwolf_install
 CC := ${ZWOLF}/llvm/x86_64/bin/clang
-INSTALL := ${ZWOLF_INSTALL}/xlibc/
+INSTALL ?= ${ZWOLF_INSTALL}/${STAGE}xlibc-
 LIBC := $(INSTALL)x86_64/lib/libc.so $(INSTALL)aarch64/lib/libc.so
 LIBZWOLF := $(INSTALL)x86_64/lib/libzwolf.so $(INSTALL)aarch64/lib/libzwolf.so
 
@@ -19,7 +19,7 @@ $(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so $(SRC) Makefile
 		-g \
 		-O2 \
 		-Wall -Wextra \
-		-Wl,-soname,/xlibc/$*/lib/libc.so \
+		-Wl,-soname,/${STAGE}xlibc-$*/lib/libc.so \
 		-Wl,--export-dynamic-symbol=__* \
 		-Wl,--no-undefined \
 		--target=$*-unknown-linux-zwolf \
