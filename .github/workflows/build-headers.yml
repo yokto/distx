@@ -1,5 +1,6 @@
 name: Build Headers
 on:
+  workflow-dispatch:
 #  push:
 #    branches: [ "master" ]
 #  pull_request:
