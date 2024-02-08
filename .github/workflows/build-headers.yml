@@ -28,7 +28,28 @@ jobs:
         sudo chown ${USER}: /_zwolf
         cd llvm-src
         CC=clang CXX=clang++ ../llvm/build-linux.sh
-      
+
+    - name: copy headers
+      run: |
+        mkdir -p "/_zwolf/github.com+2024+xlibc-common/"
+        cp -r xlibc/include "/_zwolf/github.com+2024+xlibc-common/"
+
+    - name: build rt
+      run: |
+        cd llvm-src
+        ln -s /_zwolf _zwolf 
+        mkdir _zwolf_install
+        ln -s /zwolf _zwolf_install/_zwolf
+        ../llvm/build-compiler-rt.sh
+
+    - name: build xlibc
+      run: |
+        cd "xlibc"
+        ln -s /_zwolf _zwolf 
+        ln -s /_zwolf _zwolf_install
+        make
+
+    
 #    - name: Create Release
 #      id: create_release
 #      uses: actions/create-release@v1
