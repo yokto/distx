@@ -17,7 +17,7 @@ jobs:
       run: sudo apt-get install -y ninja-build clang
 
     - name: clone llvm
-      run: git clone "https://github.com/yokto/llvm-project.git" llvm
+      run: git clone "https://github.com/yokto/llvm-project.git" llvm-src
 
     - name: build llvm stage1
       run: |
