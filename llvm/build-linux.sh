@@ -1,4 +1,4 @@
-if [ $STAGE1 == "" ]
+if [ "$STAGE1" == "" ]
 then
 	STAGE1="/_zwolf"
 fi
