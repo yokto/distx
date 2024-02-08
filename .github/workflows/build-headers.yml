@@ -12,11 +12,23 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: configure
-      run: ls
-    - name: Archive Release
-      run: tar cf headers.tar.xz xlibc/include
+    
+    - name: Install ninja
+      run: sudo apt-get install -y ninja-build clang
 
+    - name: clone llvm
+      run: git clone "https://github.com/yokto/llvm-project.git" llvm
+
+    - name: build llvm stage1
+      run: |
+        #ls
+        #mkdir -p _zwolf/github.com_2024-xlibc_2-common
+        #tar -C _zwolf/github__com_xlibc_2024-common --strip-components=1 -xf headers.tar.xz
+        sudo mkdir /_zwolf
+        sudo chown ${USER}: /_zwolf
+        cd llvm
+        ../llvm/build-linux.sh
+      
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
