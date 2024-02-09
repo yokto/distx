@@ -17,9 +17,6 @@ jobs:
     - name: Install ninja
       run: sudo apt-get install -y ninja-build clang
 
-    - name: clone llvm
-      run: git clone "https://github.com/yokto/llvm-project.git" llvm-src
-
     - name: build llvm stage1
       run: |
         #ls
@@ -27,28 +24,7 @@ jobs:
         #tar -C _zwolf/github__com_xlibc_2024-common --strip-components=1 -xf headers.tar.xz
         sudo mkdir /_zwolf
         sudo chown ${USER}: /_zwolf
-        cd llvm-src
-        CC=clang CXX=clang++ ../llvm/build-linux.sh
-
-    - name: copy headers
-      run: |
-        mkdir -p "/_zwolf/github.com+2024+xlibc-common/"
-        cp -r xlibc/include "/_zwolf/github.com+2024+xlibc-common/"
-
-    - name: build rt
-      run: |
-        cd llvm-src
-        ln -s /_zwolf _zwolf 
-        mkdir _zwolf_install
-        ln -s /zwolf _zwolf_install/_zwolf
-        ../llvm/build-compiler-rt.sh
-
-    - name: build xlibc
-      run: |
-        cd "xlibc"
-        ln -s /_zwolf _zwolf 
-        ln -s /_zwolf _zwolf_install
-        make
+        ./bootstrap.sh
 
     - name: tar
       run: tar cf zwolf.tar.xz /_zwolf

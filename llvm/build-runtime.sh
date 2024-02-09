@@ -1,7 +1,7 @@
 #!/bin/bash
 ZWOLF=${ZWOLF:-${PWD}/_zwolf}
-export CC=${ZWOLF}/llvm/x86_64/bin/clang
-export CXX=${ZWOLF}/llvm/x86_64/bin/clang++ 
+export CC=${ZWOLF}/${HOST_PREFIX}llvm-x86_64/bin/clang
+export CXX=${ZWOLF}/${HOST_PREFIX}llvm-x86_64/bin/clang++ 
 for arch in x86_64 aarch64
 do
 	mkdir -p "build-runtime-$arch"
@@ -19,9 +19,9 @@ do
 			"-DCMAKE_C_COMPILER_FORCED=TRUE" \
 			"-DCMAKE_CXX_COMPILER_FORCED=TRUE" \
 			"-DDEFAULT_SYSROOT=/_zwolf" \
-			"-DCMAKE_INSTALL_PREFIX=/_zwolf/llvm-libcxx" \
-			"-DCMAKE_INSTALL_LIBDIR=${arch}/lib" \
-			"-DCMAKE_INSTALL_INCLUDEDIR=common/include" \
+			"-DCMAKE_INSTALL_PREFIX=/_zwolf" \
+			"-DCMAKE_INSTALL_LIBDIR=${HOST_PREFIX}llvm-libcxx-${arch}/lib" \
+			"-DCMAKE_INSTALL_INCLUDEDIR=${HOST_PREFIX}llvm-libcxx-common/include" \
 			"-DLIBCXX_INCLUDE_BENCHMARKS:BOOL=OFF" \
 			"-DLIBCXX_USE_COMPILER_RT=ON" \
 			"-DLIBCXX_ENABLE_DEBUG_MODE=ON" \
@@ -32,6 +32,6 @@ do
 			"-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON" \
 			"-G" "Ninja"
 		ninja cxx cxxabi unwind
-		DESTDIR=../_zwolf_install ninja install
+		ninja install
 	)
 done

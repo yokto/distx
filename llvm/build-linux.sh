@@ -1,9 +1,19 @@
+#!/bin/bash
+set -e
+set -x
+
 if [ "$STAGE1" == "" ]
 then
 	STAGE1="/_zwolf"
 fi
 
-HOST_PREFIX="github.com+2024+"
+if [ "$HOST_PREFIX" == "" ]
+then
+	HOST_PREFIX="github.com+2024+"
+fi
+
+export CC=clang
+export CXX=clang++
 
 mkdir -p build_linux
 (
@@ -21,8 +31,8 @@ mkdir -p build_linux
 		"-DCMAKE_INSTALL_LIBDIR=${HOST_PREFIX}llvm-x86_64/lib" \
 		"-DCMAKE_INSTALL_LIBEXECDIR=${HOST_PREFIX}llvm-x86_64/libexec" \
 		"-DCMAKE_INSTALL_MANDIR=${HOST_PREFIX}llvm-doc-common/share/man" \
-		"-DCMAKE_INSTALL_DATADIR=${HOST_PREFIX}llvm-dev-common/share" \
-		"-DCMAKE_INSTALL_INCLUDEDIR=${HOST_PREFIX}llvm-dev-common/include" \
+		"-DCMAKE_INSTALL_DATADIR=${HOST_PREFIX}llvm-common/share" \
+		"-DCMAKE_INSTALL_INCLUDEDIR=${HOST_PREFIX}llvm-common/include" \
 		"-DCMAKE_INSTALL_PACKAGEDIR=${HOST_PREFIX}llvm-dev-x86_64/lib/cmake" \
 		"-DLLVM_TOOLS_INSTALL_DIR=${HOST_PREFIX}llvm-x86_64/bin" \
 		"-DCLANG_TOOLS_INSTALL_DIR=${HOST_PREFIX}llvm-x86_64/bin" \

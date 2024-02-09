@@ -1,7 +1,7 @@
 #!/bin/bash
 ZWOLF=${ZWOLF:-$PWD/_zwolf}
-export CC="$ZWOLF/llvm/x86_64/bin/clang"
-export CXX="$ZWOLF/llvm/x86_64/bin/clang++"
+export CC="$ZWOLF/${HOST_PREFIX}llvm-x86_64/bin/clang"
+export CXX="$ZWOLF/${HOST_PREFIX}llvm-x86_64/bin/clang++"
 echo CC = $CC
 for arch in x86_64 aarch64
 do
@@ -14,8 +14,8 @@ do
 			"-DCMAKE_BUILD_TYPE=Release" \
 			"-DCMAKE_C_COMPILER=${CC}" \
 			"-DCMAKE_SYSTEM_NAME=zwolf" \
-			"-DCMAKE_INSTALL_PREFIX=/_zwolf/llvm-compiler-rt/${arch}" \
-			"-DCMAKE_INSTALL_INCLUDEDIR=/_zwolf/llvm-compiler-rt/common/include" \
+			"-DCMAKE_INSTALL_PREFIX=/_zwolf/${HOST_PREFIX}llvm-rt-${arch}" \
+			"-DCMAKE_INSTALL_INCLUDEDIR=/_zwolf/${HOST_PREFIX}llvm-rt-common/include" \
 			"-DCMAKE_C_COMPILER_TARGET=${arch}-unknown-linux-zwolf" \
 			"-DCMAKE_ASM_COMPILER_TARGET=${arch}-unknown-linux-zwolf" \
 			"-DCMAKE_ASM_FLAGS=-target ${arch}-unknown-linux-zwolf" \
@@ -34,6 +34,6 @@ do
 			"-DCMAKE_CXX_COMPILER_FORCED=TRUE" \
 			"-G" "Ninja"
 		ninja compiler-rt
-		DESTDIR=../_zwolf_install ninja install
+		ninja install
 	)
 done
