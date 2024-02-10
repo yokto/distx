@@ -3,7 +3,7 @@
 set -x
 set -e
 
-export HOST_PREFIX="distx.org+2024-"
+export HOST_PREFIX="distx.org_2024-"
 export ZWOLF="/_zwolf"
 
 set +x
