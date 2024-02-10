@@ -6,20 +6,67 @@ set -e
 export HOST_PREFIX="distx.com+2024-"
 export ZWOLF="/_zwolf"
 
-git clone "https://github.com/yokto/openlibm.git" openlibm-src
-git clone "https://github.com/yokto/llvm-project.git" llvm-src
+FTP_SERVER="ftpupload.net"
+FTP_USERNAME="if0_35948865"
 
-(cd llvm-src; ../llvm/build-linux.sh)
+# Remote directory to upload to
+REMOTE_DIR="/htdocs"
 
-mkdir -p "/_zwolf/${HOST_PREFIX}xlibc-common"
-cp -r xlibc/include "/_zwolf/${HOST_PREFIX}xlibc-common/include"
+LOCAL_FILE=README.md
+ftp -n $FTP_SERVER <<END_SCRIPT
+quote USER $FTP_USERNAME
+quote PASS $FTP_PASSWORD
+cd $REMOTE_DIR
+put $LOCAL_FILE
+quit
+END_SCRIPT
 
-(cd llvm-src; ../llvm/build-compiler-rt.sh)
+#git clone "https://github.com/yokto/openlibm.git" openlibm-src
+#git clone "https://github.com/yokto/llvm-project.git" llvm-src
+#
+#(cd llvm-src; ../llvm/build-linux.sh)
+#
+#mkdir -p "/_zwolf/${HOST_PREFIX}xlibc-common"
+#cp -r xlibc/include "/_zwolf/${HOST_PREFIX}xlibc-common/include"
+#
+#(cd llvm-src; ../llvm/build-compiler-rt.sh)
+#
+#(cd xlibc; ZWOLF_INSTALL=/_zwolf make)
+#
+#(cd openlibm-src; ../openlibm/build.sh)
+#
+#(cd llvm-src; ../llvm/build-runtime.sh)
 
-(cd xlibc; ZWOLF_INSTALL=/_zwolf make)
+#(cd llvm-src; ../llvm/build-zwolf.sh)
 
-(cd openlibm-src; ../openlibm/build.sh)
+#mkdir -p "${ZWOLF}/old"
+#mv ${ZWOLF}/${HOST_PREFIX}llvm-{common,dev-*,doc-*,x86_64} ${ZWOLF}/old
+#mv ${ZWOLF}/tmp/_zwolf/* ${ZWOLF}
+#
+#(cd ${ZWOLF};
+#for x in ${HOST_PREFIX}*
+#do
+#	tar cf "$x.tar.xz" "$x"
+#done
+#)
 
-(cd llvm-src; ../llvm/build-runtime.sh)
+FTP_SERVER="ftpupload.net"
+FTP_USERNAME="if0_35948865"
 
-(cd llvm-src; ../llvm/build-zwolf.sh)
+# Remote directory to upload to
+REMOTE_DIR="/htdocs"
+
+(cd ${ZWOLF};
+for LOCAL_FILE in ${HOST_PREFIX}*tar.xz
+do
+	
+ftp -n $FTP_SERVER <<END_SCRIPT
+quote USER $FTP_USERNAME
+quote PASS $FTP_PASSWORD
+cd $REMOTE_DIR
+put $LOCAL_FILE
+quit
+END_SCRIPT
+
+done
+)
