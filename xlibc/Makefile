@@ -19,7 +19,7 @@ $(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so $(SRC) Makefile
 		-g \
 		-O2 \
 		-Wall -Wextra \
-		-Wl,-soname,/${STAGE}xlibc-$*/lib/libc.so \
+		-Wl,-soname,/${HOST_PREFIX}xlibc-$*/lib/libc.so \
 		-Wl,--export-dynamic-symbol=__* \
 		-Wl,--no-undefined \
 		--target=$*-unknown-linux-zwolf \
