@@ -15,11 +15,11 @@ jobs:
     - uses: actions/checkout@v3
     
     - name: Install ninja
-      run: sudo apt-get install -y ninja-build clang
+      run: sudo apt-get install -y ninja-build clang s3cmd
 
     - name: build llvm stage1
       env:
-        FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        AWS_KEY: ${{ secrets.AWS_KEY }}
       run: |
         #ls
         #mkdir -p _zwolf/github.com_2024-xlibc_2-common

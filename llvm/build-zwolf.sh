@@ -62,4 +62,5 @@ mkdir -p build_release_archs
 		"-G" "Ninja"
 	ninja
 	DESTDIR=/_zwolf/tmp ninja install
+	rm /_zwolf/tmp/_zwolf/${HOST_PREFIX}llvm-x86_64/lib/lib*.a
 )

@@ -6,6 +6,10 @@ set -e
 export HOST_PREFIX="distx.org+2024-"
 export ZWOLF="/_zwolf"
 
+set +x
+s3cmd --access_key AKIA3UPFWFC4ANF5H3TC --secret_key "${AWS_KEY}" put README.md s3://distx
+set -x
+
 git clone "https://github.com/yokto/openlibm.git" openlibm-src
 git clone "https://github.com/yokto/llvm-project.git" llvm-src
 
@@ -35,23 +39,12 @@ do
 done
 )
 
-FTP_SERVER="ftpupload.net"
-FTP_USERNAME="if0_35948865"
-
-# Remote directory to upload to
-REMOTE_DIR="/htdocs"
-
 (cd ${ZWOLF};
 for LOCAL_FILE in ${HOST_PREFIX}*tar.xz
 do
-	
-ftp -n $FTP_SERVER <<END_SCRIPT
-quote USER $FTP_USERNAME
-quote PASS $FTP_PASSWORD
-cd $REMOTE_DIR
-put $LOCAL_FILE
-quit
-END_SCRIPT
-
+	echo $LOCAL_FILE
+	set +x
+	s3cmd --access_key AKIA3UPFWFC4ANF5H3TC --secret_key "${AWS_KEY}" put "${LOCAL_FILE}" s3://distx
+	set -x
 done
 )
