@@ -1,6 +1,7 @@
-ZWOLF ?= ${PWD}/_zwolf
-CC := ${ZWOLF}/llvm/x86_64/bin/clang
-CXX := ${ZWOLF}/llvm/x86_64/bin/clang++
+ZWOLF ?= ${PWD}/_distx
+DISTX_PREFIX ?= "distx.org_2024-"
+CC := ${ZWOLF}/${DISTX_PREFIX}llvm-x86_64/bin/clang
+CXX := ${ZWOLF}/${DISTX_PREFIX}llvm-x86_64/bin/clang++
 BUILDDIR := ${ZWOLF}/test_programs# $(realpath $(dir ${PWD}))
 DEPDIR := ${ZWOLF}
 LIBFOOBAR := $(BUILDDIR)/lib/libfoobar.so

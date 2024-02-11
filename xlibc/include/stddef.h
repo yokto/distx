@@ -16,7 +16,11 @@ typedef __SSIZE_TYPE__ ssize_t;
 //#endif
 
 typedef __PTRDIFF_TYPE__ ptrdiff_t;
+#ifndef __cplusplus
 typedef __WCHAR_TYPE__ wchar_t;
+#endif
+
+typedef __INT64_TYPE__ max_align_t;
 
 #ifdef __cplusplus
 }
