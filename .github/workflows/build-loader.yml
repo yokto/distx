@@ -1,0 +1,26 @@
+name: Build Loader
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install ninja
+      run: sudo apt-get install -y mingw-w64 s3cmd
+
+    - name: build llvm stage1
+      env:
+        AWS_KEY: ${{ secrets.AWS_KEY }}
+      run: |
+        sudo mkdir /_zwolf
+        sudo chown ${USER}: /_zwolf
+        ./build-loader.sh
