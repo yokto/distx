@@ -35,8 +35,8 @@ TESTQT_EXECS := $(patsubst %.cpp, $(BUILDDIR)/x86_64/bin/%, $(TESTQT_SOURCES))
 all: \
 	$(TESTCPP_EXECS) \
 	$(TESTC_EXECS) \
-	$(TESTCLIB_EXECS) \
-	$(TESTCGUI_EXECS)
+	$(TESTCLIB_EXECS) #\
+	#$(TESTCGUI_EXECS)
 
 qt: $(TESTQT_EXECS)
 
@@ -170,7 +170,7 @@ $(BUILDDIR)/aarch64/bin/testcpp_%: testcpp_%.cpp
 	${CXX} -femulated-tls -g \
 		"-Wl,--no-undefined" \
 		-target aarch64-unknown-linux-zwolf \
-		"-Wl,-soname,/test_programs/aarch/bin/testcpp_$*" \
+		"-Wl,-soname,/test_programs/aarch64/bin/testcpp_$*" \
 		-o "$@" "$<"
 
 $(CONSTANTS): constants.c

@@ -1,11 +1,15 @@
 CC = gcc
 DISTX_PREFIX ?= "distx.org_2024-"
 
-all: load_elf load_elf.exe # load_elf_android
+all: load_elf load_elf_aarch load_elf.exe # load_elf_android
 
 load_elf: load_elf.c
 	mkdir -p _zwolf/${DISTX_PREFIX}xload-x86_64/bin
 	${CC} -ldl -g -o _zwolf/${DISTX_PREFIX}xload-x86_64/bin/load_elf_linux load_elf.c
+
+load_elf_aarch: load_elf.c
+	mkdir -p _zwolf/${DISTX_PREFIX}xload-aarch64/bin
+	aarch64-linux-gnu-gcc -ldl -g -o _zwolf/${DISTX_PREFIX}xload-aarch64/bin/load_elf_linux load_elf.c
 
 load_elf.exe: load_elf.c
 	mkdir -p _zwolf/${DISTX_PREFIX}xload-x86_64/bin
