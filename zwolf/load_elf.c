@@ -1035,6 +1035,9 @@ int main(int argc, char ** argv) {
 #else
 	char * realp = _fullpath(0, argv[1], 0);
 #endif
+	if (realp == 0) {
+		ERR("unknown path %s\n", argv[1]);
+	}
 	DEBUG("loading %s\n", realp)
 	loaded_lib* lib = load_absolute(realp, libs);
 	free(realp);

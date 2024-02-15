@@ -150,8 +150,11 @@ void execTarget(Target &t) {
 		const char * env[] = { 0 };
 		int32_t err = base_proc_exec(args[0], args, env, &pid);
 		uint8_t exit = 0;
+		if (err != 0) {
+			error("exec failed");
+		}
 		err = base_proc_wait(pid, &exit);
-		if (exit != 0) {
+		if (exit != 0 || err != 0) {
 			error("exec failed");
 		}
 		free(args);
