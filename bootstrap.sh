@@ -27,6 +27,7 @@ cp -r xlibc/include "/_zwolf/${HOST_PREFIX}xlibc-common/include"
 (cd llvm-src; ../llvm/build-runtime.sh)
 
 (cd llvm-src; ../llvm/build-zwolf.sh)
+(cd llvm-src; ARCH=aarch64 ../llvm/build-zwolf.sh)
 
 mkdir -p "${ZWOLF}/old"
 mv ${ZWOLF}/${HOST_PREFIX}llvm-{common,dev-*,doc-*,x86_64} ${ZWOLF}/old
