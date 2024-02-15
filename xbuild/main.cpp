@@ -236,7 +236,13 @@ int main(int argc, char** argv) {
 	loop["DISTX_DEST"] = vector<string>({ string(getcwd(0, 4096)) + "/_distx" });
 	loop["DISTX_BUILD"] = vector<string>({ string(getcwd(0, 4096)) + "/build" });
 	loop["DISTX_PREFIX"] = vector<string>({ "distx.org_2024-" });
-	loop["DISTX_ARCH"] = vector<string>({ "x86_64" });
+	loop["DISTX_ARCH"] = vector<string>({
+#ifdef __x86_64__
+			"x86_64"
+#else
+			"aarch64"
+#endif
+			});
 
 	map<string, string> varmap;
 	json::JSON transformed = replace(varmap, loop, target);

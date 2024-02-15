@@ -8,7 +8,7 @@
 		"RUN_DEP": ["xlibc", "llvm-libcxx", "llvm-rt"]
 	},
 	"dep": [
-		"{DISTX_PREFIX}{BUILD_DEP}-{DISTX_HOST}",
+		"{DISTX_PREFIX}{BUILD_DEP}-{DISTX_ARCH}",
 		"{DISTX_PREFIX}{RUN_DEP}-common",
 		"{DISTX_PREFIX}{RUN_DEP}-{ARCH}"
 	],
@@ -16,7 +16,7 @@
 		"build": {
 			"cmd": ["{DISTX_SRC}/{DISTX_PREFIX}llvm-{DISTX_ARCH}/bin/clang"],
 			"env": {
-				"{BUILD_DEP}-{DISTX_HOST}": "{PREFIX}{BUILD_DEP}-{DISTX_HOST}",
+				"{BUILD_DEP}-{DISTX_ARCH}": "{PREFIX}{BUILD_DEP}-{DISTX_ARCH}",
 				"{RUN_DEP}-COMMON": "{PREFIX}{RUN_DEP}-common",
 				"{RUN_DEP}-{ARCH}": "{PREFIX}{RUN_DEP}-{ARCH}"
 			}

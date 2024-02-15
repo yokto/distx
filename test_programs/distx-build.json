@@ -17,10 +17,13 @@
 		"build": {
 			"cmd": ["{DISTX_DEP}/{DISTX_PREFIX}xbuild-{DISTX_ARCH}/bin/xbuild", "build"],
 			"env": {
-				"{BUILD_DEP}-{DISTX_HOST}": "{PREFIX}{BUILD_DEP}-{DISTX_HOST}",
+				"{BUILD_DEP}-{DISTX_ARCH}": "{PREFIX}{BUILD_DEP}-{DISTX_ARCH}",
 				"{RUN_DEP}-COMMON": "{PREFIX}{RUN_DEP}-common",
 				"{RUN_DEP}-{ARCH}": "{PREFIX}{RUN_DEP}-{ARCH}"
 			}
+		},
+		"test": {
+			"cmd": ["{DISTX_DEP}/{DISTX_PREFIX}xbuild-{DISTX_ARCH}/bin/xbuild", "test"]
 		}
 	},
 	"pkgs": {
