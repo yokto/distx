@@ -1,0 +1,28 @@
+{
+	"env": {
+		"PREFIX": "distx.org_2024-"
+	},
+	"loop": {
+		"ARCH": ["x86_64", "aarch64"],
+		"BUILD_DEP": ["llvm", "xload", "xbuild"],
+		"RUN_DEP": ["xlibc", "llvm-libcxx", "llvm-rt"]
+	},
+	"dep": [
+		"{PREFIX}llvm-common",
+		"{PREFIX}{BUILD_DEP}-{DISTX_ARCH}",
+		"{PREFIX}{RUN_DEP}-{ARCH}",
+		"{PREFIX}{RUN_DEP}-common"
+	],
+	"run": {
+		"build": {
+			"cmd": ["{DISTX_DEP}/{DISTX_PREFIX}xbuild-{DISTX_ARCH}/bin/xbuild", "build"],
+			"env": {
+				"{BUILD_DEP}-{DISTX_HOST}": "{PREFIX}{BUILD_DEP}-{DISTX_HOST}",
+				"{RUN_DEP}-COMMON": "{PREFIX}{RUN_DEP}-common",
+				"{RUN_DEP}-{ARCH}": "{PREFIX}{RUN_DEP}-{ARCH}"
+			}
+		}
+	},
+	"pkgs": {
+	}
+}

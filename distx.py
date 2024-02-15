@@ -108,10 +108,9 @@ def main():
     # Load JSON configuration
     json_config = parse_json_file("distx-build.json")
     loop = json_config.get('loop', {})
-    loop["DISTX_HOST"] = ["x86_64"]
     loop["DISTX_DEP"] = [os.getcwd() + "/_distx"]
-    loop["DISTX_SRC"] = [os.getcwd()]
     loop["DISTX_DEST"] = [os.getcwd() + "/_distx"]
+    loop["DISTX_SRC"] = [os.getcwd()]
     loop["DISTX_BUILD"] = [os.getcwd() + "/build"]
     loop["DISTX_PREFIX"] = ["distx.org_2024-"]
     loop["DISTX_ARCH"] = [platform.machine()]

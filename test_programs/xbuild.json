@@ -1,0 +1,78 @@
+{
+        "env": {
+        },
+        "loop": {
+                "ARCH": ["x86_64", "aarch64"],
+                "C_FILE": [
+			"testc_cat",
+			"testc_cnd",
+			"testc_constr_destr",
+			"testc_crash",
+			"testc_dl",
+			"testc_empty",
+			"testc_env",
+			"testc_errno",
+			"testc_exit",
+			"testc_futex",
+			"testc_loop",
+			"testc_ls",
+			"testc_math",
+			"testc_memmove",
+			"testc_mtime",
+			"testc_mtx",
+			"testc_open",
+			"testc_qsort",
+			"testc_realpath",
+			"testc_runtests",
+			"testc_setjmp",
+			"testc_snprintf",
+			"testc_stat",
+			"testc_thread",
+			"testc_tls",
+			"testc_truncate",
+			"testc_tss",
+			"testc_unix"
+		],
+                "CPP_FILE": [
+			"testcpp_vector"
+		],
+                "TEST_FILE": [
+			"testc_empty",
+			"testc_mtx",
+			"testc_cnd",
+			"testcpp_vector",
+			"testc_futex",
+			"testc_math"
+		]
+        },
+        "target": {
+                "build": {
+			"targets": ["{C_FILE}_{ARCH}", "{CPP_FILE}_{ARCH}"]
+		},
+		"test": {
+			"targets": ["test_{TEST_FILE}"]
+		},
+		"test_{TEST_FILE}": {
+			"exec": [["{DISTX_DEST}/{DISTX_PREFIX}test_programs-{DISTX_ARCH}/bin/{TEST_FILE}"]]
+		},
+		"{C_FILE}_{ARCH}": {
+			"exec": [[
+				"{DISTX_DEP}/{DISTX_PREFIX}llvm-{DISTX_ARCH}/bin/clang",
+				"--target={DISTX_ARCH}-unknown-linux-zwolf",
+				"-Wl,-soname,/{DISTX_PREFIX}test_programs-{ARCH}/bin/{C_FILE}",
+				"-o", "{DISTX_DEST}/{DISTX_PREFIX}test_programs-{ARCH}/bin/{C_FILE}",
+				"{C_FILE}.c"
+			]]
+		},
+		"{CPP_FILE}_{ARCH}": {
+			"exec": [[
+				"{DISTX_DEP}/{DISTX_PREFIX}llvm-{DISTX_ARCH}/bin/clang",
+				"--language=c++",
+				"--target={DISTX_ARCH}-unknown-linux-zwolf",
+				"-Wl,-soname,/{DISTX_PREFIX}test_programs-{ARCH}/bin/{CPP_FILE}",
+				"-o", "{DISTX_DEST}/{DISTX_PREFIX}test_programs-{ARCH}/bin/{CPP_FILE}",
+				"{CPP_FILE}.cpp"
+			]]
+		}
+        }
+}
