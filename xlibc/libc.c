@@ -63,7 +63,11 @@ void abort() {
 typedef uint64_t linux_dev_t;
 typedef uint64_t linux_ino_t;
 typedef uint32_t linux_mode_t;
+#ifdef __x86_64__
 typedef uint64_t linux_nlink_t;
+#else // ARM
+typedef uint32_t linux_nlink_t;
+#endif
 typedef uint32_t linux_uid_t;
 typedef uint32_t linux_gid_t;
 typedef uint64_t linux_dev_t;
@@ -71,28 +75,48 @@ typedef uint64_t linux_off_t;
 typedef uint64_t linux_blksize_t;
 typedef uint64_t linux_blkcnt_t;
 struct linux_stat {
-               linux_dev_t     st_dev;         /* ID of device containing file */
-               linux_ino_t     st_ino;         /* Inode number */
-               linux_nlink_t   st_nlink;       /* Number of hard links */
-               linux_mode_t    st_mode;        /* File type and mode */
-               linux_uid_t     st_uid;         /* User ID of owner */
-               linux_gid_t     st_gid;         /* Group ID of owner */
-	       int pad0;
+#ifdef __x86_64__
+	linux_dev_t     st_dev;         /* ID of device containing file */
+	linux_ino_t     st_ino;         /* Inode number */
+	linux_nlink_t   st_nlink;       /* Number of hard links */
+	linux_mode_t    st_mode;        /* File type and mode */
+	linux_uid_t     st_uid;         /* User ID of owner */
+	linux_gid_t     st_gid;         /* Group ID of owner */
+	int pad0;
 
-               linux_dev_t     st_rdev;        /* Device ID (if special file) */
-               linux_off_t     st_size;        /* Total size, in bytes */
-               linux_blksize_t st_blksize;     /* Block size for filesystem I/O */
-               linux_blkcnt_t  st_blocks;      /* Number of 512B blocks allocated */
+	linux_dev_t     st_rdev;        /* Device ID (if special file) */
+	linux_off_t     st_size;        /* Total size, in bytes */
+	linux_blksize_t st_blksize;     /* Block size for filesystem I/O */
+	linux_blkcnt_t  st_blocks;      /* Number of 512B blocks allocated */
 
-               /* Since Linux 2.6, the kernel supports nanosecond
-                  precision for the following timestamp fields.
-                  For the details before Linux 2.6, see NOTES. */
+	/* Since Linux 2.6, the kernel supports nanosecond
+	   precision for the following timestamp fields.
+	   For the details before Linux 2.6, see NOTES. */
 
-               struct timespec st_atim;  /* Time of last access */
-               struct timespec st_mtim;  /* Time of last modification */
-               struct timespec st_ctim;  /* Time of last status change */
-	       char padding[144];
+	struct timespec st_atim;  /* Time of last access */
+	struct timespec st_mtim;  /* Time of last modification */
+	struct timespec st_ctim;  /* Time of last status change */
+	char padding[144];
+#else // aarch64
+	linux_dev_t st_dev;
+	linux_ino_t st_ino;
+	linux_mode_t st_mode;
+	linux_nlink_t st_nlink;
+	linux_uid_t st_uid;
+	linux_gid_t st_gid;
+	linux_dev_t st_rdev;
+	linux_dev_t __pad1;
+	linux_off_t st_size;
+	linux_blksize_t st_blksize;
+	uint32_t __pad2;
+	linux_blkcnt_t st_blocks;
+	struct timespec st_atim;
+	struct timespec st_mtim;
+	struct timespec st_ctim;
+	uint32_t __glibc_reserved[2];
+#endif
 };
+
 typedef uint32_t windows_dev_t;
 typedef uint16_t windows_ino_t;
 typedef uint32_t windows_dev_t;
