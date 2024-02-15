@@ -230,3 +230,8 @@ elf_Hash(const unsigned char *name)
 #define R_X86_64_PC8            15      /* 8 bit sign extended pc relative */
 #define R_X86_64_DTPMOD64       16      /* ID of module containing symbol */
 
+#define R_AARCH64_ABS64         257     /* Direct 64 bit. */
+#define R_AARCH64_GLOB_DAT     1025     /* Create GOT entry.  */
+#define R_AARCH64_JUMP_SLOT    1026     /* Create PLT entry.  */
+#define R_AARCH64_RELATIVE     1027     /* Adjust by program base.  */
+

@@ -813,10 +813,17 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 	int type = ELF64_R_TYPE(rela->r_info);
 
 	DEBUG("\t\trela info %llx, offset %llx, addend %llx, sym %x, type %x\n", rela->r_info, rela->r_offset, rela->r_addend, sym, type)
-	if (type == R_X86_64_RELATIVE && sym == 0 && rela->r_addend != 0) {
+	if ((type == R_X86_64_RELATIVE || type == R_AARCH64_RELATIVE) && sym == 0 && rela->r_addend != 0) {
 		return lib->base + rela->r_addend;
 	}
-	else if (type == R_X86_64_32 || type == R_X86_64_JUMP_SLOT || type == R_X86_64_GLOB_DAT || type == R_X86_64_64) {
+	else if (
+			type == R_X86_64_32 ||
+			type == R_X86_64_JUMP_SLOT ||
+			type == R_X86_64_GLOB_DAT ||
+			type == R_X86_64_64 ||
+			type == R_AARCH64_JUMP_SLOT ||
+			type == R_AARCH64_GLOB_DAT ||
+			type ==R_AARCH64_ABS64) {
 		char* sym_name = lib->strtab + lib->symtab[sym].st_name;
 		DEBUG("\t\tlinking symbol: %s\n", sym_name)
 
