@@ -5,6 +5,7 @@
 #include <regex>
 #include <stdlib.h>
 #include <unistd.h>
+#include <filesystem>
 
 #include "json.hpp"
 
@@ -187,9 +188,27 @@ void buildTarget(map<string, Target> &targets, string target, map<string, bool> 
 }
 
 int main(int argc, char** argv) {
-	if (argc < 1 || argc > 2) {
-		std::cerr << "./buildx <target>" << std::endl;
-		return -1;
+	if (argc < 2) {
+		error("    buildx <target>\n    buildx --sh mkdir <file>");
+	}
+	if (strcmp(argv[1], "--sh") == 0) {
+		if (argc < 3) {
+			error("    buildx --sh cmd");
+		}
+		if (strcmp(argv[2], "mkdir") == 0) {
+			if (argc != 4) {
+				error("    buildx --sh mkdir file");
+			}
+			try {
+				// Create the directory along with all its parent directories
+				std::filesystem::create_directories(argv[3]);
+			} catch (const std::filesystem::filesystem_error& e) {
+				std::cerr << "Failed to create directory: " << e.what() << std::endl;
+			}
+		} else {
+			error("unknown command");
+		}
+		return 0;
 	}
 	std::ifstream file("xbuild.json");
 	//std::ifstream file(argc == 1 ? "xbuild.json" : argv[1]);
@@ -289,10 +308,6 @@ int main(int argc, char** argv) {
 			}
 		}
 		targets[target.first] = t;
-	}
-
-	if (argc != 2) {
-		error("    buildx <target>");
 	}
 
 	map<string,bool> alreadyBuild;

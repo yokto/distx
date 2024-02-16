@@ -56,23 +56,29 @@
 			"exec": [["{DISTX_DEST}/{DISTX_PREFIX}test_programs-{DISTX_ARCH}/bin/{TEST_FILE}"]]
 		},
 		"{C_FILE}_{ARCH}": {
-			"exec": [[
-				"{DISTX_DEP}/{DISTX_PREFIX}llvm-{DISTX_ARCH}/bin/clang",
-				"--target={DISTX_ARCH}-unknown-linux-zwolf",
-				"-Wl,-soname,/{DISTX_PREFIX}test_programs-{ARCH}/bin/{C_FILE}",
-				"-o", "{DISTX_DEST}/{DISTX_PREFIX}test_programs-{ARCH}/bin/{C_FILE}",
-				"{C_FILE}.c"
-			]]
+			"exec": [
+				["{DISTX_DEP}/{DISTX_PREFIX}xbuild-{DISTX_ARCH}/bin/xbuild", "--sh", "mkdir", "{DISTX_DEST}/{DISTX_PREFIX}test_programs-{ARCH}/bin"],
+				[
+					"{DISTX_DEP}/{DISTX_PREFIX}llvm-{DISTX_ARCH}/bin/clang",
+					"--target={DISTX_ARCH}-unknown-linux-zwolf",
+					"-Wl,-soname,/{DISTX_PREFIX}test_programs-{ARCH}/bin/{C_FILE}",
+					"-o", "{DISTX_DEST}/{DISTX_PREFIX}test_programs-{ARCH}/bin/{C_FILE}",
+					"{C_FILE}.c"
+				]
+			]
 		},
 		"{CPP_FILE}_{ARCH}": {
-			"exec": [[
-				"{DISTX_DEP}/{DISTX_PREFIX}llvm-{DISTX_ARCH}/bin/clang",
-				"--language=c++",
-				"--target={DISTX_ARCH}-unknown-linux-zwolf",
-				"-Wl,-soname,/{DISTX_PREFIX}test_programs-{ARCH}/bin/{CPP_FILE}",
-				"-o", "{DISTX_DEST}/{DISTX_PREFIX}test_programs-{ARCH}/bin/{CPP_FILE}",
-				"{CPP_FILE}.cpp"
-			]]
+			"exec": [
+				["{DISTX_DEP}/{DISTX_PREFIX}xbuild-{DISTX_ARCH}/bin/xbuild", "--sh", "mkdir", "{DISTX_DEST}/{DISTX_PREFIX}test_programs-{ARCH}/bin"],
+				[
+					"{DISTX_DEP}/{DISTX_PREFIX}llvm-{DISTX_ARCH}/bin/clang",
+					"--language=c++",
+					"--target={DISTX_ARCH}-unknown-linux-zwolf",
+					"-Wl,-soname,/{DISTX_PREFIX}test_programs-{ARCH}/bin/{CPP_FILE}",
+					"-o", "{DISTX_DEST}/{DISTX_PREFIX}test_programs-{ARCH}/bin/{CPP_FILE}",
+					"{CPP_FILE}.cpp"
+				]
+			]
 		}
         }
 }
