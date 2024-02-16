@@ -11,6 +11,11 @@
 int (*linux_execve)(const char *pathname, char *const argv[], char *const envp[]);
 uint32_t (*linux_fork)(void);
 uint32_t (*linux_waitpid)(uint32_t pid, int *wstatus, int options);
+#define SYS_pidfd_open 434
+typedef int pid_t;
+int linux_pidfd_open(pid_t pid, unsigned int flags) {
+	return linux_syscall(SYS_pidfd_open, pid, flags);
+}
 
 typedef struct _STARTUPINFOW {
   uint32_t  cb;
@@ -127,11 +132,13 @@ int32_t wincmd(char * const argv[], uint16_t * cmd) {
 }
 
 DLL_PUBLIC
-int32_t base_proc_exec(const char *path, char *const argv[], char *const envp[], uintptr_t* id) {
+int32_t base_proc_exec(const char *path, char *const argv[], char *const envp[], uintptr_t* pid, uintptr_t* pidfd) {
 	debug_printf("base_proc_exec %s\n", argv[0]);
 	int32_t ret = 0;
 	void* native_path = 0;
 	ret = tonativepath(argv[0], &native_path);
+
+	uint32_t res_pid = 0;
 
 	debug_printf("base_proc_exec %s\n", native_path);
 	if (ret != 0) { return ret; }
@@ -186,12 +193,18 @@ int32_t base_proc_exec(const char *path, char *const argv[], char *const envp[],
 			&startup,
 			&info
 			);
-		*id = info.hProcess;
+		if (pidfd != 0) {
+			*pidfd = info.hProcess;
+		}
+		if (pid != 0) {
+			*pid = info.dwProcessId;
+		}
+		res_pid = info.dwProcessId;
 		debug_printf("ret %d\n", ret);
 		debug_printf("errno %d\n", zwolf_errno());
-	} else {
-		uint32_t pid = linux_fork();
-		if (pid == 0) {
+	} else { // linux
+		res_pid = linux_fork();
+		if (res_pid == 0) {
 			size_t count = 0;
 			for (char* const* args = argv; *args != 0; args++) { count++; }
 			char ** argv2 = alloca((count+2) * sizeof(char*));
@@ -205,11 +218,17 @@ int32_t base_proc_exec(const char *path, char *const argv[], char *const envp[],
 			debug_printf("exec failed with code %d\n", ret);
 			__builtin_trap();
 		} else {
-			*id = pid;
+			if (pid != 0) {
+				*pid = res_pid;
+			}
+			if (pidfd != 0) {
+				*pidfd = res_pid;
+			}
+			//*pidfd = linux_pidfd_open(res_pid, 0);
 			ret = 0;
 		}
 	}
-	debug_printf("pid %d\n", *id);
+	debug_printf("pid %d\n", res_pid);
 	free(native_path);
 	return ret;
 }

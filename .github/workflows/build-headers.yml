@@ -21,33 +21,6 @@ jobs:
       env:
         AWS_KEY: ${{ secrets.AWS_KEY }}
       run: |
-        #ls
-        #mkdir -p _zwolf/github.com_2024-xlibc_2-common
-        #tar -C _zwolf/github__com_xlibc_2024-common --strip-components=1 -xf headers.tar.xz
         sudo mkdir /_zwolf
         sudo chown ${USER}: /_zwolf
         ./bootstrap.sh
-
-    - name: tar
-      run: tar cf zwolf.tar.xz /_zwolf
-    
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: 2024.${{ github.run_number }}
-        release_name: Release 2024.${{ github.run_number }}
-        draft: false
-        prerelease: false
-    - name: Upload Release Asset
-      id: upload-release-asset 
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: ./zwolf.tar.xz
-        asset_name: zwolf.tar.xz
-        asset_content_type: application/tar

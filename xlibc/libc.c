@@ -143,6 +143,7 @@ struct windows_stat {
 
 static bool isWin = false;
 
+long (*linux_syscall)(long syscall, ...);
 DECLARE(int, vswprintf, wchar_t * ws, size_t len, const wchar_t * format, va_list arg);
 DECLARE(void*, malloc, size_t new_size)
 DECLARE(void*, calloc, size_t nmemb, size_t size)
@@ -396,6 +397,7 @@ __attribute__((constructor)) void init() {
 		stdin = zwolf_dlsym(libc, "_IO_2_1_stdin_");
 		stdout = zwolf_dlsym(libc, "_IO_2_1_stdout_");
 		stderr = zwolf_dlsym(libc, "_IO_2_1_stderr_");
+		linux_syscall = zwolf_sym(libc, "syscall");
 	}
 	stdin->fd = base_fs_stdin;
 	stdout->fd = base_fs_stdout;

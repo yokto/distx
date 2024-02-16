@@ -149,7 +149,7 @@ void execTarget(Target &t) {
 		std::cout << std::endl;
 		uintptr_t pid;
 		const char * env[] = { 0 };
-		int32_t err = base_proc_exec(args[0], args, env, &pid);
+		int32_t err = base_proc_exec(args[0], args, env, 0, &pid);
 		uint8_t exit = 0;
 		if (err != 0) {
 			error("exec failed");

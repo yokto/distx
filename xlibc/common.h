@@ -13,4 +13,6 @@ int debug_printf(char* restrict fmt, ...);
 #define concatH3(X, Y, Z) X ## Y ## Z
 #define concat3(X, Y, Z) concatH3(X, Y, Z)
 
+extern long (*linux_syscall)(long syscall, ...);
+
 #endif // COMMON_H

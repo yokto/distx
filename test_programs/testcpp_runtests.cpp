@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
 		std::string path = test[0].ToString();
 		const char * const args[] = { path.c_str(), "foo", 0 };
 		std::cout << "run test: " << test << std::endl;
-		int32_t error = base_proc_exec(args[0], args, { 0 }, &pid);
+		int32_t error = base_proc_exec(args[0], args, { 0 }, 0, &pid);
 		uint8_t exit = 0;
 		error = base_proc_wait(pid, &exit);
 		if (exit != 0) {
