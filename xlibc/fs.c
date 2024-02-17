@@ -234,6 +234,37 @@ int32_t base_fs_tonativepath(const char *pathname, void* nativepath) {
 	}
 }
 
+int32_t fromnativepath(const void *nativepath, char** pathname) {
+	int32_t error = 0;
+	if (isWin) {
+		const uint16_t* winnative = (const uint16_t*)nativepath;
+		uintptr_t length = 0;
+		error = utf16to8len(winnative, &length);
+
+		if (winnative[1] == ':') { length++; } // "C:..." -> "/C:"
+
+		*pathname = calloc(length + 1, 1); // plus 1 for '\0'
+		char* tmp = *pathname;
+
+		if (winnative[1] == ':') { // "/C:..." -> "C:..."
+			tmp[0] = '/';
+			tmp++;
+		}
+		error = utf16to8(winnative, tmp);
+		for (; *tmp != 0; tmp++) {
+			if (*tmp == '\\') { *tmp = '/'; }
+		}
+		if (tmp != *pathname && tmp[-1] == '/') {
+			tmp[-1] = 0;
+		}
+	} else {
+		uintptr_t length = strlen(nativepath) + 1;
+		*pathname = calloc(length, 1);
+		strcpy(*pathname, nativepath);
+	}
+	return error;
+}
+
 int32_t base_fs_tonativepathlen(const char *pathname, uintptr_t* length) {
 	if (isWin) {
 		if (pathname[0] == '/' && pathname[1] != '\0' && pathname[2] == ':') { // "/C:..." -> "C:..."

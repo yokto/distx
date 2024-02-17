@@ -1,4 +1,5 @@
 ZWOLF ?= ${PWD}/_distx
+DISTX_PREFIX ?= distx.org_2024-
 ZWOLF_INSTALL ?= ${PWD}/_distx_install
 CC := ${ZWOLF}/${DISTX_PREFIX}llvm-x86_64/bin/clang
 INSTALL ?= ${ZWOLF_INSTALL}/${DISTX_PREFIX}xlibc-

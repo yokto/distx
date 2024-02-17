@@ -27,6 +27,7 @@
 #include <fs.h>
 #include <base/futex_p.h>
 #include <base/loop_impl.h>
+#include <base/path.h>
 #include <unistd.h>
 
 //#define FENCE 1
@@ -154,7 +155,8 @@ DECLARE(void, aligned_free, void *ptr);
 void *(*mmap_sysv)(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 int (*munmap_sysv)(void *addr, size_t length);
 DECLARE(int, remove, const char *pathname)
-int (*_rmdir_ms)(const char *pathname) __attribute((ms_abi));
+int (*_wremove_ms)(const uint16_t *pathname) __attribute((ms_abi));
+int (*_wrmdir_ms)(const uint16_t *pathname) __attribute((ms_abi));
 //DECLARE(int, cnd_init, cnd_t* cond)
 //DECLARE(int, cnd_broadcast, cnd_t *cond )
 //DECLARE(int, cnd_wait, cnd_t* cond, mtx_t* mutex )
@@ -203,6 +205,7 @@ int32_t (*FindFirstFileW_ms)(uint16_t * path, WIN32_FIND_DATAW* lpFindFileData) 
 bool (*FindNextFileW_ms)(int32_t hFindFile, WIN32_FIND_DATAW* lpFindFileData) __attribute((ms_abi));
 DECLARE(ssize_t, readlink, const char * pathname, char * buf, size_t bufsiz);
 DECLARE(int, rename, const char *oldpath, const char *newpath);
+int (*_wrename_ms)(uint16_t* oldpath, uint16_t* newpath) __attribute((ms_abi)) = 0;
 DECLARE(int, truncate, const char *path, off_t length);
 DECLARE(int, statvfs, const char * path, struct statvfs * buf);
 DECLARE(int, lstat, const char * pathname, struct stat * statbuf);
@@ -239,6 +242,9 @@ static uint64_t (*thrd_create_ms)(
 		void* lpParameter,
 		uint32_t dwCreationFlags,
 		uint32_t* lpThreadId) __attribute((ms_abi));
+
+int32_t (*GetTempPathW_ms)(int32_t buf_len, uint16_t* str) __attribute((ms_abi)) = 0;
+char* tmpdir = 0;
 /// TRD END
 
 
@@ -299,8 +305,9 @@ __attribute__((constructor)) void init() {
 		tss_delete_ms = zwolf_dlsym(kernel32, "TlsFree");
 		tss_get_ms = zwolf_dlsym(kernel32, "TlsGetValue");
 		tss_set_ms = zwolf_dlsym(kernel32, "TlsSetValue");
+		_wremove_ms = zwolf_dlsym(libc, "_wremove");
 		remove_ms = zwolf_dlsym(libc, "remove");
-		_rmdir_ms = zwolf_dlsym(libc, "_rmdir");
+		_wrmdir_ms = zwolf_dlsym(libc, "_wrmdir");
 		//cnd_init_ms = zwolf_dlsym(kernel32, "InitializeConditionVariable");
 		//cnd_broadcast_ms = zwolf_dlsym(kernel32, "WakeAllConditionVariable");
 		//SleepConditionVariableCS = zwolf_dlsym(kernel32, "SleepConditionVariableCS");
@@ -322,7 +329,7 @@ __attribute__((constructor)) void init() {
 		realpath_ms = 0; //zwolf_dlsym(libc, "realpath");
 		_wfullpath_ms = zwolf_dlsym(libc, "_wfullpath");
 		mkdir_ms = 0;
-		_mkdir_ms = zwolf_dlsym(libc, "_mkdir");
+		_mkdir_ms = zwolf_dlsym(libc, "_wmkdir");
 		stat_ms = zwolf_dlsym(libc, "_stat");
 		_wstat_ms = zwolf_dlsym(libc, "_wstat");
 		fstat_ms = zwolf_dlsym(libc, "_fstat");
@@ -334,6 +341,7 @@ __attribute__((constructor)) void init() {
 		FindFirstFileW_ms = zwolf_dlsym(kernel32, "FindFirstFileW");
 		FindNextFileW_ms = zwolf_dlsym(kernel32, "FindNextFileW");
 		readlink_ms = 0; //zwolf_dlsym(libc, "readlink");
+		_wrename_ms = zwolf_dlsym(libc, "_wrename");
 		rename_ms = zwolf_dlsym(libc, "rename");
 		truncate_ms = 0; //zwolf_dlsym(libc, "truncate");
 		statvfs_ms = 0; //zwolf_dlsym(libc, "statvfs");
@@ -343,6 +351,10 @@ __attribute__((constructor)) void init() {
 		thrd_create_ms = zwolf_dlsym(kernel32, "CreateThread");
 		thrd_detach_ms = zwolf_dlsym(kernel32, "CloseHandle");
 		environ = *(void**)zwolf_dlsym(libc, "_environ");
+		GetTempPathW_ms = zwolf_dlsym(kernel32, "GetTempPathW");
+		uint16_t tmp[261];
+		GetTempPathW_ms(261, tmp);
+		fromnativepath(tmp, &tmpdir);
 	} else {
 		vswprintf_sysv = zwolf_dlsym(libc, "vswprintf");
 		malloc_sysv = zwolf_dlsym(libc, "malloc");
@@ -587,15 +599,29 @@ int fflush(FILE* file) {
 	return 0;
 }
 
-DLL_PUBLIC int remove(const char *pathname) {
-	debug_printf("execute os remove\n");
+DLL_PUBLIC int remove(const char *p) {
+	debug_printf("execute os remove %s =", p);
+
+	void * pathname = 0;
+	int ret = -1;
+	tonativepath(p, &pathname);
+
 	if (isWin) {
-		int ret = remove_ms(pathname);
-		if (ret == 0) { return 0; }
-		return _rmdir_ms(pathname);
+		for (uint16_t* x = pathname; *x != 0; x++) {
+			debug_printf("x%d", *x);
+		}
+		int ret = _wremove_ms(pathname);
+		if (ret != 0) {
+			debug_printf("could not remove %d trying directory", ret);
+			ret= _wrmdir_ms(pathname);
+		}
 	} else {
-		return remove_sysv(pathname);
+		ret= remove_sysv(pathname);
 	}
+
+	if (pathname != 0) { free(pathname); }
+	debug_printf("%d\n", ret);
+	return ret;
 }
 DLL_PUBLIC int rmdir(const char *pathname) {
 	return remove(pathname);
@@ -738,13 +764,8 @@ DLL_PUBLIC int thrd_sleep(const struct timespec* duration, struct timespec* rema
 	if (isWin) {
 		// long milliseconds = duration->tv_sec * 1000 + duration->tv_nsec / 1000000;
 		uint64_t milliseconds = duration->tv_sec * 1000 + duration->tv_nsec / 1000000;
-		uint64_t result = thrd_sleep_ms(milliseconds, true);
+		thrd_sleep_ms(milliseconds, false);
 
-		if (remaining != NULL) {
-			remaining->tv_sec = result / 1000;
-			remaining->tv_nsec = (result % 1000) * 1000000;
-		}
-    
 		return 0;
 	} else {
 		return thrd_sleep_sysv(duration, remaining);
@@ -1085,15 +1106,22 @@ struct win_dir {
 	bool initialized;
 	uint16_t path[MAX_WIN_PATH];
 };
-DLL_PUBLIC int mkdir(const char *pathname, mode_t mode) {
-	debug_printf("execute os mkdir\n");
+DLL_PUBLIC int mkdir(const char *path, mode_t mode) {
+	void * pathname = 0;
+	int ret = 0;
+	tonativepath(path, &pathname);
+
+	debug_printf("execute os mkdir %s =", path);
 	if (isWin) {
 		// nothing to do
-		debug_printf("execute os mkdir %p %s \n", _mkdir_ms, pathname);
-		return _mkdir_ms(pathname);
+		ret = _mkdir_ms(pathname);
 	} else {
-		return mkdir_sysv(pathname, mode);
+		ret = mkdir_sysv(pathname, mode);
 	}
+
+	debug_printf("%d\n", ret);
+	free(pathname);
+	return ret;
 }
 DLL_PUBLIC char* getcwd(char *buf, size_t size) {
 	debug_printf("getcwd\n");
@@ -1203,7 +1231,32 @@ DLL_PUBLIC ssize_t readlink(const char * pathname, char * buf, size_t bufsiz) {
 		return readlink_sysv(pathname, buf, bufsiz);
 	}
 }
-DLL_PUBLIC int rename(const char *oldpath, const char *newpath) IMPLEMENT(rename, oldpath, newpath)
+DLL_PUBLIC int rename(const char *oldpath, const char *newpath) {
+	debug_printf("execute os rename %s to %s = ", oldpath, newpath);
+
+	int ret = 0;
+	void * oldpath2 = 0;
+	void * newpath2 = 0;
+	tonativepath(oldpath, &oldpath2);
+	tonativepath(newpath, &newpath2);
+
+	if (isWin) {
+		struct stat statbuf;
+		int ret = stat(newpath, &statbuf);
+		if (ret == 0 && statbuf.st_mode & S_IFREG) {
+			remove(newpath);
+		}
+		ret = _wrename_ms(oldpath2, newpath2);
+	} else {
+		ret = rename_sysv(oldpath2, newpath2);
+	}
+
+	debug_printf("%d\n", ret);
+
+	//if (oldpath2) { free(oldpath2); }
+	//if (newpath2) { free(newpath2); }
+	return ret;
+}
 DLL_PUBLIC int thrd_detach( thrd_t thr ) IMPLEMENT(thrd_detach, thr)
 DLL_PUBLIC int truncate(const char *path, off_t length) IMPLEMENT(truncate, path, length)
 DLL_PUBLIC int statvfs(const char * path, struct statvfs * buf) IMPLEMENT(statvfs, path, buf)
@@ -2754,3 +2807,11 @@ int nanosleep(const struct timespec *req, struct timespec *rem) {
 	return thrd_sleep(req, rem);
 }
 
+DLL_PUBLIC
+char* base_path_tmp() {
+	if (isWin) {
+		return tmpdir;
+	} else {
+		return "/tmp";
+	}
+}

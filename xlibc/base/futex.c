@@ -12,9 +12,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-static bool (*WaitOnAddress)(volatile void *Address, void* CompareAddress, size_t AddressSize, uint32_t dwMilliseconds);
-static void (*WakeByAddressSingle)(void* Address);
-static void (*WakeByAddressAll)(void* Address);
+static bool (*WaitOnAddress)(volatile void *Address, void* CompareAddress, size_t AddressSize, uint32_t dwMilliseconds) __attribute((ms_abi));
+static void (*WakeByAddressSingle)(void* Address) __attribute((ms_abi));
+static void (*WakeByAddressAll)(void* Address) __attribute((ms_abi));
 
 #define SYS_futex       202
 #define FUTEX_WAIT_PRIVATE      128

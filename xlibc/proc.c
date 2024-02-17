@@ -181,7 +181,7 @@ int32_t base_proc_exec(const char *path, char *const argv[], char *const envp[],
 		memset(&info, 0, sizeof(PROCESS_INFORMATION));
 		debug_printf("method %p\n\n\n\n", win_create_process_w);
 
-		ret = win_create_process_w(
+		ret = !win_create_process_w(
 			file,
 			cmd,
 			0,

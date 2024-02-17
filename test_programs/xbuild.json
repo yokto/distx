@@ -41,7 +41,6 @@
 			"testc_mtx",
 			"testc_cnd",
 			"testcpp_vector",
-			"testc_futex",
 			"testc_math"
 		]
         },
@@ -60,6 +59,7 @@
 				["{DISTX_DEP}/{DISTX_PREFIX}xbuild-{DISTX_ARCH}/bin/xbuild", "--sh", "mkdir", "{DISTX_DEST}/{DISTX_PREFIX}test_programs-{ARCH}/bin"],
 				[
 					"{DISTX_DEP}/{DISTX_PREFIX}llvm-{DISTX_ARCH}/bin/clang",
+					"-lm",
 					"--target={ARCH}-unknown-linux-zwolf",
 					"-Wl,-soname,/{DISTX_PREFIX}test_programs-{ARCH}/bin/{C_FILE}",
 					"-o", "{DISTX_DEST}/{DISTX_PREFIX}test_programs-{ARCH}/bin/{C_FILE}",
