@@ -739,7 +739,7 @@ void* dlopen2(char* name, uint32_t flags) {
 		}
 
 		if (lib != 0) {
-			res = malloc(sizeof(res));
+			res = malloc(sizeof(struct dllib));
 			res->lib = lib;
 			res->type = flags;
 		}
@@ -747,7 +747,7 @@ void* dlopen2(char* name, uint32_t flags) {
 		remove_local_libs();
 		lib = dlopen(name, RTLD_NOW);
 		if (lib != 0) {
-			res = malloc(sizeof(res));
+			res = malloc(sizeof(struct dllib));
 			res->lib = lib;
 			res->type = flags;
 		}
@@ -760,7 +760,7 @@ void* dlopen2(char* name, uint32_t flags) {
 #endif
 		loaded_lib* lib = load_unix(name, &zwolf_global_libs);
 		if (lib != 0) {
-			res = malloc(sizeof(res));
+			res = malloc(sizeof(struct dllib));
 			loaded_libs* libs = &zwolf_global_libs;
 			for (size_t i = 0 ; i < libs->libs_count ; i++) {
 				link(&libs->libs[i], libs);

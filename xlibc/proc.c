@@ -65,12 +65,11 @@ static bool isWin;
 
 void init_proc(bool iswin, void* lib, void* kernel32) {
 	isWin = iswin;
-	debug_printf("xxx open\n");
+	debug_printf("init proc\n");
 	if (isWin) {
 		win_create_process_w = zwolf_sym(kernel32, "CreateProcessW");
 		win_WaitForSingleObject = zwolf_sym(kernel32, "WaitForSingleObject");
 		win_GetExitCodeProcess = zwolf_sym(kernel32, "GetExitCodeProcess");
-		debug_printf("xxx open%p\n",win_create_process_w);
 	} else {
 		linux_fork = zwolf_sym(lib, "fork");
 		linux_execve = zwolf_sym(lib, "execve");

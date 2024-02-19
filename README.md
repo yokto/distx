@@ -1,4 +1,33 @@
-# Zwolf
+# DistX
+
+## Quickstart
+
+### Linux
+
+    git clone "https://github.com/yokto/elf.git"
+    cd elf/test_programs
+    ../distx.py install
+    ../distx.py build
+    ../distx.py test
+
+### Windows
+
+You might get this bug when trying to install the dependencies
+
+    https://github.com/python/cpython/issues/65115
+
+You should be able to fix it by opening the following urls in your browser
+
+    https://distx.org
+    https://cloudfront.net
+
+Now get started
+
+    git clone "https://github.com/yokto/elf.git"
+    dir elf\test_programs
+    python ..\distx.py install
+    python ..\distx.py build
+    python ..\distx.py test
 
 ## Motivation
 

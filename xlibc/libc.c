@@ -2621,7 +2621,7 @@ static unsigned long next = 1;
 
 int rand() {
     next = 1103515245 * next + 12345;
-    return next;
+    return (unsigned)(next/65536) % 32768;
 }
 
 void srand(unsigned int seed) {
