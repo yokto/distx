@@ -7,8 +7,8 @@
     git clone "https://github.com/yokto/elf.git"
     cd elf/test_programs
     ../distx.py install
-    ../distx.py build
-    ../distx.py test
+    ../distx.py run build
+    ../distx.py run test
 
 ### Windows
 
@@ -26,8 +26,8 @@ Now get started
     git clone "https://github.com/yokto/elf.git"
     dir elf\test_programs
     python ..\distx.py install
-    python ..\distx.py build
-    python ..\distx.py test
+    python ..\distx.py run build
+    python ..\distx.py run test
 
 ## Motivation
 
