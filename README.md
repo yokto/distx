@@ -29,6 +29,25 @@ Now get started
     python ..\distx.py run build
     python ..\distx.py run test
 
+### Manually compile program
+
+Create the c++ file in elf/test_programs.
+
+    [...elf/test_programs]$ cat hello_world.cpp
+    #include <iostream>
+    
+    int main() {
+    	std::cout << "hello world!";
+    }
+
+Build it. It is important that the final binary is inside _distx and that the path within that directory matches the soname.
+
+    _distx/distx.org_2024-llvm-x86_64/bin/clang++ hello_world.cpp -o _distx/hello_world -Wl,-soname=/hello_world
+
+Run it.
+
+    _distx/distx.org_2024-xload-x86_64/bin/load_elf_linux _distx/hello_world
+
 ## Motivation
 
 At the moment the web is the only framework that allows app developers to deploy their apps to most platforms with relative ease.
