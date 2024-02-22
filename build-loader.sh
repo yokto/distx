@@ -7,7 +7,7 @@ export HOST_PREFIX="distx.org_2024-"
 
 type x86_64-w64-mingw32-gcc
 
-cd zwolf
+cd xload
 make
 
 cd _zwolf

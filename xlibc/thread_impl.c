@@ -5,7 +5,7 @@
 // https://github.com/m-ou-se/atomic-wait/blob/main/src/macos.rs
 #include "base/futex.h"
 #include "common.h"
-#include <zwolf.h>
+#include <xload.h>
 #include <errno.h>
 #include "threads.h"
 #include <stdlib.h>

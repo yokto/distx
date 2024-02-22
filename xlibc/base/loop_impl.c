@@ -1,7 +1,7 @@
 #include <base/loop.h>
 #include <linux_base/aio_abi.h>
 #include <base_private/loop.h>
-#include <zwolf.h>
+#include <xload.h>
 #include <stdlib.h>
 #include <common.h>
 #include <stdbool.h>
@@ -103,7 +103,7 @@ void base_loop_p_init(bool isWin2, void * lib) {
     isWin = isWin2;
     if (isWin) {
     } else {
-        syscall = zwolf_sym(lib, "syscall");
-        epoll_create = zwolf_sym(lib, "epoll_create");
+        syscall = xload_sym(lib, "syscall");
+        epoll_create = xload_sym(lib, "epoll_create");
     }
 }

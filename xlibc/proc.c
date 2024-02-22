@@ -1,5 +1,5 @@
 #include <common.h>
-#include <zwolf.h>
+#include <xload.h>
 #include <base/types.h>
 #include <unicode.h>
 #include <stdbool.h>
@@ -67,13 +67,13 @@ void init_proc(bool iswin, void* lib, void* kernel32) {
 	isWin = iswin;
 	debug_printf("init proc\n");
 	if (isWin) {
-		win_create_process_w = zwolf_sym(kernel32, "CreateProcessW");
-		win_WaitForSingleObject = zwolf_sym(kernel32, "WaitForSingleObject");
-		win_GetExitCodeProcess = zwolf_sym(kernel32, "GetExitCodeProcess");
+		win_create_process_w = xload_sym(kernel32, "CreateProcessW");
+		win_WaitForSingleObject = xload_sym(kernel32, "WaitForSingleObject");
+		win_GetExitCodeProcess = xload_sym(kernel32, "GetExitCodeProcess");
 	} else {
-		linux_fork = zwolf_sym(lib, "fork");
-		linux_execve = zwolf_sym(lib, "execve");
-		linux_waitpid = zwolf_sym(lib, "waitpid");
+		linux_fork = xload_sym(lib, "fork");
+		linux_execve = xload_sym(lib, "execve");
+		linux_waitpid = xload_sym(lib, "waitpid");
 	}
 }
 
@@ -149,7 +149,7 @@ int32_t base_proc_exec(const char *path, char *const argv[], char *const envp[],
 		argv2[count+1] = 0;
 
 		// make args in utf8
-		argv2[0] = getenv("ZWOLF_EXECUTABLE");
+		argv2[0] = (char*)xload_exec;
 		uintptr_t len = 0;
 		ret = utf16to8len(native_path, &len);
 		argv2[1] = alloca(len + 1);
@@ -200,7 +200,7 @@ int32_t base_proc_exec(const char *path, char *const argv[], char *const envp[],
 		}
 		res_pid = info.dwProcessId;
 		debug_printf("ret %d\n", ret);
-		debug_printf("errno %d\n", zwolf_errno());
+		debug_printf("errno %d\n", xload_errno());
 	} else { // linux
 		res_pid = linux_fork();
 		if (res_pid == 0) {
@@ -209,7 +209,7 @@ int32_t base_proc_exec(const char *path, char *const argv[], char *const envp[],
 			char ** argv2 = alloca((count+2) * sizeof(char*));
 			argv2[count+1] = 0;
 			argv2[1] = native_path;
-			argv2[0] = getenv("ZWOLF_EXECUTABLE");
+			argv2[0] = (char*)xload_exec;
 			for (size_t c = 1; c < count; c++) { argv2[c+1] = argv[c]; }
 			for (size_t c = 0; c < count; c++) { debug_printf("arg %s\n", argv2[c]); }
 			//for (char* const* env = envp; *env != 0; env++) {  debug_printf("env %s\n", env); }

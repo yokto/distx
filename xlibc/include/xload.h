@@ -9,21 +9,24 @@ extern "C" {
 /* exit program
  * probably can replace this with lib exit
  */
-void zwolf_exit(int ret)  __attribute__ ((noreturn));
+void xload_exit(int ret)  __attribute__ ((noreturn));
 
 /* writes to stdout. for debugging before library functions are available */
-int zwolf_write(const char* str);
+int xload_write(const char* str);
 
 /* reads this threads errno */
-extern int zwolf_errno();
+extern int xload_errno();
 
-#define ZWOLF_OPEN_EXTERNAL 1
+#define XLOAD_OPEN_EXTERNAL 1
 
 /* open a library */
-void* zwolf_open(const char* name, uint32_t flags);
+void* xload_open(const char* name, uint32_t flags);
 
 /* find a symbol in an open library */
-void* zwolf_sym(void* handle, const char* name);
+void* xload_sym(void* handle, const char* name);
+
+extern const char * const xload_root;
+extern const char * const xload_exec;
 
 #ifdef __cplusplus
 }

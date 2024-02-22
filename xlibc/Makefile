@@ -4,7 +4,7 @@ ZWOLF_INSTALL ?= ${PWD}/_distx_install
 CC := ${ZWOLF}/${DISTX_PREFIX}llvm-x86_64/bin/clang
 INSTALL ?= ${ZWOLF_INSTALL}/${DISTX_PREFIX}xlibc-
 LIBC := $(INSTALL)x86_64/lib/libc.so $(INSTALL)aarch64/lib/libc.so
-LIBZWOLF := $(INSTALL)x86_64/lib/libzwolf.so $(INSTALL)aarch64/lib/libzwolf.so
+LIBZWOLF := $(INSTALL)x86_64/lib/libxload.so $(INSTALL)aarch64/lib/libxload.so
 
 SRC := libc.c printf.c string.c time.c unicode.c fs.c qsort.c proc.c thread_impl.c emutls.c longjmp.c setjmp.c base/futex.c base/loop_impl.c
 
@@ -13,7 +13,7 @@ HEADERS = $(addprefix $(INSTALL)common/,$(wildcard include/*.h)) $(addprefix $(I
 
 all: $(LIBC) $(HEADERS) $(LIBZWOLF)
 
-$(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so $(SRC) Makefile
+$(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libxload.so $(SRC) Makefile
 	mkdir -p $(INSTALL)$*/lib
 	echo ${CC}
 	${CC} \
@@ -30,7 +30,7 @@ $(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so $(SRC) Makefile
 		-nolibc -shared \
 		-femulated-tls \
 		--unwindlib=none \
-		-lzwolf \
+		-lxload \
 		-L "${INSTALL}/$*/lib" \
 		-Ilibc \
 		-I. \
@@ -39,18 +39,18 @@ $(INSTALL)%/lib/libc.so: $(INSTALL)%/lib/libzwolf.so $(SRC) Makefile
 		-o $@ \
 		$(SRC)
 
-$(INSTALL)%/lib/libzwolf.so: libzwolf/libzwolf.c
+$(INSTALL)%/lib/libxload.so: libxload/libxload.c
 	mkdir -p $(INSTALL)$*/lib
 	echo ${CC}
 	${CC} \
 		-g \
-		-Wl,-soname,_zwolf \
+		-Wl,-soname,_xload \
 		--target=$*-unknown-linux-zwolf \
 		-nolibc -shared \
 		--unwindlib=none \
 		-Iinclude \
 		-o $@ \
-		libzwolf/libzwolf.c
+		libxload/libxload.c
 
 # copy headers
 $(INSTALL)common/include/%.h: include/%.h

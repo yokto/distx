@@ -6,7 +6,7 @@
 #include "base/futex.h"
 #include "base/futex_p.h"
 #include "common.h"
-#include <zwolf.h>
+#include <xload.h>
 #include <errno.h>
 #include "threads.h"
 #include <stdlib.h>
@@ -28,12 +28,12 @@ static bool isWin = false;
 void base_futex_p_init(bool iswin, void* lib) {
 	isWin = iswin;
 	if (isWin) {
-		void* sync = zwolf_open("api-ms-win-core-synch-l1-2-0.dll", ZWOLF_OPEN_EXTERNAL);
-		WaitOnAddress = zwolf_sym(sync, "WaitOnAddress");
-		WakeByAddressAll = zwolf_sym(sync, "WakeByAddressAll");
-		WakeByAddressSingle = zwolf_sym(sync, "WakeByAddressSingle");
+		void* sync = xload_open("api-ms-win-core-synch-l1-2-0.dll", XLOAD_OPEN_EXTERNAL);
+		WaitOnAddress = xload_sym(sync, "WaitOnAddress");
+		WakeByAddressAll = xload_sym(sync, "WakeByAddressAll");
+		WakeByAddressSingle = xload_sym(sync, "WakeByAddressSingle");
 	} else {
-		syscall = zwolf_sym(lib, "syscall");
+		syscall = xload_sym(lib, "syscall");
 	}
 }
 

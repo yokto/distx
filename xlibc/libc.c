@@ -1,5 +1,5 @@
 #include <stdarg.h>
-#include <zwolf.h>
+#include <xload.h>
 #include <base/fs.h>
 #include <proc.h>
 #include <dirent.h>
@@ -256,8 +256,8 @@ DLL_PUBLIC FILE * stdin = &stdinf;
 DLL_PUBLIC FILE * stdout = &stdoutf;
 DLL_PUBLIC FILE * stderr = &stderrf;
 
-static void* zwolf_dlsym(void* lib, char* name) {
-	void* ret = zwolf_sym(lib, name);
+static void* xload_dlsym(void* lib, char* name) {
+	void* ret = xload_sym(lib, name);
 	if (ret) { return ret; }
 	debug_printf("couldn't find symbol %s\n", name);
 	__builtin_trap();
@@ -270,13 +270,13 @@ __attribute__((constructor)) void init() {
 	void* kernel32 = 0;
 	void* bcrypt = 0;
 	if (!libc) {
-		libc = zwolf_open("msvcrt.dll", ZWOLF_OPEN_EXTERNAL);
-		kernel32 = zwolf_open("KERNEL32.DLL", ZWOLF_OPEN_EXTERNAL);
-		bcrypt = zwolf_open("Bcrypt.DLL", ZWOLF_OPEN_EXTERNAL);
+		libc = xload_open("msvcrt.dll", XLOAD_OPEN_EXTERNAL);
+		kernel32 = xload_open("KERNEL32.DLL", XLOAD_OPEN_EXTERNAL);
+		bcrypt = xload_open("Bcrypt.DLL", XLOAD_OPEN_EXTERNAL);
 		isWin = true;
 	}
 	if (!libc) {
-		libc = zwolf_open("libc.so.6", ZWOLF_OPEN_EXTERNAL);
+		libc = xload_open("libc.so.6", XLOAD_OPEN_EXTERNAL);
 		isWin = false;
 	}
 	if (!libc) {
@@ -291,125 +291,125 @@ __attribute__((constructor)) void init() {
 	base_futex_p_init(isWin, libc);
 	init_proc(isWin, libc, kernel32);
 	if (isWin) {
-		vswprintf_ms = zwolf_dlsym(libc, "vswprintf");
-		malloc_ms = zwolf_dlsym(libc, "malloc");
-		calloc_ms = zwolf_dlsym(libc, "calloc");
-		aligned_alloc_ms = zwolf_dlsym(libc, "_aligned_malloc");
-		aligned_free_ms = zwolf_dlsym(libc, "_aligned_free");
-		realloc_ms = zwolf_dlsym(libc, "realloc");
-		free_ms = zwolf_dlsym(libc, "free");
-		thrd_yield_ms = zwolf_dlsym(kernel32, "SwitchToThread");
-		thrd_current_ms = zwolf_dlsym(kernel32, "GetCurrentThread");
-		thrd_sleep_ms = zwolf_dlsym(kernel32, "SleepEx");
-		tss_create_ms = zwolf_dlsym(kernel32, "TlsAlloc");
-		tss_delete_ms = zwolf_dlsym(kernel32, "TlsFree");
-		tss_get_ms = zwolf_dlsym(kernel32, "TlsGetValue");
-		tss_set_ms = zwolf_dlsym(kernel32, "TlsSetValue");
-		_wremove_ms = zwolf_dlsym(libc, "_wremove");
-		remove_ms = zwolf_dlsym(libc, "remove");
-		_wrmdir_ms = zwolf_dlsym(libc, "_wrmdir");
-		//cnd_init_ms = zwolf_dlsym(kernel32, "InitializeConditionVariable");
-		//cnd_broadcast_ms = zwolf_dlsym(kernel32, "WakeAllConditionVariable");
-		//SleepConditionVariableCS = zwolf_dlsym(kernel32, "SleepConditionVariableCS");
+		vswprintf_ms = xload_dlsym(libc, "vswprintf");
+		malloc_ms = xload_dlsym(libc, "malloc");
+		calloc_ms = xload_dlsym(libc, "calloc");
+		aligned_alloc_ms = xload_dlsym(libc, "_aligned_malloc");
+		aligned_free_ms = xload_dlsym(libc, "_aligned_free");
+		realloc_ms = xload_dlsym(libc, "realloc");
+		free_ms = xload_dlsym(libc, "free");
+		thrd_yield_ms = xload_dlsym(kernel32, "SwitchToThread");
+		thrd_current_ms = xload_dlsym(kernel32, "GetCurrentThread");
+		thrd_sleep_ms = xload_dlsym(kernel32, "SleepEx");
+		tss_create_ms = xload_dlsym(kernel32, "TlsAlloc");
+		tss_delete_ms = xload_dlsym(kernel32, "TlsFree");
+		tss_get_ms = xload_dlsym(kernel32, "TlsGetValue");
+		tss_set_ms = xload_dlsym(kernel32, "TlsSetValue");
+		_wremove_ms = xload_dlsym(libc, "_wremove");
+		remove_ms = xload_dlsym(libc, "remove");
+		_wrmdir_ms = xload_dlsym(libc, "_wrmdir");
+		//cnd_init_ms = xload_dlsym(kernel32, "InitializeConditionVariable");
+		//cnd_broadcast_ms = xload_dlsym(kernel32, "WakeAllConditionVariable");
+		//SleepConditionVariableCS = xload_dlsym(kernel32, "SleepConditionVariableCS");
 		//cnd_wait_ms = 0;
-		//cnd_signal_ms = zwolf_dlsym(kernel32, "WakeConditionVariable");
+		//cnd_signal_ms = xload_dlsym(kernel32, "WakeConditionVariable");
 		//cnd_destroy_ms = 0; // not needed
 		//cnd_timedwait_ms = 0;
-//		mtx_init_ms = zwolf_dlsym(kernel32, "InitializeCriticalSection");
-//		mtx_lock_ms = zwolf_dlsym(kernel32, "EnterCriticalSection");
-//		mtx_unlock_ms = zwolf_dlsym(kernel32, "LeaveCriticalSection");
-//		mtx_trylock_ms = zwolf_dlsym(kernel32, "TryEnterCriticalSection");
-//		mtx_destroy_ms = zwolf_dlsym(kernel32, "DeleteCriticalSection");
+//		mtx_init_ms = xload_dlsym(kernel32, "InitializeCriticalSection");
+//		mtx_lock_ms = xload_dlsym(kernel32, "EnterCriticalSection");
+//		mtx_unlock_ms = xload_dlsym(kernel32, "LeaveCriticalSection");
+//		mtx_trylock_ms = xload_dlsym(kernel32, "TryEnterCriticalSection");
+//		mtx_destroy_ms = xload_dlsym(kernel32, "DeleteCriticalSection");
 		thrd_equal_ms = 0;
-		GetThreadId_ms = zwolf_dlsym(kernel32, "GetThreadId");
-		QueryPerformanceCounter_ms = zwolf_dlsym(kernel32, "QueryPerformanceCounter");
-		QueryPerformanceFrequency_ms = zwolf_dlsym(kernel32, "QueryPerformanceFrequency");
-		BCryptGenRandom_ms = zwolf_dlsym(bcrypt, "BCryptGenRandom");
+		GetThreadId_ms = xload_dlsym(kernel32, "GetThreadId");
+		QueryPerformanceCounter_ms = xload_dlsym(kernel32, "QueryPerformanceCounter");
+		QueryPerformanceFrequency_ms = xload_dlsym(kernel32, "QueryPerformanceFrequency");
+		BCryptGenRandom_ms = xload_dlsym(bcrypt, "BCryptGenRandom");
 		getentropy_native = &getentropy_ms;
-		realpath_ms = 0; //zwolf_dlsym(libc, "realpath");
-		_wfullpath_ms = zwolf_dlsym(libc, "_wfullpath");
+		realpath_ms = 0; //xload_dlsym(libc, "realpath");
+		_wfullpath_ms = xload_dlsym(libc, "_wfullpath");
 		mkdir_ms = 0;
-		_mkdir_ms = zwolf_dlsym(libc, "_wmkdir");
-		stat_ms = zwolf_dlsym(libc, "_stat");
-		_wstat_ms = zwolf_dlsym(libc, "_wstat");
-		fstat_ms = zwolf_dlsym(libc, "_fstat");
-		wgetcwd_ms = zwolf_dlsym(libc, "_wgetcwd");
-		readdir_ms = 0; //zwolf_dlsym(libc, "readdir");
-		closedir_ms = 0; //zwolf_dlsym(libc, "closedir");
-		chdir_ms = 0; //zwolf_dlsym(libc, "chdir");
-		opendir_ms = 0; //zwolf_dlsym(libc, "opendir");
-		FindFirstFileW_ms = zwolf_dlsym(kernel32, "FindFirstFileW");
-		FindNextFileW_ms = zwolf_dlsym(kernel32, "FindNextFileW");
-		readlink_ms = 0; //zwolf_dlsym(libc, "readlink");
-		_wrename_ms = zwolf_dlsym(libc, "_wrename");
-		rename_ms = zwolf_dlsym(libc, "rename");
-		truncate_ms = 0; //zwolf_dlsym(libc, "truncate");
-		statvfs_ms = 0; //zwolf_dlsym(libc, "statvfs");
-		lstat_ms = 0; //zwolf_dlsym(libc, "lstat");
-		thrd_join_ms = zwolf_dlsym(kernel32, "GetExitCodeThread");
-		thrd_join_wait_ms = zwolf_dlsym(kernel32, "WaitForSingleObject");
-		thrd_create_ms = zwolf_dlsym(kernel32, "CreateThread");
-		thrd_detach_ms = zwolf_dlsym(kernel32, "CloseHandle");
-		environ = *(void**)zwolf_dlsym(libc, "_environ");
-		GetTempPathW_ms = zwolf_dlsym(kernel32, "GetTempPathW");
+		_mkdir_ms = xload_dlsym(libc, "_wmkdir");
+		stat_ms = xload_dlsym(libc, "_stat");
+		_wstat_ms = xload_dlsym(libc, "_wstat");
+		fstat_ms = xload_dlsym(libc, "_fstat");
+		wgetcwd_ms = xload_dlsym(libc, "_wgetcwd");
+		readdir_ms = 0; //xload_dlsym(libc, "readdir");
+		closedir_ms = 0; //xload_dlsym(libc, "closedir");
+		chdir_ms = 0; //xload_dlsym(libc, "chdir");
+		opendir_ms = 0; //xload_dlsym(libc, "opendir");
+		FindFirstFileW_ms = xload_dlsym(kernel32, "FindFirstFileW");
+		FindNextFileW_ms = xload_dlsym(kernel32, "FindNextFileW");
+		readlink_ms = 0; //xload_dlsym(libc, "readlink");
+		_wrename_ms = xload_dlsym(libc, "_wrename");
+		rename_ms = xload_dlsym(libc, "rename");
+		truncate_ms = 0; //xload_dlsym(libc, "truncate");
+		statvfs_ms = 0; //xload_dlsym(libc, "statvfs");
+		lstat_ms = 0; //xload_dlsym(libc, "lstat");
+		thrd_join_ms = xload_dlsym(kernel32, "GetExitCodeThread");
+		thrd_join_wait_ms = xload_dlsym(kernel32, "WaitForSingleObject");
+		thrd_create_ms = xload_dlsym(kernel32, "CreateThread");
+		thrd_detach_ms = xload_dlsym(kernel32, "CloseHandle");
+		environ = *(void**)xload_dlsym(libc, "_environ");
+		GetTempPathW_ms = xload_dlsym(kernel32, "GetTempPathW");
 		uint16_t tmp[261];
 		GetTempPathW_ms(261, tmp);
 		fromnativepath(tmp, &tmpdir);
 	} else {
-		vswprintf_sysv = zwolf_dlsym(libc, "vswprintf");
-		malloc_sysv = zwolf_dlsym(libc, "malloc");
-		calloc_sysv = zwolf_dlsym(libc, "calloc");
-		aligned_alloc_sysv = zwolf_dlsym(libc, "aligned_alloc");
-		aligned_free_sysv = zwolf_dlsym(libc, "free");
-		realloc_sysv = zwolf_dlsym(libc, "realloc");
-		free_sysv = zwolf_dlsym(libc, "free");
-		thrd_yield_sysv = zwolf_dlsym(libc, "thrd_yield");
-		thrd_current_sysv = zwolf_dlsym(libc, "thrd_current");
-		thrd_sleep_sysv = zwolf_dlsym(libc, "thrd_sleep");
-		tss_create_sysv = zwolf_dlsym(libc, "tss_create");
-		tss_delete_sysv = zwolf_dlsym(libc, "tss_delete");
-		tss_get_sysv = zwolf_dlsym(libc, "tss_get");
-		tss_set_sysv = zwolf_dlsym(libc, "tss_set");
-		remove_sysv = zwolf_dlsym(libc, "remove");
-		//cnd_init_ms = zwolf_dlsym(libc, "cnd_init");
-		//cnd_broadcast_sysv = zwolf_dlsym(libc, "cnd_broadcast");
-		//cnd_signal_sysv = zwolf_dlsym(libc, "cnd_signal");
-		//cnd_wait_sysv = zwolf_dlsym(libc, "cnd_wait");
-		//cnd_destroy_sysv = zwolf_dlsym(libc, "cnd_destroy");
-		//cnd_timedwait_sysv = zwolf_dlsym(libc, "cnd_timedwait");
-//		mtx_init_sysv = zwolf_dlsym(libc, "mtx_init");
-//		mtx_lock_sysv = zwolf_dlsym(libc, "mtx_lock");
-//		mtx_unlock_sysv = zwolf_dlsym(libc, "mtx_unlock");
-//		mtx_trylock_sysv = zwolf_dlsym(libc, "mtx_trylock");
-//		mtx_destroy_sysv = zwolf_dlsym(libc, "mtx_destroy");
-		thrd_equal_sysv = zwolf_dlsym(libc, "thrd_equal");
-		clock_gettime_sysv = zwolf_dlsym(libc, "clock_gettime");
-		getentropy_native = zwolf_dlsym(libc, "getentropy");
-		realpath_sysv = zwolf_dlsym(libc, "realpath");
-		mkdir_sysv = zwolf_dlsym(libc, "mkdir");
-		stat_sysv = zwolf_dlsym(libc, "stat");
-		fstat_sysv = zwolf_dlsym(libc, "fstat");
-		getcwd_sysv = zwolf_dlsym(libc, "getcwd");
-		readdir_sysv = zwolf_dlsym(libc, "readdir");
-		closedir_sysv = zwolf_dlsym(libc, "closedir");
-		chdir_sysv = zwolf_dlsym(libc, "chdir");
-		opendir_sysv = zwolf_dlsym(libc, "opendir");
-		readlink_sysv = zwolf_dlsym(libc, "readlink");
-		rename_sysv = zwolf_dlsym(libc, "rename");
-		thrd_join_sysv = zwolf_dlsym(libc, "thrd_join");
-		thrd_create_sysv = zwolf_dlsym(libc, "thrd_create");
-		thrd_detach_sysv = zwolf_dlsym(libc, "thrd_detach");
-		truncate_sysv = zwolf_dlsym(libc, "truncate");
-		statvfs_sysv = zwolf_dlsym(libc, "statvfs");
-		lstat_sysv = zwolf_dlsym(libc, "lstat");
-		mmap_sysv = zwolf_dlsym(libc, "mmap");
-		munmap_sysv = zwolf_dlsym(libc, "munmap");
-		fchmod_sysv = zwolf_dlsym(libc, "fchmod");
-		environ = *(void**)zwolf_dlsym(libc, "__environ");
-		stdin = zwolf_dlsym(libc, "_IO_2_1_stdin_");
-		stdout = zwolf_dlsym(libc, "_IO_2_1_stdout_");
-		stderr = zwolf_dlsym(libc, "_IO_2_1_stderr_");
-		linux_syscall = zwolf_sym(libc, "syscall");
+		vswprintf_sysv = xload_dlsym(libc, "vswprintf");
+		malloc_sysv = xload_dlsym(libc, "malloc");
+		calloc_sysv = xload_dlsym(libc, "calloc");
+		aligned_alloc_sysv = xload_dlsym(libc, "aligned_alloc");
+		aligned_free_sysv = xload_dlsym(libc, "free");
+		realloc_sysv = xload_dlsym(libc, "realloc");
+		free_sysv = xload_dlsym(libc, "free");
+		thrd_yield_sysv = xload_dlsym(libc, "thrd_yield");
+		thrd_current_sysv = xload_dlsym(libc, "thrd_current");
+		thrd_sleep_sysv = xload_dlsym(libc, "thrd_sleep");
+		tss_create_sysv = xload_dlsym(libc, "tss_create");
+		tss_delete_sysv = xload_dlsym(libc, "tss_delete");
+		tss_get_sysv = xload_dlsym(libc, "tss_get");
+		tss_set_sysv = xload_dlsym(libc, "tss_set");
+		remove_sysv = xload_dlsym(libc, "remove");
+		//cnd_init_ms = xload_dlsym(libc, "cnd_init");
+		//cnd_broadcast_sysv = xload_dlsym(libc, "cnd_broadcast");
+		//cnd_signal_sysv = xload_dlsym(libc, "cnd_signal");
+		//cnd_wait_sysv = xload_dlsym(libc, "cnd_wait");
+		//cnd_destroy_sysv = xload_dlsym(libc, "cnd_destroy");
+		//cnd_timedwait_sysv = xload_dlsym(libc, "cnd_timedwait");
+//		mtx_init_sysv = xload_dlsym(libc, "mtx_init");
+//		mtx_lock_sysv = xload_dlsym(libc, "mtx_lock");
+//		mtx_unlock_sysv = xload_dlsym(libc, "mtx_unlock");
+//		mtx_trylock_sysv = xload_dlsym(libc, "mtx_trylock");
+//		mtx_destroy_sysv = xload_dlsym(libc, "mtx_destroy");
+		thrd_equal_sysv = xload_dlsym(libc, "thrd_equal");
+		clock_gettime_sysv = xload_dlsym(libc, "clock_gettime");
+		getentropy_native = xload_dlsym(libc, "getentropy");
+		realpath_sysv = xload_dlsym(libc, "realpath");
+		mkdir_sysv = xload_dlsym(libc, "mkdir");
+		stat_sysv = xload_dlsym(libc, "stat");
+		fstat_sysv = xload_dlsym(libc, "fstat");
+		getcwd_sysv = xload_dlsym(libc, "getcwd");
+		readdir_sysv = xload_dlsym(libc, "readdir");
+		closedir_sysv = xload_dlsym(libc, "closedir");
+		chdir_sysv = xload_dlsym(libc, "chdir");
+		opendir_sysv = xload_dlsym(libc, "opendir");
+		readlink_sysv = xload_dlsym(libc, "readlink");
+		rename_sysv = xload_dlsym(libc, "rename");
+		thrd_join_sysv = xload_dlsym(libc, "thrd_join");
+		thrd_create_sysv = xload_dlsym(libc, "thrd_create");
+		thrd_detach_sysv = xload_dlsym(libc, "thrd_detach");
+		truncate_sysv = xload_dlsym(libc, "truncate");
+		statvfs_sysv = xload_dlsym(libc, "statvfs");
+		lstat_sysv = xload_dlsym(libc, "lstat");
+		mmap_sysv = xload_dlsym(libc, "mmap");
+		munmap_sysv = xload_dlsym(libc, "munmap");
+		fchmod_sysv = xload_dlsym(libc, "fchmod");
+		environ = *(void**)xload_dlsym(libc, "__environ");
+		stdin = xload_dlsym(libc, "_IO_2_1_stdin_");
+		stdout = xload_dlsym(libc, "_IO_2_1_stdout_");
+		stderr = xload_dlsym(libc, "_IO_2_1_stderr_");
+		linux_syscall = xload_sym(libc, "syscall");
 	}
 	stdin->fd = base_fs_stdin;
 	stdout->fd = base_fs_stdout;
@@ -946,7 +946,7 @@ DLL_PUBLIC int stat(const char * p, struct stat * statbuf) {
 	if (isWin) {
 		struct windows_stat ls;
 		ret = _wstat_ms(pathname, (struct stat*)&ls);
-		if (ret == -1) { errno = zwolf_errno(); }
+		if (ret == -1) { errno = xload_errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
 		statbuf->st_ino = rand();
@@ -958,7 +958,7 @@ DLL_PUBLIC int stat(const char * p, struct stat * statbuf) {
 	} else {
 		struct linux_stat ls;
 		ret = stat_sysv(pathname, (struct stat*)&ls);
-		if (ret == -1) { errno = zwolf_errno(); }
+		if (ret == -1) { errno = xload_errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
 		statbuf->st_ino = ls.st_ino;
@@ -978,7 +978,7 @@ DLL_PUBLIC int fstat(int fd, struct stat * statbuf) {
 	if (isWin) {
 		struct windows_stat ls;
 		const int ret = fstat_ms(fd, (struct stat*)&ls);
-		if (ret == -1) { errno = zwolf_errno(); }
+		if (ret == -1) { errno = xload_errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
 		statbuf->st_ino = rand();
@@ -991,7 +991,7 @@ DLL_PUBLIC int fstat(int fd, struct stat * statbuf) {
 	} else {
 		struct linux_stat ls;
 		const int ret = fstat_sysv(fd, (struct stat*)&ls);
-		if (ret == -1) { errno = zwolf_errno(); }
+		if (ret == -1) { errno = xload_errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
 		statbuf->st_ino = ls.st_ino;
@@ -1265,7 +1265,7 @@ DLL_PUBLIC int lstat(const char * pathname, struct stat * statbuf) {
 	if (isWin) {
 		struct windows_stat ls;
 		const int ret = stat_ms(pathname, (struct stat*)&ls);
-		if (ret == -1) { errno = zwolf_errno(); }
+		if (ret == -1) { errno = xload_errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
 		statbuf->st_ino = ls.st_ino;
@@ -1278,7 +1278,7 @@ DLL_PUBLIC int lstat(const char * pathname, struct stat * statbuf) {
 	} else {
 		struct linux_stat ls;
 		const int ret = lstat_sysv(pathname, (struct stat*)&ls);
-		if (ret == -1) { errno = zwolf_errno(); }
+		if (ret == -1) { errno = xload_errno(); }
 		statbuf->st_mode = ls.st_mode;        /* File type and mode */
 		statbuf->st_dev = ls.st_dev;
 		statbuf->st_ino = ls.st_ino;
@@ -2522,7 +2522,7 @@ DLL_PUBLIC int mtime(const char *pathname, struct timespec * time) {
 DLL_PUBLIC
 _Noreturn void exit(int status)
 {
-	zwolf_exit(status);
+	xload_exit(status);
 }
 
 //void print_addr(void * ptr) {
@@ -2678,7 +2678,7 @@ DLL_PUBLIC int madvise(void *addr, size_t length, int advice) NO_IMPL(madvise)
 DLL_PUBLIC int getpwnam_r(const char * name, struct passwd * pwd, char * buf, size_t buflen, struct passwd ** result) NO_IMPL(getpwnam_r)
 DLL_PUBLIC int fstatfs(int fd, struct statfs *buf) NO_IMPL(fstatfs)
 DLL_PUBLIC void _exit(int status) {
-	zwolf_exit(status);
+	xload_exit(status);
 }
 DLL_PUBLIC struct tm *localtime_r(const time_t *timer, struct tm* result) NO_IMPL(localtime_r)
 DLL_PUBLIC int usleep(useconds_t usec) NO_IMPL(usleep)
@@ -2692,14 +2692,14 @@ DLL_PUBLIC char *asctime(const struct tm *timeptr) NO_IMPL(asctime)
 DLL_PUBLIC struct tm *localtime(const time_t *timep) NO_IMPL(localtime)
 DLL_PUBLIC int dladdr(const void *addr, Dl_info *info) NO_IMPL(dladdr)
 DLL_PUBLIC void *dlsym(void * handle, const char * symbol) {
-	return zwolf_sym(handle, symbol);
+	return xload_sym(handle, symbol);
 }
 DLL_PUBLIC void *dlopen(const char *filename, int flags) {
 	debug_printf("dlopen %s = ", filename);
 	char * basep = NULL;
 	int32_t error = alloc_libc_to_base_path(filename, &basep);
 	if (error != SUCCESS) { return 0; }
-	void* ret = zwolf_open(basep, 0);
+	void* ret = xload_open(basep, 0);
 	debug_printf("%p\n", ret);
 	return ret;
 }

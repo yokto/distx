@@ -8,6 +8,9 @@
 #include <stdarg.h>
 
 bool zwolf_debug = false;
+const char* xload_root = 0;
+const char* xload_exec = 0;
+
 
 #define DEBUG(...) { \
 	if (zwolf_debug) { \
@@ -286,15 +289,11 @@ void set_basedir(loaded_libs * libs, const char * path, char * soname) {
 
 	// set env
 	const char * var = "ZWOLF_RUNDIR=";
-	int varlen = strlen(var);
-	char * env = calloc(base_len + 1 + varlen + 1, 1);
-	strcat(env, var);
-	strcat(env, libs->basedir);
-	_putenv(env);
+	xload_root = libs->basedir;
 #else
 	libs->basedir = malloc(base_len + 1);
 	strncpy(libs->basedir, realp, base_len);
-	setenv("ZWOLF_RUNDIR", libs->basedir, true);
+	xload_root = libs->basedir;
 #endif
 	DEBUG("basedir %s\n", libs->basedir);
 	free(realp);
@@ -507,7 +506,7 @@ loaded_lib* load_absolute(const char* lib_path, loaded_libs* libs) {
 				}
 				if (dynamic->d_tag == DT_NEEDED) {
 					char* needed = lib->strtab + dynamic->d_un.d_ptr;
-					if (strcmp(needed, "_zwolf") != 0) {
+					if (strcmp(needed, "_xload") != 0) {
 						loaded_lib * ignore = load(needed, libs);
 						lib = &libs->libs[lib_idx];
 					}
@@ -829,19 +828,23 @@ void* findSymbol(Elf64_Rela * rela, loaded_lib * lib, loaded_libs * libs) {
 
 		void* ret = 0;
 		char * file = verneedstr(sym, lib);
-		if (file && strcmp(file, "_zwolf") == 0) {
-			if (strcmp(sym_name, "zwolf_write") == 0) {
+		if (file && strcmp(file, "_xload") == 0) {
+			if (strcmp(sym_name, "xload_write") == 0) {
 				ret = &write2;
-			} else if (strcmp(sym_name, "zwolf_errno") == 0) {
+			} else if (strcmp(sym_name, "xload_errno") == 0) {
 				ret = &errno2;
 				//		} else if (strcmp(sym_name, "__resolve") == 0) {
 				//			ret = &resolve_addr;
-			} else if (strcmp(sym_name, "zwolf_sym") == 0) {
+			} else if (strcmp(sym_name, "xload_sym") == 0) {
 				ret = &dlsym2;
-			} else if (strcmp(sym_name, "zwolf_open") == 0) {
+			} else if (strcmp(sym_name, "xload_open") == 0) {
 				ret = &dlopen2;
-			} else if (strcmp(sym_name, "zwolf_exit") == 0) {
+			} else if (strcmp(sym_name, "xload_exit") == 0) {
 				ret = &exit2;
+			} else if (strcmp(sym_name, "xload_root") == 0) {
+				ret = &xload_root;
+			} else if (strcmp(sym_name, "xload_exec") == 0) {
+				ret = &xload_exec;
 			}
 		} else {
 			if (!file) {
@@ -992,18 +995,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 #else
 int main(int argc, char ** argv) {
 #endif
-	const char * exec_env = "ZWOLF_EXECUTABLE";
+
 #ifdef WIN32
 	char * path = _fullpath(0, argv[0], 0);
-	char* path2 = calloc(strlen(path) + strlen(exec_env) + 2, 1);
-	strcat(path2, exec_env);
-	strcat(path2, "=");
-	strcat(path2, path);
-	free(path);
-	_putenv(path2);
+	xload_exec = path;
 #else
 	const char * path = realpath(argv[0], 0);
-	setenv(exec_env, path, true);
+	xload_exec = path;
 #endif
 	if (getenv("ZWOLF_DEBUG")) {
 		zwolf_debug = true;
