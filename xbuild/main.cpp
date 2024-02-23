@@ -1,11 +1,13 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <sstream>
 #include <base/proc.h>
 #include <regex>
 #include <stdlib.h>
 #include <unistd.h>
 #include <filesystem>
+#include <sys/stat.h>
 
 #include "json.hpp"
 
@@ -22,28 +24,52 @@ void error(const string &s)
 	exit(-1);
 }
 
-//tuple<map<string, string>, Loop, vector<string>> multiply(map<string, string> map, Loop loop, string input) {
-//	for (auto m : map) {
-//		input = std::regex_replace(input, std::regex("\\{" + m.first + "\\}"), m.second);
-//	}
-//	vector<string> strings = { input };
-//	for (auto l : loop) {
-//		vector<string> new_string = {};
-//		for (auto s : strings) {
-//			string key = "\\{" + l.first + "\\}";
-//			if (s.find(key) != string::npos)
-//			{
-//				for (auto replace : l.second) {
-//					new_string.push_back(std::regex_replace(s, std::regex(key), replace));
-//				}
-//			} else {
-//				new_string.push_back(s);
-//			}
-//		}
-//		strings = new_string;
-//	}
-//	return tuple<
-//}
+struct Dep {
+	vector<string> outputs;
+	vector<string> inputs;
+};
+
+class Target {
+	public:
+	vector<string> targets;
+	string makeDeps;
+	Dep dep;
+	vector<vector<string>> exec;
+};
+
+void readMakeDepFile(Target& t) {
+	std::ifstream file(t.makeDeps);
+	if (!file.is_open()) {
+		return;
+	}
+
+	std::string line((std::istreambuf_iterator<char>(file)), (std::istreambuf_iterator<char>()));
+	file.close();
+	
+	// Find the position of the first colon
+	size_t colonPos = line.find(':');
+	if (colonPos == std::string::npos) {
+		error("Error: Invalid make line format\n");
+	}
+
+	// Extract outputs
+	t.dep.outputs.push_back(line.substr(0, colonPos));
+
+	// Extract inputs
+	std::stringstream ss(line.substr(colonPos + 1));
+	std::string input;
+	while (ss >> input) {
+		if (input == "\\") { // Handle line continuation
+			continue;
+		}
+		if (input[0] != '/') {
+			input = std::filesystem::current_path().string() + "/" + input;
+		}
+		t.dep.inputs.push_back(input);
+	}
+
+	return;
+}
 
 void appendStrings(map<string, string> &map, Loop &loop, json::JSON &list, string input) {
 	for (auto m : map) {
@@ -106,6 +132,11 @@ json::JSON replace(map<string, string> &map, Loop &loop, const json::JSON &input
 		for (auto m : map) {
 			out = std::regex_replace(out, std::regex("\\{" + m.first + "\\}"), m.second);
 		}
+		for (auto l : loop) {
+			if (l.second.size() == 1) {
+				out = std::regex_replace(out, std::regex("\\{" + l.first + "\\}"), l.second[0]);
+			}
+		}
 		return json::JSON(out);
 	}
 	if (input.JSONType() == json::JSON::Class::Array) {
@@ -130,13 +161,35 @@ json::JSON replace(map<string, string> &map, Loop &loop, const json::JSON &input
 	return input;
 }
 
-class Target {
-	public:
-	vector<string> targets;
-	vector<vector<string>> exec;
-};
-
 void execTarget(Target &t) {
+	if (!t.makeDeps.empty()) {
+		readMakeDepFile(t);
+	}
+	if (t.dep.outputs.size() >= 1) {
+		struct timespec oldestOut = { 1000000000000000000, 0 };
+		bool rebuild = false;
+		for (string o : t.dep.outputs) {
+			struct stat s;
+			int32_t err = stat(o.c_str(), &s);
+			if (err) { rebuild = true; continue; }
+			if (s.st_mtim.tv_sec < oldestOut.tv_sec || s.st_mtim.tv_sec == oldestOut.tv_sec && s.st_mtim.tv_nsec < oldestOut.tv_nsec) {
+				oldestOut.tv_sec = s.st_mtim.tv_sec;
+				oldestOut.tv_nsec = s.st_mtim.tv_nsec;
+			}
+		}
+		for (string i : t.dep.inputs) {
+			struct stat s;
+			int32_t err = stat(i.c_str(), &s);
+			if (err) { rebuild = true; continue; }
+			if (s.st_mtim.tv_sec > oldestOut.tv_sec || s.st_mtim.tv_sec == oldestOut.tv_sec && s.st_mtim.tv_nsec > oldestOut.tv_nsec) {
+				rebuild = true;
+			}
+		}
+		if (!rebuild) {
+			std::cout << "already built\n";
+			return;
+		}
+	}
 	for (auto exec: t.exec) {
 		const char ** args = (const char**)calloc(exec.size() + 1, sizeof(char*));
 		int i = 0;
@@ -255,7 +308,7 @@ int main(int argc, char** argv) {
 
 	loop["DISTX_SRC"] = vector<string>({ getcwd(0, 4096) });
 	loop["DISTX_DEP"] = vector<string>({ string(getcwd(0, 4096)) + "/_distx" });
-	loop["DISTX_DEST"] = vector<string>({ string(getcwd(0, 4096)) + "/_distx" });
+	loop["DISTX_INSTALL"] = vector<string>({ string(getcwd(0, 4096)) + "/_distx" });
 	loop["DISTX_BUILD"] = vector<string>({ string(getcwd(0, 4096)) + "/build" });
 	loop["DISTX_PREFIX"] = vector<string>({ "distx.org_2024-" });
 	loop["DISTX_ARCH"] = vector<string>({
@@ -288,6 +341,29 @@ int main(int argc, char** argv) {
 					if (entry.JSONType() != json::JSON::Class::String)
 					{ error("targets entry needs to be a string"); }
 					t.targets.push_back(entry.ToString());
+				}
+			}
+			if (entry.first == "make-deps") {
+				if (entry.second.JSONType() != json::JSON::Class::String)
+				{ error("make-deps needs to be a string"); }
+				t.makeDeps = entry.second.ToString();
+			}
+			if (entry.first == "inputs") {
+				if (entry.second.JSONType() != json::JSON::Class::Array)
+				{ error("inputs needs to be an array"); }
+				for (auto entry : entry.second.ArrayRange()) {
+					if (entry.JSONType() != json::JSON::Class::String)
+					{ error("inputs entry needs to be a string"); }
+					t.dep.inputs.push_back(entry.ToString());
+				}
+			}
+			if (entry.first == "outputs") {
+				if (entry.second.JSONType() != json::JSON::Class::Array)
+				{ error("outputs needs to be an array"); }
+				for (auto entry : entry.second.ArrayRange()) {
+					if (entry.JSONType() != json::JSON::Class::String)
+					{ error("outputs entry needs to be a string"); }
+					t.dep.outputs.push_back(entry.ToString());
 				}
 			}
 			if (entry.first == "exec") {

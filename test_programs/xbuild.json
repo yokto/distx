@@ -52,33 +52,52 @@
 			"targets": ["test_{TEST_FILE}"]
 		},
 		"test_{TEST_FILE}": {
-			"exec": [["{DISTX_DEST}/{DISTX_PREFIX}test_programs-{DISTX_ARCH}/bin/{TEST_FILE}"]]
+			"exec": [["{DISTX_INSTALL}/{DISTX_PREFIX}test_programs-{DISTX_ARCH}/bin/{TEST_FILE}"]]
+		},
+		"dirs-{ARCH}": {
+			"exec": [
+				["{DISTX_DEP}/{DISTX_PREFIX}xbuild-{DISTX_ARCH}/bin/xbuild", "--sh", "mkdir", "{DISTX_INSTALL}/{DISTX_PREFIX}test_programs-{ARCH}/bin"]
+			],
+			"inputs": [],
+			"outputs": ["{DISTX_INSTALL}/{DISTX_PREFIX}test_programs-{ARCH}/bin"]
+		},
+		"dirs": {
+			"exec": [
+				["{DISTX_DEP}/{DISTX_PREFIX}xbuild-{DISTX_ARCH}/bin/xbuild", "--sh", "mkdir", "{DISTX_BUILD}"]
+			],
+			"targets": ["dirs-{ARCH}"],
+			"inputs": [],
+			"outputs": ["{DISTX_BUILD}"]
 		},
 		"{C_FILE}_{ARCH}": {
 			"exec": [
-				["{DISTX_DEP}/{DISTX_PREFIX}xbuild-{DISTX_ARCH}/bin/xbuild", "--sh", "mkdir", "{DISTX_DEST}/{DISTX_PREFIX}test_programs-{ARCH}/bin"],
 				[
 					"{DISTX_DEP}/{DISTX_PREFIX}llvm-{DISTX_ARCH}/bin/clang",
 					"-lm",
 					"--target={ARCH}-unknown-linux-zwolf",
 					"-Wl,-soname,/{DISTX_PREFIX}test_programs-{ARCH}/bin/{C_FILE}",
-					"-o", "{DISTX_DEST}/{DISTX_PREFIX}test_programs-{ARCH}/bin/{C_FILE}",
+					"-MF", "{DISTX_BUILD}/{ARCH}-{C_FILE}.d", "-MMD",
+					"-o", "{DISTX_INSTALL}/{DISTX_PREFIX}test_programs-{ARCH}/bin/{C_FILE}",
 					"{C_FILE}.c"
 				]
-			]
+			],
+			"targets": ["dirs"],
+			"make-deps": "{DISTX_BUILD}/{ARCH}-{C_FILE}.d"
 		},
 		"{CPP_FILE}_{ARCH}": {
 			"exec": [
-				["{DISTX_DEP}/{DISTX_PREFIX}xbuild-{DISTX_ARCH}/bin/xbuild", "--sh", "mkdir", "{DISTX_DEST}/{DISTX_PREFIX}test_programs-{ARCH}/bin"],
 				[
 					"{DISTX_DEP}/{DISTX_PREFIX}llvm-{DISTX_ARCH}/bin/clang",
 					"--language=c++",
 					"--target={ARCH}-unknown-linux-zwolf",
 					"-Wl,-soname,/{DISTX_PREFIX}test_programs-{ARCH}/bin/{CPP_FILE}",
-					"-o", "{DISTX_DEST}/{DISTX_PREFIX}test_programs-{ARCH}/bin/{CPP_FILE}",
+					"-MF", "{DISTX_BUILD}/{ARCH}-{CPP_FILE}.d", "-MMD",
+					"-o", "{DISTX_INSTALL}/{DISTX_PREFIX}test_programs-{ARCH}/bin/{CPP_FILE}",
 					"{CPP_FILE}.cpp"
 				]
-			]
+			],
+			"targets": ["dirs"],
+			"make-deps": "{DISTX_BUILD}/{ARCH}-{CPP_FILE}.d"
 		}
         }
 }

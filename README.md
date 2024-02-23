@@ -2,6 +2,8 @@
 
 ## Quickstart
 
+The quickstart should work under Linux (x86_64, aarch64) and Windows (x86_64).
+
 ### Linux
 
     git clone "https://github.com/yokto/elf.git"
@@ -42,13 +44,121 @@ Create the c++ file in elf/test_programs.
 
 Build it. It is important that the final binary is inside _distx and that the path within that directory matches the soname.
 
-    _distx/distx.org_2024-llvm-x86_64/bin/clang++ hello_world.cpp -o _distx/hello_world -Wl,-soname=/hello_world
+    _distx/distx.org_2024-xload-x86_64/bin/xload_linux _distx/distx.org_2024-llvm-x86_64/bin/clang++ hello_world.cpp -o _distx/hello_world -Wl,-soname=/hello_world
 
 Run it.
 
-    _distx/distx.org_2024-xload-x86_64/bin/load_elf_linux _distx/hello_world
+    _distx/distx.org_2024-xload-x86_64/bin/xload_linux _distx/hello_world
 
-## Motivation
+### Register executable on linux
+
+On linux you can register the loader. Just put it in a place that makes sense. E.g. /_distx/xload_linux and register it with the kernel. Afterwards you can call distx programs without calling the loader explicitly.
+
+    mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+    echo ":zwolf:M:0:\\x7FELF\\x02\\x01\\x01\\x13::/_distx/xload_linux:" > /proc/sys/fs/binfmt_misc/register
+
+# What is Distx
+
+Distx can run the same binary code on different operating systems.
+You still need to compile your code for different architectures.
+It consists of the following components.
+
+## The loader
+
+The loader is quite simple. It just takes the binary, loads it into ram. Links it with it's dependencies and executes it.
+
+    _distx/distx.org_2024-xload-x86_64/bin/xload_linux path-to-exec arg1 arg2
+
+Dependencies can only be other Distx libraries.
+The program itself can dynamically load system libraries and symbols however.
+
+## Distx (distribution mechanism)
+
+Distx is the name of the distribution as well as the name of the overall project.
+
+At the moment this is a simple python script that downloads build dependencies.
+It can some predefined commands this helps with not always having to specify paths when building a project.
+
+    distx.py install # installs dependencies specified in distx-build.json
+    distx.py run build # runs the command "build" which is specified in distx-build.json
+
+distx-build.json is the config file used.
+
+    {
+        "// comment1": "it will loop through those variables when it encounters a {VAR}",
+        "loop": {
+            "ARCH": ["x86_64", "aarch64"],
+            "BUILD_DEP": ["llvm", "xload", "xbuild"],
+            "RUN_DEP": ["xlibc", "llvm-libcxx", "llvm-rt"]
+        },
+        "// comment2": "just a plain list of build time dependencies",
+        "// comment3": "we can also make use of the default variables DISTX_PREFIX, DISTX_SRC, DISTX_INSTALL, DISTX_BUILD, DISTX_ARCH, DISTX_DEP",
+        "dep": [
+            "{DISTX_PREFIX}llvm-common",
+            "{DISTX_PREFIX}{BUILD_DEP}-{DISTX_ARCH}",
+            "{DISTX_PREFIX}{RUN_DEP}-{ARCH}",
+            "{DISTX_PREFIX}{RUN_DEP}-common"
+        ],
+        "// comment4": "list of commands that can be run with distx.py run <...>",
+        "run": {
+            "build": {
+                "cmd": ["{DISTX_DEP}/{DISTX_PREFIX}xbuild-{DISTX_ARCH}/bin/xbuild", "build"]
+            },
+            "test": {
+                "cmd": ["{DISTX_DEP}/{DISTX_PREFIX}xbuild-{DISTX_ARCH}/bin/xbuild", "test"]
+            }
+        }
+    }
+
+Default variables
+
+* DISTX_PREFIX: prefix of the repository where all the packages are
+* DISTX_SRC: path to sources (usually current working directory)
+* DISTX_INSTALL: path to install directory
+* DISTX_BUILD: path to build directory
+* DISTX_ARCH: host architecture
+* DISTX_DEP: path to dependencies
+
+
+## The toolchain
+
+This part is relatively straight forward. We just use clang. The main problem here is that clang is somewhat intertwined with the libc++/libunwind which we use as runtime libraries. There are some default compiler options we added. One important part is that we always need an soname that tells us where the library file is. I.e.
+
+    $ find /some/path
+    ./somelib/lib/x64/lib.so
+    ./someexe/bin/x64/exe
+    $ readelf -a somelib/lib/x64/lib.so  | grep SONAME
+    (SONAME) Library soname: [somelib/lib/x64/lib.so]
+    $ readelf -a someexe/bin/x64/exe | grep SONAME
+    (SONAME) Library soname: [someexe/bin/x64/exe]
+
+So you need to build it with
+
+    clang -Wl,-soname,someexe/bin/x64/exe -o someexe/bin/x64/exe exe.c
+
+## Libraries
+
+This is a complicated part of the project.
+We would like to get the smalles possible interface that will make it easy to port to many operating systems.
+The initial idea was to simply write a libc (xlibc) that just calls the underlying operatingsystems libc functions.
+This works mostly.
+However of course this is a monumental task.
+There are also many libc functions that have nothing to do with the operating system.
+Such as all the string, wchar and locale functions.
+Even printf, and scanf are mostly about formating and contain very little actual os specific code.
+On the other hand there is a lot missing from libc such as networking.
+
+### libc++
+
+We use clangs libc++ as c++ standard library.
+
+### Gui library
+
+... difficult :(
+might try qt
+
+
+# Motivation
 
 At the moment the web is the only framework that allows app developers to deploy their apps to most platforms with relative ease.
 Native App Developers have it hard to deploy to all platforms.
@@ -68,7 +178,7 @@ However there are several problems with it in the long run.
 - Lack of access to very basic native APIs. I.e. File System, TCP ..
 - If the process of standardizing ever goes in the wrong direction, the rest of the world will still be stuck with it.
 
-### Reducing build complexity
+## Reducing build complexity
 
 There are several options for reducing build complexity.
 
@@ -99,91 +209,16 @@ There are several options for reducing build complexity.
 So in summary we will try to make a system where you need to build for each architecture (point 1) but not for each operating system (point 3). We will also try to make files available in the same place on all operating systems (point 2).
 
 
-## What is Zwolf
-
-There are four components needed to build this system.
-
-### The loader
-
-The loader is quite simple. It just takes a binary, loads it into ram. Links it with it's dependencies and executes it.
-
-   ./elf/x64/linux_loaders program/bin/x64/program
-
-or
-
-   .\elf\x64\windows_loader.exe program\bin\x64\program
-
-It links only dependencies on other non-OS libraries that were built for Zwolf.
-The program itself can dynamically load system libraries and symbols however.
-
-### The toolchain
-
-This part is relatively straight forward. We just use clang. The main problem here is that clang is somewhat intertwined with the libc++/libunwind which we use as runtime libraries. There are some default compiler options we added. One important part is that we always need an soname that tells us where the library file is. I.e.
-
-    $ find /some/path
-    ./somelib/lib/x64/lib.so
-    ./someexe/bin/x64/exe
-    $ readelf -a somelib/lib/x64/lib.so  | grep SONAME
-    (SONAME) Library soname: [somelib/lib/x64/lib.so]
-    $ readelf -a someexe/bin/x64/exe | grep SONAME
-    (SONAME) Library soname: [someexe/bin/x64/exe]
-
-So you need to build it with
-
-    clang -Wl,-soname,someexe/bin/x64/exe -o someexe/bin/x64/exe exe.c
-
-### Libraries
-
-This is a complicated part of the project.
-We would like to get the smalles possible interface that will make it easy to port to many operating systems.
-The initial idea was to simply write a libc (xlibc) that just calls the underlying operatingsystems libc functions.
-This works mostly.
-However of course this is a monumental task.
-There are also many libc functions that have nothing to do with the operating system.
-Such as all the string, wchar and locale functions.
-Even printf, and scanf are mostly about formating and contain very little actual os specific code.
-On the other hand there is a lot missing from libc such as networking.
-
-#### libc++
-
-We use clangs libc++ as c++ standard library.
-
-#### Gui library
-
-... difficult :(
-might try qt
-
-### Distribution mechanism
-
-Building for all operating systems is all good and right but how does it get to the users.
-We would need some kind of store or probably initially more something like npm.
-
-Nothing has been done on this.
-
-TODO
-
-## Quickstart?
-
-The loader will be given the executable.
-The executable is in the format of a shared library with a main function.
-The loader loads the relevant parts of the executable into memory.
-Since the loader is already running with a setup stack/... and is in fact running the loaders main function it is in the right state to also run the executables main function.
-So there is very little systemspecific setup needed.
-
-
-In the current setup you can compile on linux with the following flag.
-    -shared -nostdlib -fvisibility=hidden -fPIC
-
-## Design considerations
+# Design Choices
     
 To understand this section it is good if you have a good understanding of how programs are loaded. There is a short overview in the "Loading on Linux" section
 
-### Where do we make the cut
+## Where do we make the cut
 
 A program will always need some functionality from the operating system.
 The question is where we want to set this interface.
 
-#### systemcall interface
+### systemcall interface
 We could set it at the systemcall interface.
 This is what docker/WSL (windows subsystem linux) does.
 
@@ -210,7 +245,7 @@ The system probably needs to provide linux userspace drivers that talk to virtua
 I assume this is how WSL manages to support OpenGL, but I'm not sure???.
 WSL seems to run it's own version of an XServer. Ideally this overhead could also be removed.
 
-#### Fix unchanged binary in userspace
+### Fix unchanged binary in userspace
 
 This is what wine does. The userspace will load the code of the windows binary.
 For all windows system functions wine will link in implementions that use linux systemcalls.
@@ -223,7 +258,7 @@ Disadvantages:
 There is a part of code between the libc api and the api that wine virtualizes.
 This part probably consists of proprietary code linked into the executable itself and proprietary code in dlls provided by wine.
 
-#### Create Binary in minimal form
+### Create Binary in minimal form
 
 What should the loader do and what should the executable do?
 
@@ -237,14 +272,14 @@ We want to decide for the following things.
   - We can not put this into a dynamically linked library because it needs to run before dynamic linking
   - We don't want to put it in all executables because it would make executables much to big and be very unmodular
 
-### Other solutions
+## Other solutions
     
 
 How does this compare to wine?
 
-## Loading on Linux
+# Loading on Linux
 
-### Overview
+## Overview
 
 Here we describe the different components involved in starting a new program.
 
@@ -258,13 +293,13 @@ We are mostly interested in dynamically linked programs. So this is always assum
 6. main (executable)
 
 
-### Exit from old program
+## Exit from old program
 
 The old program calles the execve systemcall.
 This call does not return.
 Instead the specified program is executed in this process (programs usually call clone before execve).
 
-### Kernel
+## Kernel
 
 The program specified in the execve systemcall can be either a script with she-bang or an elf executable.
 We will always assume it's an elf executable.
@@ -287,7 +322,7 @@ Simplified `load_elf_binary` function:
 				&arch_state);
 	}
 
-## CSU (C Start Up)
+# CSU (C Start Up)
 
 Defined in glibc/csu.
 This contains some important files.
@@ -295,7 +330,7 @@ This contains some important files.
 	crti.o
 	crtn.o
 
-### crt1.o (c run time)
+## crt1.o (c run time)
 
 This gets added to to every executable at the beginning.
 It contains the `_start` symbol.
@@ -305,14 +340,14 @@ This in turn fiddles some more, calls the initializers of all the shared librari
 
 In our loader these tasks are done by the loader so we (hopefully) don't need this.
 
-### crti.o and crtn.o
+## crti.o and crtn.o
 
 They seem to do some magic with the .init .fini section.
 They are only a couple of lines of assembly.
 E.g in `sysdeps/x86_64/crti.S`
 I think `crti` can setup `__gmon_start__` which is some kind of monitoring/progiling tool if it's present.
 
-## ELF strucutre
+# ELF strucutre
 
 https://stevens.netmeister.org/631/elf.html
 
@@ -352,11 +387,11 @@ Other sections:
 - .gnu.version (VERSYM in dynamic) 
 - .gnu.version_d (VERDEF in dynamic)
 
-## Stack Layout
+# Stack Layout
 
 http://articles.manugarg.com/aboutelfauxiliaryvectors.html
 
-## PLT/GOT (Procedure Linkage Table)
+# PLT/GOT (Procedure Linkage Table)
 
 Assuming your code looks like this. `foo` and `bar` are external functions
 
@@ -387,7 +422,7 @@ The got will look like
     0x22220    0x11136 # this is foo@got.plt (this will be replaced to point to the actual foo)
     0x22228    0x11146 # this is bar@got.plt
 
-## Windows
+# Windows
 
 Trying to run ELF executables on Windows we run into the following problem.
 Our executables want most of their segments to be loaded contiguously.
@@ -399,15 +434,15 @@ This has two backdraws.
 1. Multiple copies of the same library in memory.
 2. The whole memory segment has to be rwx. This could be a security problem.
 
-## Libc
+# Libc
 
 After fighting with c++ on gcc a bit, it seems like it might easier to port glibc to windows and just emulate the systemcalls than to port stdlibc++ to a libc that just uses the corresponding libc calls of the os. This is because glibc has many calls that are not really standard.
 
-## GDB
+# GDB
 
 It seems gdb gets info about newly loaded librarys when the loader calls `_dl_debug_state`
 
-### breakpoints
+## breakpoints
 
 In gdb `target_insert_breakpoint`.
 There are different breakpoints.
@@ -434,75 +469,19 @@ separate debug from exec data as follows
 
 # MISC
 
-### Program Header
+## Program Header
 
 FileSiz can be shorter than MemSiz. This happens for instance for the .bss section of uninitialized variables. The loader needs to set them to 0.
 
-### Register executable on linux
+## Bootstrap llvm from linux
 
-    mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
-    echo ":zwolf:M:0:\\x7FELF\\x02\\x01\\x01\\x13::/home/silvio/stuff/sources/elf_src/zwolf/zwolf/_zwolf/zwolf/x86_64/bin/load_elf_linux:" > /proc/sys/fs/binfmt_misc/register
-
-### Bootstrap llvm from linux
-
-We assume ZWOLF_SRC points to your zwolf repository "https://github.com/yokto/elf".
-We assume LLVM_SRC points to your llvm src reporitory "https://github.com/yokto/llvm-project".
-We assume OPENLIBM_SRC points to your openlibm src reporitory "https://github.com/yokto/openlibm".
-We assume STAGE1 to point to an empty dir for stage1.
-We assume STAGE2 to point to an empty dir for stage2.
-
-Build the stage1 cross compiler - without runtime.
-
-    cd "$LLVM_SRC"
-    STAGE1="$STAGE1" ${ZWOLF_SRC}/llvm/build-linux.sh
-
-Copy headers:
-
-    mkdir -p "${STAGE1}/xlibc/common/"
-    cp -r ${ZWOLF_SRC}/xlibc/include "${STAGE1}/xlibc/common"
-
-Build compiler-rt (in llvm src)
-
-    cd "$LLVM_SRC"
-    ln -s "$STAGE1" _zwolf 
-    mkdir _zwolf_install
-    ln -s "$STAGE1" _zwolf_install/_zwolf
-    ${ZWOLF_SRC}/llvm/build-compiler-rt.sh
-    
-Build xlibc
-
-    cd "${ZWOLF_SRC}/xlibc"
-    ln -s "$STAGE1" _zwolf 
-    ln -s "$STAGE1" _zwolf_install
-    make
-
-Build openlibm
-
-    cd "${OPENLIBM_SRC}"
-    ln -s "$STAGE1" _zwolf 
-    ln -s "$STAGE1" _zwolf_install
-    ${ZWOLF_SRC}/openlibm/build.sh
-
-Build c++ runtime
-
-    cd "$LLVM_SRC"
-    ${ZWOLF_SRC}/llvm/build-runtime.sh
-
-Build stage2
-
-    rm _zwolf_install/_zwolf
-    ln -s "$STAGE2" _zwolf_install/_zwolf
-    ${ZWOLF_SRC}/llvm/build-zwolf.sh
-
-Copy all the libraries from stage1 or build them again.
-When developing normal programs you don't need _zwolf_install.
-This is just so we can build things in our toolchain without immediately overwriting the toolchain.
+There is a script for that in ./bootstrap.sh
 
 # FAQ
 
 *Q: Why does ninja on linux always rebuild everything.
 
-A: because clangs writes the dependency files to /_zwolf which exists for a clang running on zwolf but not for ninja running on linux. You can link /_zwolf to your zwolf root dir.
+A: because clangs writes the dependency files to /_zwolf which exists for a clang running on distx but not for ninja running on linux. You can link /_zwolf to your zwolf root dir.
 
 # REFERENCES
 

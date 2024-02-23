@@ -17,10 +17,13 @@
 				"-target",
 				"{ARCH}-unknown-linux-zwolf",
 				"{DISTX_BUILD}/{ARCH}-{FILE}.o",
+				"-Wl,-soname={DISTX_PREFIX}xbuild-{ARCH}/bin/xbuild",
 				"-o",
-				"{DISTX_BUILD}/{ARCH}-xbuild"
+				"{DISTX_INSTALL}/{DISTX_PREFIX}xbuild-{ARCH}/bin/xbuild"
 			]],
-			"targets": ["{ARCH}-{FILE}.o"]
+			"targets": ["{ARCH}-{FILE}.o"],
+			"inputs": ["{DISTX_BUILD}/{ARCH}-{FILE}.o"],
+			"outputs": ["{DISTX_INSTALL}/{DISTX_PREFIX}xbuild-{ARCH}/bin/xbuild"]
 		},
 		"{ARCH}-{FILE}.o": {
 			"exec": [[
@@ -29,9 +32,11 @@
 				"{ARCH}-unknown-linux-zwolf",
 				"{FILE}.cpp",
 				"-c",
+				"-MF", "{DISTX_BUILD}/{ARCH}-{FILE}.d", "-MMD",
 				"-o",
 				"{DISTX_BUILD}/{ARCH}-{FILE}.o"
-			]]
+			]],
+			"make-deps": "{DISTX_BUILD}/{ARCH}-{FILE}.d"
 		}
         }
 }

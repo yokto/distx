@@ -93,7 +93,7 @@ def run_cmd(cmd, loops):
     system = "windows.exe"
     if platform.system() == "Linux":
         system = "linux"
-    loader = loops["DISTX_DEP"][0] + "/" + loops["DISTX_PREFIX"][0] + "xload-" + loops["DISTX_ARCH"][0] + "/bin/load_elf_" + system
+    loader = loops["DISTX_DEP"][0] + "/" + loops["DISTX_PREFIX"][0] + "xload-" + loops["DISTX_ARCH"][0] + "/bin/xload_" + system
     print("loader", loader)
     subprocess.run([ loader ] + cmd["cmd"])
 
@@ -109,7 +109,7 @@ def main():
     json_config = parse_json_file("distx-build.json")
     loop = json_config.get('loop', {})
     loop["DISTX_DEP"] = [os.getcwd() + "/_distx"]
-    loop["DISTX_DEST"] = [os.getcwd() + "/_distx"]
+    loop["DISTX_INSTALL"] = [os.getcwd() + "/_distx"]
     loop["DISTX_SRC"] = [os.getcwd()]
     loop["DISTX_BUILD"] = [os.getcwd() + "/build"]
     loop["DISTX_PREFIX"] = ["distx.org_2024-"]
