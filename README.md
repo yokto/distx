@@ -1,12 +1,20 @@
 # DistX
 
+## What is Distx
+
+The purpose of distx is to make it easy to create *binary* programs and distribute them.
+Distx can run the same binary code on different operating systems.
+You still need to compile your code for different architectures.
+Distx works on the same concept as wine.
+However instead of being based on the windows API, it tires to create a minimal API that can be supported by as many operating systems as possible.
+
 ## Quickstart
 
 The quickstart should work under Linux (x86_64, aarch64) and Windows (x86_64).
 
 ### Linux
 
-    git clone "https://github.com/yokto/elf.git"
+    git clone "https://github.com/yokto/distx.git"
     cd elf/test_programs
     ../distx.py install
     ../distx.py run build
