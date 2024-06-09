@@ -15,7 +15,7 @@ The quickstart should work under Linux (x86_64, aarch64) and Windows (x86_64).
 ### Linux
 
     git clone "https://github.com/yokto/distx.git"
-    cd elf/test_programs
+    cd distx/test_programs
     ../distx.py install
     ../distx.py run build
     ../distx.py run test
@@ -33,17 +33,17 @@ You should be able to fix it by opening the following urls in your browser
 
 Now get started
 
-    git clone "https://github.com/yokto/elf.git"
-    dir elf\test_programs
+    git clone "https://github.com/yokto/distx.git"
+    dir distx\test_programs
     python ..\distx.py install
     python ..\distx.py run build
     python ..\distx.py run test
 
 ### Manually compile program
 
-Create the c++ file in elf/test_programs.
+Create the c++ file in distx/test_programs.
 
-    [...elf/test_programs]$ cat hello_world.cpp
+    [...distx/test_programs]$ cat hello_world.cpp
     #include <iostream>
     
     int main() {
